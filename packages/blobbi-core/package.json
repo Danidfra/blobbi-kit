@@ -2,7 +2,6 @@
   "name": "@blobbi/core",
   "version": "0.1.0",
   "description": "Portable, framework-agnostic core domain logic for Blobbi.",
-  "private": true,
   "type": "module",
   "license": "MIT",
   "keywords": [

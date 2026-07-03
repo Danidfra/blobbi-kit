@@ -2,7 +2,6 @@
   "name": "@blobbi/react",
   "version": "0.1.0",
   "description": "Portable, app-agnostic React hooks for Blobbi, built on @blobbi/core.",
-  "private": true,
   "type": "module",
   "license": "MIT",
   "keywords": [
