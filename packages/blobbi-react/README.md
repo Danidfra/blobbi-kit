@@ -7,7 +7,7 @@ on top of [`@blobbi-kit/core`](../blobbi-core).
 `window`-based `daily-missions-updated` event bus, `localStorage`, and
 `document.visibilityState`. They run in DOM hosts only — not in SSR or Node.
 
-> Status: currently private / not published. Target registry is npm public.
+> Status: prepared for public npm publication as `@blobbi-kit/react`. npm is the intended public distribution channel; local `file:` consumption is useful for development.
 
 ## What's inside
 

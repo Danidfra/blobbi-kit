@@ -5,7 +5,7 @@ Portable, framework-agnostic core domain logic for [Blobbi](https://github.com/b
 **DOM-free.** This package makes no browser assumptions and runs in Node, React
 Native, or tests without a DOM.
 
-> Status: currently private / not published. Target registry is npm public.
+> Status: prepared for public npm publication as `@blobbi-kit/core`. npm is the intended public distribution channel; local `file:` consumption is useful for development.
 
 ## What's inside
 

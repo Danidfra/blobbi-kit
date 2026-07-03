@@ -13,10 +13,10 @@ Island, and future clients).
 
 ## Status
 
-These packages are currently **private and not published**. The first validation
-target is local `file:` consumption from the host apps (Ditto and Blobbi Island).
-The long-term target registry is **npm public** (`@blobbi-kit/core`, `@blobbi-kit/react`),
-but publishing has not happened yet.
+These packages are prepared for **public npm publication** as
+`@blobbi-kit/core` and `@blobbi-kit/react`. npm is the intended public
+distribution channel. Local `file:` consumption from the host apps (Ditto and
+Blobbi Island) remains useful for development and validation.
 
 ## Layout
 
