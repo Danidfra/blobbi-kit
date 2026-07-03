@@ -12,12 +12,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/blobbi/blobbi-kit.git",
+    "url": "git+https://github.com/Danidfra/blobbi-kit.git",
     "directory": "packages/blobbi-core"
   },
-  "homepage": "https://github.com/blobbi/blobbi-kit/tree/main/packages/blobbi-core#readme",
+  "homepage": "https://github.com/Danidfra/blobbi-kit/tree/main/packages/blobbi-core#readme",
   "bugs": {
-    "url": "https://github.com/blobbi/blobbi-kit/issues"
+    "url": "https://github.com/Danidfra/blobbi-kit/issues"
   },
   "publishConfig": {
     "access": "public"
