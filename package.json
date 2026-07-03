@@ -1,0 +1,32 @@
+{
+  "name": "blobbi-kit",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @blobbi/core && npm run build --workspace @blobbi/react",
+    "typecheck": "npm run typecheck --workspace @blobbi/core && npm run typecheck --workspace @blobbi/react",
+    "test": "vitest run --reporter=dot",
+    "clean": "rimraf packages/*/dist packages/*/*.tsbuildinfo",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "@nostrify/nostrify": "^0.53.0",
+    "@nostrify/react": "^0.6.3",
+    "@tanstack/react-query": "^5.56.2",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "jsdom": "^26.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.5.3",
+    "vitest": "^4.1.8"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "files": [],
+  "include": [
+    "packages/blobbi-core/src",
+    "packages/blobbi-react/src"
+  ]
+}

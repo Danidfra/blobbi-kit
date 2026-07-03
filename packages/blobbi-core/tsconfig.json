@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@blobbi/core": ["./src/index.ts"],
+      "@blobbi/core/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}
