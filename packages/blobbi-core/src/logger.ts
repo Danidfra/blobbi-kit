@@ -1,5 +1,5 @@
 /**
- * Package-safe logger for @blobbi/core.
+ * Package-safe logger for @blobbi-kit/core.
  *
  * Constraints (Phase 1):
  * - No React.
@@ -7,7 +7,7 @@
  * - Defaults to a no-op so importing the package never produces console noise.
  *
  * A host application (e.g. Ditto) can inject its own logger via
- * `setBlobbiLogger` to route @blobbi/core diagnostics wherever it wants.
+ * `setBlobbiLogger` to route @blobbi-kit/core diagnostics wherever it wants.
  */
 
 export interface BlobbiLogger {
@@ -28,7 +28,7 @@ const noopLogger: BlobbiLogger = {
 let currentLogger: BlobbiLogger = noopLogger;
 
 /**
- * Install a custom logger implementation for @blobbi/core.
+ * Install a custom logger implementation for @blobbi-kit/core.
  * Pass `null` to reset back to the default no-op logger.
  */
 export function setBlobbiLogger(logger: BlobbiLogger | null): void {
@@ -36,7 +36,7 @@ export function setBlobbiLogger(logger: BlobbiLogger | null): void {
 }
 
 /**
- * The active @blobbi/core logger. Always safe to call; defaults to a no-op.
+ * The active @blobbi-kit/core logger. Always safe to call; defaults to a no-op.
  */
 export const blobbiLogger: BlobbiLogger = {
   debug: (...args) => currentLogger.debug(...args),

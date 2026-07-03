@@ -8,7 +8,7 @@
  * @module blobbi-tag-schema
  */
 
-import { blobbiLogger } from '@blobbi/core/logger';
+import { blobbiLogger } from '@blobbi-kit/core/logger';
 
 import type { BlobbiStage } from './blobbi';
 

@@ -21,9 +21,9 @@ import { useEffect, useRef } from 'react';
 import { useNostr } from '@nostrify/react';
 import type { NostrEvent } from '@nostrify/nostrify';
 
-import { KIND_BLOBBONAUT_PROFILE } from '@blobbi/core/blobbi';
-import { serializeProfileContent } from '@blobbi/core/missions';
-import { fetchFreshEvent } from '@blobbi/core/fetchFreshEvent';
+import { KIND_BLOBBONAUT_PROFILE } from '@blobbi-kit/core/blobbi';
+import { serializeProfileContent } from '@blobbi-kit/core/missions';
+import { fetchFreshEvent } from '@blobbi-kit/core/fetchFreshEvent';
 
 import { readDailyFromStorage } from '../lib/daily-mission-tracker';
 import { areAllDailyComplete } from '../lib/daily-missions';

@@ -15,13 +15,13 @@ import { useMemo } from 'react';
 import { useNostr } from '@nostrify/react';
 import { useQuery } from '@tanstack/react-query';
 
-import type { BlobbiCompanion } from '@blobbi/core/blobbi';
-import { buildBlobbiAddress } from '@blobbi/core/blobbi';
+import type { BlobbiCompanion } from '@blobbi-kit/core/blobbi';
+import { buildBlobbiAddress } from '@blobbi-kit/core/blobbi';
 import {
   KIND_BLOBBI_INTERACTION,
   parseInteractionEvent,
   type BlobbiInteraction,
-} from '@blobbi/core/blobbi-interaction';
+} from '@blobbi-kit/core/blobbi-interaction';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

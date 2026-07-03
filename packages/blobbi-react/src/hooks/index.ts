@@ -1,7 +1,7 @@
 /**
- * @blobbi/react public hooks.
+ * @blobbi-kit/react public hooks.
  *
- * App-agnostic React hooks built on @blobbi/core, React, TanStack Query, and
+ * App-agnostic React hooks built on @blobbi-kit/core, React, TanStack Query, and
  * Nostrify. Many rely on a `window`-based `daily-missions-updated` event bus and
  * `document.visibilityState`; they are DOM-only and run in browser hosts.
  *
@@ -11,7 +11,7 @@
  * `filterPersistentTasks` under the alias `filterPersistentTasksFromProcess`
  * (matching Ditto's existing convention); `useEvolveTasks` re-exports only its
  * unique members (the mission constants and `EvolveTask` alias live on their
- * canonical source, `@blobbi/react/lib`).
+ * canonical source, `@blobbi-kit/react/lib`).
  */
 
 export * from './useAwardDailyXp';
@@ -32,7 +32,7 @@ export * from './useRerollMission';
 
 // Canonical source of `TaskType`, `HatchTask`, `filterPersistentTasks`, and the
 // hatch KIND_* constants. `HATCH_REQUIRED_INTERACTIONS` is intentionally NOT
-// re-exported here — its canonical home is `@blobbi/react/lib` (via
+// re-exported here — its canonical home is `@blobbi-kit/react/lib` (via
 // `evolution-missions`), and re-exporting it from two `export *` barrels would
 // make TypeScript silently drop the name from the merged root barrel.
 export {

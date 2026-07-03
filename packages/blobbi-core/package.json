@@ -1,5 +1,5 @@
 {
-  "name": "@blobbi/core",
+  "name": "@blobbi-kit/core",
   "version": "0.1.0",
   "description": "Portable, framework-agnostic core domain logic for Blobbi.",
   "type": "module",

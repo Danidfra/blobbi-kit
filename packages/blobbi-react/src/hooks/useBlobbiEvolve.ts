@@ -19,14 +19,14 @@
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import type { NostrEvent } from '@nostrify/nostrify';
 
-import type { BlobbiCompanion, BlobbonautProfile, BlobbiStage, StorageItem } from '@blobbi/core/blobbi';
+import type { BlobbiCompanion, BlobbonautProfile, BlobbiStage, StorageItem } from '@blobbi-kit/core/blobbi';
 import {
   KIND_BLOBBI_STATE,
   updateBlobbiTags,
-} from '@blobbi/core/blobbi';
-import { applyBlobbiDecay } from '@blobbi/core/blobbi-decay';
-import { validateAndRepairBlobbiTags } from '@blobbi/core/blobbi-tag-schema';
-import { serializeEvolutionContent } from '@blobbi/core/missions';
+} from '@blobbi-kit/core/blobbi';
+import { applyBlobbiDecay } from '@blobbi-kit/core/blobbi-decay';
+import { validateAndRepairBlobbiTags } from '@blobbi-kit/core/blobbi-tag-schema';
+import { serializeEvolutionContent } from '@blobbi-kit/core/missions';
 
 import { clearEvolutionFromStorage } from '../lib/daily-mission-tracker';
 import { getStreakTagUpdates } from '../lib/blobbi-streak';

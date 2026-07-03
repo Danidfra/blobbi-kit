@@ -23,7 +23,7 @@
  * Item-specific care effects are resolved through an injected, catalog-agnostic
  * `resolveCareItemEffect` resolver so this hook stays free of any host-app shop
  * catalog. When no resolver is provided, only the generic fallback effects in
- * @blobbi/core's social projection are applied.
+ * @blobbi-kit/core's social projection are applied.
  *
  * @module useCanonicalSync
  */
@@ -32,23 +32,23 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import type { NostrEvent } from '@nostrify/nostrify';
-import type { BlobbiCompanion } from '@blobbi/core/blobbi';
-import { KIND_BLOBBI_STATE, updateBlobbiTags, statsToTagUpdates, buildBlobbiAddress } from '@blobbi/core/blobbi';
-import { applyBlobbiDecay } from '@blobbi/core/blobbi-decay';
-import { consolidateSocialInteractions, type CareItemEffectResolver } from '@blobbi/core/blobbi-social-projection';
+import type { BlobbiCompanion } from '@blobbi-kit/core/blobbi';
+import { KIND_BLOBBI_STATE, updateBlobbiTags, statsToTagUpdates, buildBlobbiAddress } from '@blobbi-kit/core/blobbi';
+import { applyBlobbiDecay } from '@blobbi-kit/core/blobbi-decay';
+import { consolidateSocialInteractions, type CareItemEffectResolver } from '@blobbi-kit/core/blobbi-social-projection';
 import {
   resolveSocialCheckpoint,
   serializeSocialCheckpoint,
   type BlobbiInteraction,
   type SocialCheckpoint,
-} from '@blobbi/core/blobbi-interaction';
+} from '@blobbi-kit/core/blobbi-interaction';
 
 import type { PublishAdapter } from '../adapters/types';
 
 /**
  * Default no-op care-item effect resolver.
  *
- * Returns `undefined` for every item, so @blobbi/core falls back to its generic
+ * Returns `undefined` for every item, so @blobbi-kit/core falls back to its generic
  * per-action effects. Hosts with a real item catalog inject their own resolver
  * (e.g. `(itemId) => getShopItemById(itemId)?.effect`).
  */

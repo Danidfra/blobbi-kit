@@ -8,14 +8,14 @@ Island, and future clients).
 
 | Package | Description | Environment |
 | --- | --- | --- |
-| [`@blobbi/core`](./packages/blobbi-core) | Framework-agnostic core domain logic (kinds, addressing, seed/identity, decay, missions, progression). | **DOM-free.** Runs in Node, React Native, or tests without a DOM. |
-| [`@blobbi/react`](./packages/blobbi-react) | App-agnostic React hooks built on `@blobbi/core`. | **Browser-only.** Many hooks rely on `window`, `localStorage`, and `document.visibilityState`. |
+| [`@blobbi-kit/core`](./packages/blobbi-core) | Framework-agnostic core domain logic (kinds, addressing, seed/identity, decay, missions, progression). | **DOM-free.** Runs in Node, React Native, or tests without a DOM. |
+| [`@blobbi-kit/react`](./packages/blobbi-react) | App-agnostic React hooks built on `@blobbi-kit/core`. | **Browser-only.** Many hooks rely on `window`, `localStorage`, and `document.visibilityState`. |
 
 ## Status
 
 These packages are currently **private and not published**. The first validation
 target is local `file:` consumption from the host apps (Ditto and Blobbi Island).
-The long-term target registry is **npm public** (`@blobbi/core`, `@blobbi/react`),
+The long-term target registry is **npm public** (`@blobbi-kit/core`, `@blobbi-kit/react`),
 but publishing has not happened yet.
 
 ## Layout
@@ -36,7 +36,7 @@ blobbi-kit/
 Requires Node `>=22`.
 
 ```sh
-npm install        # links @blobbi/core into @blobbi/react via workspaces
+npm install        # links @blobbi-kit/core into @blobbi-kit/react via workspaces
 npm run build      # builds core first, then react (tsup, ESM + .d.ts)
 npm run typecheck  # tsc --noEmit for both packages
 npm run test       # vitest (package unit tests)
@@ -51,7 +51,7 @@ Both packages are built with [tsup](https://tsup.egoist.dev/):
 - **ESM only** (no CJS yet).
 - Emits `.d.ts` type declarations and source maps.
 - Each source module is emitted 1:1, so deep imports
-  (`@blobbi/core/blobbi`, `@blobbi/react/hooks/index`, …) keep working.
+  (`@blobbi-kit/core/blobbi`, `@blobbi-kit/react/hooks/index`, …) keep working.
 - Relative and self-referential imports are rewritten to explicit `.js`
   specifiers so the output is importable under **raw Node ESM** with no
   extensionless-import failures.
@@ -64,8 +64,8 @@ Host apps can depend on the built packages via `file:` while validating:
 // host app package.json
 {
   "dependencies": {
-    "@blobbi/core": "file:../blobbi-kit/packages/blobbi-core",
-    "@blobbi/react": "file:../blobbi-kit/packages/blobbi-react"
+    "@blobbi-kit/core": "file:../blobbi-kit/packages/blobbi-core",
+    "@blobbi-kit/react": "file:../blobbi-kit/packages/blobbi-react"
   }
 }
 ```

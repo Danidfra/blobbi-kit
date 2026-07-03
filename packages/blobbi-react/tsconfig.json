@@ -5,10 +5,10 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@blobbi/core": ["../blobbi-core/src/index.ts"],
-      "@blobbi/core/*": ["../blobbi-core/src/*"],
-      "@blobbi/react": ["./src/index.ts"],
-      "@blobbi/react/*": ["./src/*"]
+      "@blobbi-kit/core": ["../blobbi-core/src/index.ts"],
+      "@blobbi-kit/core/*": ["../blobbi-core/src/*"],
+      "@blobbi-kit/react": ["./src/index.ts"],
+      "@blobbi-kit/react/*": ["./src/*"]
     }
   },
   "include": ["src"]

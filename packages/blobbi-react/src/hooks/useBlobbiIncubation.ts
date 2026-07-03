@@ -21,13 +21,13 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { useNostr } from '@nostrify/react';
 import type { NostrEvent } from '@nostrify/nostrify';
 
-import type { BlobbiCompanion, BlobbonautProfile, StorageItem } from '@blobbi/core/blobbi';
+import type { BlobbiCompanion, BlobbonautProfile, StorageItem } from '@blobbi-kit/core/blobbi';
 import {
   KIND_BLOBBI_STATE,
   updateBlobbiTags,
-} from '@blobbi/core/blobbi';
-import { applyBlobbiDecay } from '@blobbi/core/blobbi-decay';
-import { serializeEvolutionContent } from '@blobbi/core/missions';
+} from '@blobbi-kit/core/blobbi';
+import { applyBlobbiDecay } from '@blobbi-kit/core/blobbi-decay';
+import { serializeEvolutionContent } from '@blobbi-kit/core/missions';
 
 import { createHatchMissions, createEvolveMissions } from '../lib/evolution-missions';
 import {

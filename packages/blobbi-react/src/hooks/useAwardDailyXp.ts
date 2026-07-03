@@ -22,11 +22,11 @@ import {
   KIND_BLOBBONAUT_PROFILE,
   updateBlobbonautTags,
   parseBlobbonautEvent,
-} from '@blobbi/core/blobbi';
-import { buildXpTagUpdates } from '@blobbi/core/progression';
-import { serializeProfileContent } from '@blobbi/core/missions';
-import type { MissionsContent } from '@blobbi/core/missions';
-import { fetchFreshEvent } from '@blobbi/core/fetchFreshEvent';
+} from '@blobbi-kit/core/blobbi';
+import { buildXpTagUpdates } from '@blobbi-kit/core/progression';
+import { serializeProfileContent } from '@blobbi-kit/core/missions';
+import type { MissionsContent } from '@blobbi-kit/core/missions';
+import { fetchFreshEvent } from '@blobbi-kit/core/fetchFreshEvent';
 
 import { totalDailyXp } from '../lib/daily-missions';
 

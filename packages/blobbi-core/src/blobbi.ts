@@ -2,9 +2,9 @@ import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import type { NostrEvent } from '@nostrify/nostrify';
 
-import { blobbiLogger } from '@blobbi/core/logger';
+import { blobbiLogger } from '@blobbi-kit/core/logger';
 
-import { ADULT_FORMS, type AdultForm, deriveAdultFormFromSeed } from '@blobbi/core/types/adult';
+import { ADULT_FORMS, type AdultForm, deriveAdultFormFromSeed } from '@blobbi-kit/core/types/adult';
 
 import { validateAndRepairBlobbiTags } from './blobbi-tag-schema';
 import { applyColorGuardrails, hexToHsl, hslToHex } from './color-guardrails';

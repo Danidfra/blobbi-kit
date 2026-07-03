@@ -10,7 +10,7 @@ import {
   buildEggTags,
   parseBlobbiEvent,
   type BlobbiCompanion,
-} from '@blobbi/core/blobbi';
+} from '@blobbi-kit/core/blobbi';
 import { useCanonicalSync } from './useCanonicalSync';
 
 // Publish spy passed directly as the `publish` option (no host `useNostrPublish`).

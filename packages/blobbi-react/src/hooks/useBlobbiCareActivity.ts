@@ -21,13 +21,13 @@ import { useNostr } from '@nostrify/react';
 import { useMutation } from '@tanstack/react-query';
 import type { NostrEvent } from '@nostrify/nostrify';
 
-import type { BlobbiCompanion } from '@blobbi/core/blobbi';
+import type { BlobbiCompanion } from '@blobbi-kit/core/blobbi';
 import {
   KIND_BLOBBI_STATE,
   updateBlobbiTags,
   isValidBlobbiEvent,
   parseBlobbiEvent,
-} from '@blobbi/core/blobbi';
+} from '@blobbi-kit/core/blobbi';
 
 import { getStreakTagUpdates, calculateStreakUpdate, type StreakUpdateResult } from '../lib/blobbi-streak';
 

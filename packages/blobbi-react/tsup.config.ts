@@ -25,9 +25,9 @@ function withExtension(spec: string, importerDir: string): string {
 /**
  * Emit each source file 1:1 (no duplication, shared singletons preserved) while
  * rewriting intra-package specifiers for raw Node ESM:
- *   - `@blobbi/react/*` self-subpaths  -> relative `.js`
+ *   - `@blobbi-kit/react/*` self-subpaths  -> relative `.js`
  *   - relative specifiers              -> explicit `.js` extension
- * Cross-package (`@blobbi/core`, `@blobbi/core/*`), react, @tanstack/*,
+ * Cross-package (`@blobbi-kit/core`, `@blobbi-kit/core/*`), react, @tanstack/*,
  * @nostrify/* stay bare externals resolved by the consumer's node_modules.
  */
 const emitAsFiles = {
@@ -40,9 +40,9 @@ const emitAsFiles = {
         | undefined,
     ) => void;
   }) {
-    // Self subpath imports (`@blobbi/react/lib/x`) -> relative + .js, external.
-    build.onResolve({ filter: /^@blobbi\/react\// }, (args) => {
-      const subpath = args.path.replace(/^@blobbi\/react\//, '');
+    // Self subpath imports (`@blobbi-kit/react/lib/x`) -> relative + .js, external.
+    build.onResolve({ filter: /^@blobbi-kit\/react\// }, (args) => {
+      const subpath = args.path.replace(/^@blobbi-kit\/react\//, '');
       const target = join(srcRoot, subpath);
       let rel = relative(dirname(args.importer), target);
       if (!rel.startsWith('.')) rel = `./${rel}`;
@@ -84,6 +84,6 @@ export default defineConfig({
   clean: true,
   outDir: 'dist',
   target: 'es2020',
-  external: ['@blobbi/core'],
+  external: ['@blobbi-kit/core'],
   esbuildPlugins: [emitAsFiles],
 });

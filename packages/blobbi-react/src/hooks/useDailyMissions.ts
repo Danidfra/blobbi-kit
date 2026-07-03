@@ -17,9 +17,9 @@
 
 import { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 
-import type { MissionsContent } from '@blobbi/core/missions';
-import { isMissionComplete, missionProgress } from '@blobbi/core/missions';
-import { parseProfileContent } from '@blobbi/core/missions';
+import type { MissionsContent } from '@blobbi-kit/core/missions';
+import { isMissionComplete, missionProgress } from '@blobbi-kit/core/missions';
+import { parseProfileContent } from '@blobbi-kit/core/missions';
 
 import {
   type BlobbiStage,
@@ -32,12 +32,12 @@ import {
   getDefinition,
   MAX_DAILY_REROLLS,
   DAILY_BONUS_XP,
-} from '@blobbi/react/lib/daily-missions';
+} from '@blobbi-kit/react/lib/daily-missions';
 
 import {
   readDailyFromStorage,
   writeDailyToStorage,
-} from '@blobbi/react/lib/daily-mission-tracker';
+} from '@blobbi-kit/react/lib/daily-mission-tracker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

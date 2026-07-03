@@ -10,27 +10,27 @@
  */
 
 const runtimeEntries = [
-  '@blobbi/core',
-  '@blobbi/core/blobbi',
-  '@blobbi/core/missions',
-  '@blobbi/core/logger',
-  '@blobbi/core/progression',
-  '@blobbi/core/blobbi-decay',
-  '@blobbi/core/blobbi-segments',
-  '@blobbi/core/types/adult',
-  '@blobbi/core/types/shop',
-  '@blobbi/react',
-  '@blobbi/react/hooks/index',
-  '@blobbi/react/lib/index',
-  '@blobbi/react/lib/blobbi-xp',
-  '@blobbi/react/lib/blobbi-streak',
-  '@blobbi/react/lib/blobbi-actions',
-  '@blobbi/react/adapters/types',
+  '@blobbi-kit/core',
+  '@blobbi-kit/core/blobbi',
+  '@blobbi-kit/core/missions',
+  '@blobbi-kit/core/logger',
+  '@blobbi-kit/core/progression',
+  '@blobbi-kit/core/blobbi-decay',
+  '@blobbi-kit/core/blobbi-segments',
+  '@blobbi-kit/core/types/adult',
+  '@blobbi-kit/core/types/shop',
+  '@blobbi-kit/react',
+  '@blobbi-kit/react/hooks/index',
+  '@blobbi-kit/react/lib/index',
+  '@blobbi-kit/react/lib/blobbi-xp',
+  '@blobbi-kit/react/lib/blobbi-streak',
+  '@blobbi-kit/react/lib/blobbi-actions',
+  '@blobbi-kit/react/adapters/types',
 ];
 
 // Type-only deep entries: assert they still load as ESM modules (types are
 // fully covered by `npm run typecheck`).
-const typeOnlyEntries = ['@blobbi/core/types/blobbi'];
+const typeOnlyEntries = ['@blobbi-kit/core/types/blobbi'];
 
 let failures = 0;
 

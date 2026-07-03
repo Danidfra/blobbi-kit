@@ -9,8 +9,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "npm run build --workspace @blobbi/core && npm run build --workspace @blobbi/react",
-    "typecheck": "npm run typecheck --workspace @blobbi/core && npm run typecheck --workspace @blobbi/react",
+    "build": "npm run build --workspace @blobbi-kit/core && npm run build --workspace @blobbi-kit/react",
+    "typecheck": "npm run typecheck --workspace @blobbi-kit/core && npm run typecheck --workspace @blobbi-kit/react",
     "test": "vitest run --reporter=dot",
     "clean": "rimraf packages/*/dist packages/*/*.tsbuildinfo",
     "smoke": "node scripts/smoke.mjs"

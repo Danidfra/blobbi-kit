@@ -10,9 +10,9 @@ import {
   type BlobbiCompanion,
   type BlobbonautProfile,
   type StorageItem,
-} from '@blobbi/core/blobbi';
+} from '@blobbi-kit/core/blobbi';
 
-import { fetchFreshBlobbonautProfile } from '@blobbi/core/fetchFreshBlobbonautProfile';
+import { fetchFreshBlobbonautProfile } from '@blobbi-kit/core/fetchFreshBlobbonautProfile';
 
 /**
  * Options for the fresh-fetch helper.

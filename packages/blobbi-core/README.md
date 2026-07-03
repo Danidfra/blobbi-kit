@@ -1,4 +1,4 @@
-# @blobbi/core
+# @blobbi-kit/core
 
 Portable, framework-agnostic core domain logic for [Blobbi](https://github.com/blobbi).
 
@@ -19,7 +19,7 @@ Native, or tests without a DOM.
 ## Install
 
 ```sh
-npm install @blobbi/core @nostrify/nostrify
+npm install @blobbi-kit/core @nostrify/nostrify
 ```
 
 `@nostrify/nostrify` is a peer dependency.
@@ -27,11 +27,11 @@ npm install @blobbi/core @nostrify/nostrify
 ## Usage
 
 ```ts
-import { buildBlobbiAddress, applyBlobbiDecay } from '@blobbi/core';
+import { buildBlobbiAddress, applyBlobbiDecay } from '@blobbi-kit/core';
 
 // Deep imports are also supported:
-import { blobbiLogger } from '@blobbi/core/logger';
-import type { Blobbi } from '@blobbi/core/types/blobbi';
+import { blobbiLogger } from '@blobbi-kit/core/logger';
+import type { Blobbi } from '@blobbi-kit/core/types/blobbi';
 ```
 
 ## Peer dependencies

@@ -1,5 +1,5 @@
 /**
- * @blobbi/react public helper libraries.
+ * @blobbi-kit/react public helper libraries.
  *
  * Pure/logic helpers plus a few browser-only utilities (item cooldown store,
  * daily-mission tracker). Browser-only members are noted inline; they rely on

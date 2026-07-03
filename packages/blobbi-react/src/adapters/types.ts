@@ -1,8 +1,8 @@
 /**
- * @blobbi/react adapter contracts.
+ * @blobbi-kit/react adapter contracts.
  *
  * Type-only dependency-injection contracts that let host apps supply their own
- * implementations of the services @blobbi/react hooks need — without the package
+ * implementations of the services @blobbi-kit/react hooks need — without the package
  * ever importing host internals (`@/`, Ditto UI, toasts, shop catalog, signer,
  * publish, etc.).
  *
@@ -11,7 +11,7 @@
  */
 
 import type { NostrEvent } from '@nostrify/nostrify';
-import type { CareItemEffect } from '@blobbi/core/blobbi-social-projection';
+import type { CareItemEffect } from '@blobbi-kit/core/blobbi-social-projection';
 
 /**
  * Identifies the current viewer/owner. Replaces a host-app `useCurrentUser`.
@@ -79,7 +79,7 @@ export interface StorageAdapter {
 }
 
 /**
- * Aggregate set of adapters a fully-wired @blobbi/react host would provide.
+ * Aggregate set of adapters a fully-wired @blobbi-kit/react host would provide.
  * Individual hooks accept only the subset they actually need.
  */
 export interface BlobbiReactAdapters {

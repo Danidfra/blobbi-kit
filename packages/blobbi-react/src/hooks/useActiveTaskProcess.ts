@@ -17,11 +17,11 @@
  */
 
 import { useMemo } from 'react';
-import type { BlobbiCompanion } from '@blobbi/core/blobbi';
-import type { HatchTask, HatchTasksResult } from '@blobbi/react/hooks/useHatchTasks';
-import type { EvolveTasksResult } from '@blobbi/react/hooks/useEvolveTasks';
-import { HATCH_REQUIRED_INTERACTIONS } from '@blobbi/react/hooks/useHatchTasks';
-import { EVOLVE_REQUIRED_INTERACTIONS } from '@blobbi/react/hooks/useEvolveTasks';
+import type { BlobbiCompanion } from '@blobbi-kit/core/blobbi';
+import type { HatchTask, HatchTasksResult } from '@blobbi-kit/react/hooks/useHatchTasks';
+import type { EvolveTasksResult } from '@blobbi-kit/react/hooks/useEvolveTasks';
+import { HATCH_REQUIRED_INTERACTIONS } from '@blobbi-kit/react/hooks/useHatchTasks';
+import { EVOLVE_REQUIRED_INTERACTIONS } from '@blobbi-kit/react/hooks/useEvolveTasks';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

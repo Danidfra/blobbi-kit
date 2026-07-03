@@ -12,8 +12,8 @@
  * Dispatches 'daily-missions-updated' CustomEvent so React hooks re-render.
  */
 
-import type { Mission } from '@blobbi/core/missions';
-import type { MissionsContent } from '@blobbi/core/missions';
+import type { Mission } from '@blobbi-kit/core/missions';
+import type { MissionsContent } from '@blobbi-kit/core/missions';
 import type { DailyMissionAction } from './daily-missions';
 import {
   getTodayDateString,

@@ -1,8 +1,8 @@
 /**
- * @blobbi/core — portable, framework-agnostic core domain logic for Blobbi.
+ * @blobbi-kit/core — portable, framework-agnostic core domain logic for Blobbi.
  *
  * This is the public package barrel. Everything re-exported here is considered
- * stable public API. Deep imports (`@blobbi/core/*`) remain supported for now,
+ * stable public API. Deep imports (`@blobbi-kit/core/*`) remain supported for now,
  * but new consumers should prefer the root barrel.
  *
  * DOM-free: this package makes no browser assumptions and can run in Node,
@@ -13,7 +13,7 @@
  * names deliberately overlap with the runtime domain module (`./blobbi`). To
  * avoid TS2308 duplicate-export collisions, they are re-exported here under
  * namespaces (`BlobbiTypes`, `AdultTypes`, `ShopTypes`). Consumers that need the
- * flat names continue to deep-import `@blobbi/core/types/blobbi` etc.
+ * flat names continue to deep-import `@blobbi-kit/core/types/blobbi` etc.
  */
 
 // Logger (package-safe, no-op by default; host apps can inject their own).

@@ -19,7 +19,7 @@ interface FetchFreshEventOptions {
  * `{ store }` IndexedDB fallback floor (for destructive list mutations like
  * follow/mute lists). That branch pulls in `@nostrify/indexeddb`, which no
  * Blobbi package caller needs, so it is intentionally omitted here to avoid
- * adding a dependency to @blobbi/core. Ditto keeps its fuller
+ * adding a dependency to @blobbi-kit/core. Ditto keeps its fuller
  * `src/lib/fetchFreshEvent.ts` for those callers; deduping the two copies is
  * deferred to a later cleanup wave.
  *

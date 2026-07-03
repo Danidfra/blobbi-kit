@@ -64,10 +64,10 @@ export interface MissionsContent {
  * The top-level content JSON for kind 11125.
  * Keys are added alongside each other; `serializeProfileContent` preserves unknown keys.
  *
- * Only `missions` is interpreted by @blobbi/core. All other top-level keys
+ * Only `missions` is interpreted by @blobbi-kit/core. All other top-level keys
  * (e.g. Ditto's `room_layouts` / `room_furniture`, or any future extension) are
  * preserved opaquely as `unknown` and round-tripped unchanged — their shapes are
- * owned and parsed by their respective host modules, not by @blobbi/core.
+ * owned and parsed by their respective host modules, not by @blobbi-kit/core.
  */
 export interface ProfileContent {
   missions?: MissionsContent;

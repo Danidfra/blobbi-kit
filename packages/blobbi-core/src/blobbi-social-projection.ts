@@ -18,7 +18,7 @@
  *   - All stats are clamped to [STAT_MIN, STAT_MAX] after each interaction.
  *
  * The care-item effect table itself is NOT owned by this module: the host
- * application injects a `resolveCareItemEffect` resolver so @blobbi/core stays
+ * application injects a `resolveCareItemEffect` resolver so @blobbi-kit/core stays
  * decoupled from any specific item catalog.
  *
  * @module blobbi-social-projection
@@ -27,7 +27,7 @@
 import type { BlobbiStats } from './blobbi';
 import { STAT_MIN, STAT_MAX } from './blobbi';
 import type { BlobbiInteraction, InteractionAction, SocialCheckpoint } from './blobbi-interaction';
-import type { ItemEffect } from '@blobbi/core/types/shop';
+import type { ItemEffect } from '@blobbi-kit/core/types/shop';
 
 /**
  * Stat deltas a care item applies to a Blobbi when used in an interaction.
@@ -41,7 +41,7 @@ export type CareItemEffect = ItemEffect;
 /**
  * Resolves an interaction's `itemId` to its care-item effect.
  *
- * Injected by the host so @blobbi/core never imports a concrete item catalog.
+ * Injected by the host so @blobbi-kit/core never imports a concrete item catalog.
  * Returns `undefined` when the id is unknown, in which case the fallback
  * per-action effect is used.
  */

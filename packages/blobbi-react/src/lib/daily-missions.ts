@@ -9,8 +9,8 @@
  * No explicit completed/claimed flags.
  */
 
-import type { Mission, TallyMission, EventMission, MissionsContent } from '@blobbi/core/missions';
-import { isTallyMission, isEventMission, isMissionComplete } from '@blobbi/core/missions';
+import type { Mission, TallyMission, EventMission, MissionsContent } from '@blobbi-kit/core/missions';
+import { isTallyMission, isEventMission, isMissionComplete } from '@blobbi-kit/core/missions';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -458,5 +458,5 @@ export function rerollMission(
 }
 
 // Re-export mission utilities for convenience
-export { isTallyMission, isEventMission, isMissionComplete, missionProgress } from '@blobbi/core/missions';
-export type { Mission, TallyMission, EventMission, MissionsContent } from '@blobbi/core/missions';
+export { isTallyMission, isEventMission, isMissionComplete, missionProgress } from '@blobbi-kit/core/missions';
+export type { Mission, TallyMission, EventMission, MissionsContent } from '@blobbi-kit/core/missions';

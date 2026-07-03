@@ -18,9 +18,9 @@ import { useNostr } from '@nostrify/react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { NostrEvent } from '@nostrify/nostrify';
 
-import { KIND_BLOBBI_STATE } from '@blobbi/core/blobbi';
-import { serializeEvolutionContent } from '@blobbi/core/missions';
-import { fetchFreshEvent } from '@blobbi/core/fetchFreshEvent';
+import { KIND_BLOBBI_STATE } from '@blobbi-kit/core/blobbi';
+import { serializeEvolutionContent } from '@blobbi-kit/core/missions';
+import { fetchFreshEvent } from '@blobbi-kit/core/fetchFreshEvent';
 
 import { readEvolutionFromStorage } from '../lib/daily-mission-tracker';
 

@@ -28,10 +28,10 @@ function withExtension(spec: string, importerDir: string): string {
  * With `bundle: true` we mark every intra-package import as external so each
  * source file is emitted 1:1 (no duplication, shared singletons preserved),
  * while still letting esbuild run our onResolve hook to:
- *   - rewrite self-referential subpaths (`@blobbi/core/logger`) to relative
+ *   - rewrite self-referential subpaths (`@blobbi-kit/core/logger`) to relative
  *   - append explicit `.js` extensions to relative specifiers (raw Node ESM)
- * Everything else (react, @noble/hashes, @nostrify/*, @blobbi/core from
- * @blobbi/react) stays a bare external specifier resolved by the consumer.
+ * Everything else (react, @noble/hashes, @nostrify/*, @blobbi-kit/core from
+ * @blobbi-kit/react) stays a bare external specifier resolved by the consumer.
  */
 const emitAsFiles = {
   name: 'blobbi-emit-as-files',
@@ -44,8 +44,8 @@ const emitAsFiles = {
     ) => void;
   }) {
     // Self subpath imports -> relative + .js, external.
-    build.onResolve({ filter: /^@blobbi\/core\// }, (args) => {
-      const subpath = args.path.replace(/^@blobbi\/core\//, '');
+    build.onResolve({ filter: /^@blobbi-kit\/core\// }, (args) => {
+      const subpath = args.path.replace(/^@blobbi-kit\/core\//, '');
       const target = join(srcRoot, subpath);
       let rel = relative(dirname(args.importer), target);
       if (!rel.startsWith('.')) rel = `./${rel}`;

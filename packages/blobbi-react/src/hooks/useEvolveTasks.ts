@@ -14,15 +14,15 @@ import { useQuery } from '@tanstack/react-query';
 import { useNostr } from '@nostrify/react';
 import type { NostrFilter } from '@nostrify/nostrify';
 
-import type { BlobbiCompanion } from '@blobbi/core/blobbi';
-import type { Mission } from '@blobbi/core/missions';
-import { missionProgress, isEventMission } from '@blobbi/core/missions';
+import type { BlobbiCompanion } from '@blobbi-kit/core/blobbi';
+import type { Mission } from '@blobbi-kit/core/missions';
+import { missionProgress, isEventMission } from '@blobbi-kit/core/missions';
 import {
   trackEvolutionMissionEvent,
   readEvolutionFromStorage,
   writeEvolutionToStorage,
   hydrateEvolutionFromPersisted,
-} from '@blobbi/react/lib/daily-mission-tracker';
+} from '@blobbi-kit/react/lib/daily-mission-tracker';
 import {
   EVOLVE_MISSIONS,
   EVOLVE_REQUIRED_INTERACTIONS,
@@ -33,7 +33,7 @@ import {
   createEvolveMissions,
   evolutionMatchesDefinitions,
   migrateEvolutionMissions,
-} from '@blobbi/react/lib/evolution-missions';
+} from '@blobbi-kit/react/lib/evolution-missions';
 
 import {
   KIND_THEME_DEFINITION,
@@ -41,7 +41,7 @@ import {
   KIND_PROFILE_METADATA,
   type HatchTask,
   type TaskType,
-} from '@blobbi/react/hooks/useHatchTasks';
+} from '@blobbi-kit/react/hooks/useHatchTasks';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

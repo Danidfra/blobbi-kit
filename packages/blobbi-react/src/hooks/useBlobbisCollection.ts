@@ -10,7 +10,7 @@ import {
   isLegacyBlobbiEvent,
   parseBlobbiEvent,
   type BlobbiCompanion,
-} from '@blobbi/core/blobbi';
+} from '@blobbi-kit/core/blobbi';
 
 /** Maximum number of d-tags per query chunk to avoid relay issues */
 const CHUNK_SIZE = 20;

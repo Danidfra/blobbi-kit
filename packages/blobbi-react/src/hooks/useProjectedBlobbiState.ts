@@ -13,22 +13,22 @@
  * Item-specific care effects are resolved through an injected, catalog-agnostic
  * `resolveCareItemEffect` resolver so this hook stays free of any host-app shop
  * catalog. When no resolver is provided, only the generic fallback effects in
- * @blobbi/core's social projection are applied.
+ * @blobbi-kit/core's social projection are applied.
  * 
  * @see docs/blobbi/decay-system.md
  */
 
 import { useState, useEffect, useMemo } from 'react';
 
-import type { BlobbiCompanion, BlobbiStats } from '@blobbi/core/blobbi';
-import { applyBlobbiDecay, getVisibleStatsWithValues, type DecayResult } from '@blobbi/core/blobbi-decay';
-import { applySocialInteractions, type CareItemEffectResolver } from '@blobbi/core/blobbi-social-projection';
-import { resolveSocialCheckpoint, type BlobbiInteraction } from '@blobbi/core/blobbi-interaction';
+import type { BlobbiCompanion, BlobbiStats } from '@blobbi-kit/core/blobbi';
+import { applyBlobbiDecay, getVisibleStatsWithValues, type DecayResult } from '@blobbi-kit/core/blobbi-decay';
+import { applySocialInteractions, type CareItemEffectResolver } from '@blobbi-kit/core/blobbi-social-projection';
+import { resolveSocialCheckpoint, type BlobbiInteraction } from '@blobbi-kit/core/blobbi-interaction';
 
 /**
  * Default no-op care-item effect resolver.
  *
- * Returns `undefined` for every item, so @blobbi/core falls back to its generic
+ * Returns `undefined` for every item, so @blobbi-kit/core falls back to its generic
  * per-action effects. Hosts with a real item catalog inject their own resolver
  * (e.g. `(itemId) => getShopItemById(itemId)?.effect`).
  */

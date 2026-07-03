@@ -11,7 +11,7 @@
  *   - Are NOT deterministically seeded — the full set is always used
  */
 
-import type { Mission, TallyMission, EventMission } from '@blobbi/core/missions';
+import type { Mission, TallyMission, EventMission } from '@blobbi-kit/core/missions';
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────
 
