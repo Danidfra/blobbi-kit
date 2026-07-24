@@ -43,7 +43,16 @@ export interface FreshBlobbiResult {
   profileAllTags: string[][];
   /** The previous profile event, for passing as `prev` to publishEvent */
   profileEvent: NostrEvent;
-  /** The latest profile storage to use as the base for storage modifications */
+  /**
+   * The latest profile consumable storage (legacy), read from pre-existing
+   * `storage` tags.
+   *
+   * @deprecated Consumable inventory is no longer modeled on kind 11125 and the
+   * kit never writes new `storage` tags. This field is populated only for
+   * backward-compatible reads and is scheduled for removal in a future major
+   * release. Hosts that need finite inventory own it via `@nostr-games/inventory`
+   * (kinds 31632/31633).
+   */
   profileStorage: StorageItem[];
 }
 

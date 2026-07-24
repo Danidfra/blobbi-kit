@@ -8,6 +8,7 @@ import {
   mergeBlobbonautTagsForRepublish,
   buildBlobbonautTags,
   getTagValues,
+  MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES,
 } from './blobbi';
 import { validateAndRepairBlobbiTags } from './blobbi-tag-schema';
 
@@ -130,5 +131,91 @@ describe('extension tag preservation — kind 11125 (Blobbonaut profile)', () =>
 
     expect(getTagValues(merged, 'has')).toEqual(['blobbi-x']);
     expect(valuesFor(merged, 'inv')).toEqual(['potion:3']);
+  });
+});
+
+/**
+ * Consumable inventory migration (product decision):
+ *
+ *   Consumable inventory is no longer modeled on kind 11125. Legacy `storage`
+ *   tags must be:
+ *     - treated as opaque, host-owned extension tags (NOT managed),
+ *     - preserved verbatim when an existing profile is rewritten,
+ *     - never generated anew by the kit (no dual write, no backfill).
+ *
+ *   `inv` (accessory/cosmetic host data) is unrelated and must keep behaving
+ *   exactly as before — the tests above already lock that in.
+ */
+describe('consumable storage decoupling — kind 11125 (Blobbonaut profile)', () => {
+  it('no longer treats `storage` as a managed tag', () => {
+    expect(MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES.has('storage')).toBe(false);
+  });
+
+  it('preserves legacy storage tags verbatim through updateBlobbonautTags', () => {
+    const base = buildBlobbonautTags(PUBKEY);
+    const withStorage = [
+      ...base,
+      ['storage', 'food_cake:3'],
+      ['storage', 'medicine-basic:1'],
+    ];
+
+    const updated = updateBlobbonautTags(withStorage, { coins: '150' });
+
+    // Legacy storage passes through opaquely (like inv), unchanged and unordered-merged.
+    expect(valuesFor(updated, 'storage')).toEqual(['food_cake:3', 'medicine-basic:1']);
+    expect(updated.find(([n]) => n === 'coins')?.[1]).toBe('150');
+  });
+
+  it('preserves legacy storage tags through mergeBlobbonautTagsForRepublish', () => {
+    const base = buildBlobbonautTags(PUBKEY);
+    const withStorage = [...base, ['storage', 'food_cake:3'], ['storage', 'toy-ball:2']];
+
+    const merged = mergeBlobbonautTagsForRepublish(withStorage, { xp: '42' });
+
+    expect(valuesFor(merged, 'storage')).toEqual(['food_cake:3', 'toy-ball:2']);
+    expect(merged.find(([n]) => n === 'xp')?.[1]).toBe('42');
+  });
+
+  it('refuses to WRITE new storage tags: a `storage` update key is dropped', () => {
+    const base = buildBlobbonautTags(PUBKEY);
+
+    const updated = updateBlobbonautTags(base, {
+      coins: '10',
+      storage: 'food_cake:5',
+    });
+
+    // The kit never generates new consumable storage tags on kind 11125.
+    expect(valuesFor(updated, 'storage')).toEqual([]);
+    // The non-storage update still applied.
+    expect(updated.find(([n]) => n === 'coins')?.[1]).toBe('10');
+  });
+
+  it('drops a `storage` update key but still preserves pre-existing storage tags', () => {
+    const base = buildBlobbonautTags(PUBKEY);
+    const withStorage = [...base, ['storage', 'food_cake:3']];
+
+    // Attempt to overwrite storage AND update coins.
+    const updated = updateBlobbonautTags(withStorage, {
+      coins: '20',
+      storage: 'food_cake:99',
+    });
+
+    // The update value is ignored; the original legacy tag survives unchanged.
+    expect(valuesFor(updated, 'storage')).toEqual(['food_cake:3']);
+    expect(updated.find(([n]) => n === 'coins')?.[1]).toBe('20');
+  });
+
+  it('keeps `inv` and legacy `storage` independent and both untouched', () => {
+    const base = buildBlobbonautTags(PUBKEY);
+    const withBoth = [
+      ...base,
+      ['inv', 'hat-001'],
+      ['storage', 'food_cake:3'],
+    ];
+
+    const merged = mergeBlobbonautTagsForRepublish(withBoth, { xp: '7' });
+
+    expect(valuesFor(merged, 'inv')).toEqual(['hat-001']);
+    expect(valuesFor(merged, 'storage')).toEqual(['food_cake:3']);
   });
 });
