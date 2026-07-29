@@ -9,7 +9,8 @@
  * (the `import` export condition) rather than the CJS `require.resolve`.
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+import { satisfies } from 'semver';
 
 const runtimeEntries = [
   '@blobbi-kit/core',
@@ -135,6 +136,182 @@ for (const { file, patterns } of REMOVED_TYPE_DECLARATIONS) {
     console.error(`  FAIL ${file} still declares removed API: ${hits.join(', ')}`);
   } else {
     console.log(`  ok  ${file} declares no removed consumable-storage API`);
+  }
+}
+// ─── Packaged-artifact contract ───────────────────────────────────────────────
+//
+// 0.3.0 shipped `peer @nostrify/nostrify: ^0.53.0`, which for a pre-1.0 package
+// means `>=0.53.0 <0.54.0` and so excluded Nostrify 0.54; hosts had to suppress
+// the resulting ERESOLVE with an npm `overrides` entry. The lesson is that a
+// dependency *classification* mistake is invisible to unit tests, so it needs an
+// assertion of its own.
+//
+// Division of labour, to keep exactly one owner per fact:
+//
+//   packages/*/src/package-manifest.test.ts  — what the manifests DECLARE
+//     (versions, peer ranges and their semver semantics, files, exports,
+//      lockstep). Pure data; no build or install required.
+//
+//   this file                                — what the built ARTIFACT and the
+//     installed TREE actually do. Only checks that cannot run without `dist/`
+//     or `node_modules/` belong here.
+//
+// So nothing below re-asserts a range or a version. Instead it cross-checks the
+// two sides: every bare specifier the emitted JavaScript imports must be
+// declared in the manifest. The manifest is therefore its own allowlist — a new
+// runtime dependency cannot be added without declaring it — and a peer that is
+// meant to be type-only must not appear in the emitted JavaScript at all.
+
+const NOSTRIFY = '@nostrify/nostrify';
+
+const fail = (msg) => {
+  failures++;
+  console.error(`  FAIL ${msg}`);
+};
+
+const readJson = async (path) =>
+  JSON.parse(await readFile(new URL(`../${path}`, import.meta.url), 'utf8'));
+
+/**
+ * Every bare (non-relative) specifier the emitted `.js` files import, reduced to
+ * its package name. Covers the three module-loading forms esbuild can emit:
+ * `import … from`, `export … from`, side-effect `import`, and dynamic
+ * `import()`. Static forms are anchored to the start of a line, because an
+ * unanchored /from ["']x["']/ also matches prose inside template literals
+ * (e.g. `Repaired state from '${currentState}' to 'active'`).
+ */
+async function runtimeExternals(distDir) {
+  const patterns = [
+    /^\s*(?:import|export)\b[^'"]*?\bfrom\s*['"]([^'"]+)['"]/gm,
+    /^\s*import\s*['"]([^'"]+)['"]/gm,
+    /\bimport\s*\(\s*['"]([^'"]+)['"]/g,
+  ];
+  const found = new Set();
+  const walk = async (dir) => {
+    let entries;
+    try {
+      entries = await readdir(new URL(`../${dir}/`, import.meta.url), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        await walk(`${dir}/${entry.name}`);
+        continue;
+      }
+      if (!entry.name.endsWith('.js')) continue;
+      const src = await readFile(new URL(`../${dir}/${entry.name}`, import.meta.url), 'utf8');
+      for (const re of patterns) {
+        for (const [, spec] of src.matchAll(re)) {
+          if (spec.startsWith('.') || spec.startsWith('/')) continue; // intra-package
+          const parts = spec.split('/');
+          found.add(spec.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]);
+        }
+      }
+    }
+  };
+  await walk(distDir);
+  return found;
+}
+
+for (const dir of ['packages/blobbi-core', 'packages/blobbi-react']) {
+  let manifest;
+  try {
+    manifest = await readJson(`${dir}/package.json`);
+  } catch (err) {
+    fail(`cannot read ${dir}/package.json\n        ${err?.message ?? err}`);
+    continue;
+  }
+
+  const declared = new Set([
+    ...Object.keys(manifest.dependencies ?? {}),
+    ...Object.keys(manifest.peerDependencies ?? {}),
+  ]);
+  const externals = await runtimeExternals(`${dir}/dist`);
+
+  if (externals.size === 0) {
+    fail(`${manifest.name} dist imports nothing — is dist/ built?`);
+    continue;
+  }
+
+  // A bare import that no manifest field declares would resolve only by luck,
+  // via whatever the host happens to have hoisted.
+  const undeclared = [...externals].filter((spec) => !declared.has(spec));
+  if (undeclared.length) {
+    fail(
+      `${manifest.name} dist imports ${undeclared.join(', ')} at runtime, ` +
+        `but neither dependencies nor peerDependencies declares it`,
+    );
+  }
+
+  // Nostrify is consumed via `import type` only. If it ever reaches the emitted
+  // JavaScript it has become a real runtime coupling, and the host could end up
+  // with a second copy — `NPool` declares `private` members, so two copies are
+  // nominally distinct types and break assignability.
+  if (externals.has(NOSTRIFY)) {
+    fail(`${manifest.name} dist imports ${NOSTRIFY} at runtime; it must remain type-only`);
+  }
+
+  console.log(
+    `  ok  ${manifest.name} dist imports only declared externals ` +
+      `(${[...externals].sort().join(', ')}); ${NOSTRIFY} type-only`,
+  );
+}
+
+// ─── Installed-tree sanity: exactly one Nostrify ──────────────────────────────
+//
+// `@nostrify/react` pins `@nostrify/nostrify` to an EXACT version (0.6.3→0.53.0,
+// 0.6.4→0.54.0), so the two must be upgraded as a matched pair. Bumping one alone
+// leaves a second Nostrify nested under `@nostrify/react`, and because `NPool`
+// declares `private` members it is nominally typed — the duplicate then surfaces
+// as a pile of baffling `TS2345: NPool is not assignable to NPool` errors that
+// mimic a version incompatibility. Fail with the real reason instead.
+//
+// The range is read from core's manifest rather than restated, so this stays
+// correct when the peer range next changes.
+{
+  const declaredRange = (await readJson('packages/blobbi-core/package.json'))
+    .peerDependencies?.[NOSTRIFY];
+  const root = await readJson(`node_modules/${NOSTRIFY}/package.json`).catch(() => null);
+
+  if (!root) {
+    fail(`${NOSTRIFY} is not installed — run npm install`);
+  } else {
+    // Any copy nested one level deep under another installed package.
+    const nested = [];
+    for (const scope of await readdir(new URL('../node_modules/', import.meta.url), {
+      withFileTypes: true,
+    })) {
+      if (!scope.isDirectory()) continue;
+      const pkgDirs = scope.name.startsWith('@')
+        ? (await readdir(new URL(`../node_modules/${scope.name}/`, import.meta.url))).map(
+            (n) => `${scope.name}/${n}`,
+          )
+        : [scope.name];
+      for (const pkgDir of pkgDirs) {
+        const copy = await readJson(
+          `node_modules/${pkgDir}/node_modules/${NOSTRIFY}/package.json`,
+        ).catch(() => null);
+        if (copy) nested.push(`${pkgDir} -> ${copy.version}`);
+      }
+    }
+
+    if (nested.length) {
+      fail(
+        `duplicate ${NOSTRIFY} in the installed tree: root ${root.version}, also nested under ` +
+          `${nested.join(', ')}. Upgrade ${NOSTRIFY} and @nostrify/react together ` +
+          `(@nostrify/react pins nostrify exactly).`,
+      );
+    } else if (!satisfies(root.version, declaredRange)) {
+      fail(
+        `installed ${NOSTRIFY} ${root.version} is outside the declared peer range ` +
+          `"${declaredRange}", so typecheck/test are not validating a supported version`,
+      );
+    } else {
+      console.log(
+        `  ok  exactly one ${NOSTRIFY} installed (${root.version}), within the declared peer range "${declaredRange}"`,
+      );
+    }
   }
 }
 

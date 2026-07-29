@@ -16,15 +16,17 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
-    "@nostrify/nostrify": "^0.53.0",
-    "@nostrify/react": "^0.6.3",
+    "@nostrify/nostrify": "^0.54.0",
+    "@nostrify/react": "^0.6.4",
     "@tanstack/react-query": "^5.56.2",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
+    "@types/semver": "^7.7.1",
     "jsdom": "^26.1.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "rimraf": "^6.0.1",
+    "semver": "^7.8.5",
     "tsup": "^8.3.5",
     "typescript": "^5.5.3",
     "vitest": "^4.1.8"
