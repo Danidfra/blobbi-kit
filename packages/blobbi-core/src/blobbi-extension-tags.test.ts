@@ -135,13 +135,13 @@ describe('extension tag preservation — kind 11125 (Blobbonaut profile)', () =>
 });
 
 /**
- * Consumable inventory migration (product decision):
+ * Consumable inventory removal (product decision, @blobbi-kit/core 0.3.0):
  *
- *   Consumable inventory is no longer modeled on kind 11125. Legacy `storage`
+ *   Consumable inventory is not modeled on kind 11125 at all. Legacy `storage`
  *   tags must be:
  *     - treated as opaque, host-owned extension tags (NOT managed),
  *     - preserved verbatim when an existing profile is rewritten,
- *     - never generated anew by the kit (no dual write, no backfill).
+ *     - never generated or mutated by the kit (no dual write, no backfill).
  *
  *   `inv` (accessory/cosmetic host data) is unrelated and must keep behaving
  *   exactly as before — the tests above already lock that in.
@@ -217,5 +217,94 @@ describe('consumable storage decoupling — kind 11125 (Blobbonaut profile)', ()
 
     expect(valuesFor(merged, 'inv')).toEqual(['hat-001']);
     expect(valuesFor(merged, 'storage')).toEqual(['food_cake:3']);
+  });
+
+  it('preserves legacy storage tags tag-for-tag, including malformed and extra-element tags', () => {
+    // Deliberately hostile shapes: values the removed `parseStorageTags` would
+    // have dropped (bad quantity, zero quantity, no separator) and tags with
+    // extra elements the old `['storage','id:qty']` model could not express.
+    // As opaque unknown tags these must survive byte-for-byte regardless.
+    const base = buildBlobbonautTags(PUBKEY);
+    const legacyStorage = [
+      ['storage', 'food_cake:3'],
+      ['storage', 'toy-ball:not-a-number'],
+      ['storage', 'medicine-basic:0'],
+      ['storage', 'malformed-no-colon'],
+      ['storage', 'hygiene-soap:2', 'extra-element', 'another'],
+      ['storage', ''],
+    ];
+    const withStorage = [...base, ...legacyStorage];
+
+    const merged = mergeBlobbonautTagsForRepublish(withStorage, { xp: '9', coins: '12' });
+
+    // Identical tags, identical order, identical arity — nothing normalized away.
+    expect(merged.filter(([n]) => n === 'storage')).toEqual(legacyStorage);
+  });
+
+  it('preserves arbitrary host extension tags alongside legacy storage', () => {
+    const base = buildBlobbonautTags(PUBKEY);
+    const extensions = [
+      ['inv', 'hat-001'],
+      ['storage', 'food_cake:3'],
+      ['room_layout', '{"couch":[1,2]}'],
+      ['island_quest', 'q-42', 'in-progress'],
+      ['x-vendor-thing', 'anything at all'],
+    ];
+
+    const merged = mergeBlobbonautTagsForRepublish([...base, ...extensions], { name: 'Nova' });
+
+    for (const tag of extensions) {
+      expect(merged).toContainEqual(tag);
+    }
+    expect(merged.find(([n]) => n === 'name')?.[1]).toBe('Nova');
+  });
+
+  it('updates normal profile fields without clobbering unknown tags', () => {
+    const base = buildBlobbonautTags(PUBKEY);
+    const extensions = [
+      ['inv', 'hat-001'],
+      ['inv', 'scarf-002'],
+      ['storage', 'food_cake:3'],
+      ['room_layout', '{"couch":[1,2]}'],
+    ];
+
+    // Every managed field the kit actually writes, in one republish.
+    const merged = mergeBlobbonautTagsForRepublish([...base, ...extensions], {
+      coins: '999',
+      xp: '4200',
+      level: '7',
+      room: 'kitchen',
+      name: 'Nova',
+      current_companion: 'blobbi-abc',
+      has: ['blobbi-abc', 'blobbi-def'],
+      blobbi_onboarding_done: 'true',
+      pettingLevel: '11',
+    });
+
+    expect(merged.find(([n]) => n === 'coins')?.[1]).toBe('999');
+    expect(merged.find(([n]) => n === 'xp')?.[1]).toBe('4200');
+    expect(merged.find(([n]) => n === 'level')?.[1]).toBe('7');
+    expect(merged.find(([n]) => n === 'room')?.[1]).toBe('kitchen');
+    expect(getTagValues(merged, 'has')).toEqual(['blobbi-abc', 'blobbi-def']);
+
+    for (const tag of extensions) {
+      expect(merged).toContainEqual(tag);
+    }
+    // ...and exactly once each — no duplication from the passthrough.
+    expect(valuesFor(merged, 'inv')).toEqual(['hat-001', 'scarf-002']);
+    expect(valuesFor(merged, 'storage')).toEqual(['food_cake:3']);
+  });
+
+  it('never emits a storage tag when building a fresh profile', () => {
+    expect(valuesFor(buildBlobbonautTags(PUBKEY), 'storage')).toEqual([]);
+  });
+
+  it('never invents a storage tag on a profile that has none', () => {
+    const base = buildBlobbonautTags(PUBKEY);
+    const merged = mergeBlobbonautTagsForRepublish([...base, ['inv', 'hat-001']], {
+      coins: '5',
+      xp: '10',
+    });
+    expect(valuesFor(merged, 'storage')).toEqual([]);
   });
 });

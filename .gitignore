@@ -8,6 +8,8 @@ dist/
 # TypeScript incremental
 *.tsbuildinfo
 
+docs/audits
+
 # Logs
 *.log
 npm-debug.log*

@@ -9,7 +9,6 @@ import {
   parseBlobbiEvent,
   type BlobbiCompanion,
   type BlobbonautProfile,
-  type StorageItem,
 } from '@blobbi-kit/core/blobbi';
 
 import { fetchFreshBlobbonautProfile } from '@blobbi-kit/core/fetchFreshBlobbonautProfile';
@@ -43,17 +42,6 @@ export interface FreshBlobbiResult {
   profileAllTags: string[][];
   /** The previous profile event, for passing as `prev` to publishEvent */
   profileEvent: NostrEvent;
-  /**
-   * The latest profile consumable storage (legacy), read from pre-existing
-   * `storage` tags.
-   *
-   * @deprecated Consumable inventory is no longer modeled on kind 11125 and the
-   * kit never writes new `storage` tags. This field is populated only for
-   * backward-compatible reads and is scheduled for removal in a future major
-   * release. Hosts that need finite inventory own it via `@nostr-games/inventory`
-   * (kinds 31632/31633).
-   */
-  profileStorage: StorageItem[];
 }
 
 /**
@@ -150,7 +138,6 @@ export function useFreshBlobbiBeforeAction(pubkey?: string) {
       content: companion.event.content,
       profileAllTags: profile.allTags,
       profileEvent: profile.event,
-      profileStorage: profile.storage,
     };
   }, [pubkey, nostr, fetchFreshCompanion]);
 

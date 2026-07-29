@@ -21,7 +21,7 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { useNostr } from '@nostrify/react';
 import type { NostrEvent } from '@nostrify/nostrify';
 
-import type { BlobbiCompanion, BlobbonautProfile, StorageItem } from '@blobbi-kit/core/blobbi';
+import type { BlobbiCompanion, BlobbonautProfile } from '@blobbi-kit/core/blobbi';
 import {
   KIND_BLOBBI_STATE,
   updateBlobbiTags,
@@ -46,18 +46,12 @@ export interface CanonicalIncubationResult {
   companion: BlobbiCompanion;
   content: string;
   allTags: string[][];
-  /** Latest profile tags */
-  profileAllTags: string[][];
   /**
-   * Latest profile consumable storage (legacy).
-   *
-   * @deprecated Unused by incubation flows and no longer an active inventory
-   * source. Consumable inventory is not modeled on kind 11125; hosts own finite
-   * inventory via `@nostr-games/inventory` (kinds 31632/31633). Retained only
-   * for backward compatibility and scheduled for removal in a future major
-   * release.
+   * Latest profile tags, verbatim. Includes any unknown host extension tags
+   * (e.g. `inv`, legacy `storage`) — pass them straight back through the core
+   * merge helpers so a republish never clobbers them.
    */
-  profileStorage: StorageItem[];
+  profileAllTags: string[][];
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

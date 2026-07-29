@@ -334,22 +334,6 @@ export interface BlobbiCompanion {
 }
 
 /**
- * Stored consumable item in a Blobbonaut's profile (from purchases).
- *
- * @deprecated Consumable inventory is no longer modeled on kind 11125.
- * Finite inventory is owned by the host application (e.g. via
- * `@nostr-games/inventory`, kinds 31632/31633). This type — together with
- * {@link parseStorageTags}, {@link createStorageTags}, and
- * {@link BlobbonautProfile.storage} — is retained only for backward-compatible
- * reads of legacy `storage` tags and is scheduled for removal in a future
- * major release. Do not use it for new inventory features.
- */
-export interface StorageItem {
-  itemId: string;   // Must match a ShopItem.id
-  quantity: number; // Must be >= 1
-}
-
-/**
  * Parsed representation of a Blobbonaut Profile event (Kind 11125).
  * Also supports legacy Kind 31125 profiles.
  */
@@ -376,17 +360,6 @@ export interface BlobbonautProfile {
   level: number;
   /** Current room the player is in (persisted for cross-session continuity) */
   room: string | undefined;
-  /**
-   * Purchased consumable items parsed from legacy `storage` tags.
-   *
-   * @deprecated Consumable inventory is no longer modeled on kind 11125. This
-   * field is populated only from pre-existing legacy `storage` tags for
-   * backward-compatible reads; the kit never writes new `storage` tags and
-   * never treats this as an active inventory source. Finite inventory is owned
-   * by the host (kinds 31632/31633 via `@nostr-games/inventory`). Scheduled for
-   * removal in a future major release.
-   */
-  storage: StorageItem[];
   /** Raw content string for missions JSON */
   content: string;
   /** All tags preserved for republishing */
@@ -541,51 +514,6 @@ function parseBooleanTag(tags: string[][], name: string, defaultValue = false): 
   if (value === 'true') return true;
   if (value === 'false') return false;
   return defaultValue;
-}
-
-/**
- * Parse legacy `storage` tags from a Blobbonaut Profile event (Kind 11125).
- * Storage tags format: ['storage', 'itemId:quantity']
- *
- * @deprecated Consumable inventory is no longer modeled on kind 11125. This
- * helper is retained only to read pre-existing legacy `storage` tags for
- * backward compatibility; it is not an active inventory source and will be
- * removed in a future major release. Host apps that need finite inventory own
- * it via `@nostr-games/inventory` (kinds 31632/31633).
- *
- * @param tags - Event tags array
- * @returns Array of storage items with itemId and quantity
- */
-export function parseStorageTags(tags: string[][]): StorageItem[] {
-  return tags
-    .filter(tag => tag[0] === 'storage')
-    .map(tag => {
-      const [itemId, quantityStr] = tag[1].split(':');
-      return {
-        itemId,
-        quantity: parseInt(quantityStr, 10),
-      };
-    })
-    .filter(item => item.itemId && !isNaN(item.quantity) && item.quantity > 0);
-}
-
-/**
- * Create `storage` tags from a storage items array.
- * Each item becomes: ['storage', 'itemId:quantity']
- *
- * @deprecated The kit no longer generates consumable `storage` tags on kind
- * 11125. This builder is retained for backward compatibility only and will be
- * removed in a future major release. It is NOT used by any kit writer — profile
- * republish paths must never emit new `storage` tags. Host apps that need finite
- * inventory own it via `@nostr-games/inventory` (kinds 31632/31633).
- *
- * @param storage - Array of storage items
- * @returns Array of storage tags
- */
-export function createStorageTags(storage: StorageItem[]): string[][] {
-  return storage
-    .filter(item => item.itemId && item.quantity > 0)
-    .map(item => ['storage', `${item.itemId}:${item.quantity}`]);
 }
 
 // ─── Legacy Detection ─────────────────────────────────────────────────────────
@@ -1391,10 +1319,9 @@ export function parseBlobbonautEvent(event: NostrEvent): BlobbonautProfile | und
     xp: parseNumericTag(tags, 'xp') ?? 0,
     level: parseNumericTag(tags, 'level') ?? 1,
     room: getTagValue(tags, 'room') ?? undefined,
-    // Legacy read-only: populated from pre-existing `storage` tags for backward
-    // compatibility. Consumable inventory is no longer modeled on kind 11125;
-    // the kit never writes new `storage` tags. @deprecated — see StorageItem.
-    storage: parseStorageTags(tags),
+    // NOTE: consumable inventory is NOT modeled here. Legacy `storage` tags are
+    // never parsed or surfaced — they reach callers only through `allTags`, as
+    // opaque unknown extension tags (see MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES).
     content: event.content,
     allTags: tags,
   };
@@ -1550,11 +1477,11 @@ export const DEPRECATED_BLOBBI_TAG_NAMES = new Set([
  * These tags are controlled by the application and may be overwritten.
  *
  * NOTE: `storage` (legacy consumable inventory) is intentionally NOT managed.
- * Consumable inventory is no longer modeled on kind 11125 (owned by hosts via
- * `@nostr-games/inventory`, kinds 31632/31633). Any pre-existing `storage` tags
- * are now treated as opaque, host-owned extension tags: they are preserved
- * verbatim on republish (like `inv`) but the kit never reads them as an active
- * inventory source and never writes new ones. Do NOT re-add `storage` here.
+ * Consumable inventory is not modeled on kind 11125 at all — the kit does not
+ * parse, expose, create, update, normalize, or delete `storage` tags. Any
+ * pre-existing `storage` tags are opaque, host-owned extension tags: preserved
+ * verbatim on republish exactly like `inv` and any other unknown tag. Do NOT
+ * re-add `storage` here.
  */
 export const MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES = new Set([
   'd', 'b', 'name', 'current_companion', 'blobbi_onboarding_done', 'onboarding_done', 'has',
@@ -1781,11 +1708,12 @@ export function mergeBlobbiStateTagsForRepublish(
  * Merge tags for republishing a Kind 11125 Blobbonaut Profile event.
  * Preserves unknown tags, applies updates, and deduplicates repeated tags like 'has'.
  *
- * Consumable inventory note: `storage` is NOT a managed tag. Any pre-existing
- * `storage` tags are preserved verbatim (opaque passthrough, like `inv`), but
- * the kit refuses to WRITE new `storage` tags — a `storage` key in `updates` is
- * dropped (with a dev-time warning) so profile republishes can never generate
- * new consumable inventory on kind 11125.
+ * Consumable inventory note: `storage` is NOT a managed tag and is not part of
+ * the profile model. Any pre-existing `storage` tags are preserved verbatim
+ * (opaque passthrough, like `inv`), but the kit refuses to WRITE `storage` tags
+ * — a `storage` key in `updates` is dropped (with a dev-time warning) so a
+ * profile republish can never create or mutate consumable inventory on kind
+ * 11125.
  */
 export function mergeBlobbonautTagsForRepublish(
   existingTags: string[][],
@@ -1797,7 +1725,7 @@ export function mergeBlobbonautTagsForRepublish(
   let effectiveUpdates = updates;
   if ('storage' in updates) {
     blobbiLogger.warn(
-      '[Blobbi] Ignoring `storage` update on kind 11125: consumable inventory is no longer written by the kit. Existing storage tags are preserved opaquely.',
+      '[Blobbi] Ignoring `storage` update on kind 11125: consumable inventory is not modeled by the kit. Existing storage tags are preserved opaquely.',
     );
     effectiveUpdates = { ...updates };
     delete effectiveUpdates.storage;
