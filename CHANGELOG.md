@@ -9,6 +9,62 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## 0.4.0 — Remove the obsolete profile-Coin economy surface (breaking)
+
+**Breaking.** The kit no longer defines or exposes any Blobbi Coin economy.
+Active Blobbi Coin balances are owned by host applications and live outside
+blobbi-kit entirely; this release removes the last remnants of the old
+kind:11125 profile-Coin model, following the same pattern the 0.3.0
+consumable-storage removal established.
+
+### Removed
+
+- `INITIAL_BLOBBONAUT_COINS`, `BLOBBI_PREVIEW_REROLL_COST`, and
+  `BLOBBI_ADOPTION_COST` — the onboarding economy constants are gone from
+  `@blobbi-kit/core` (source, barrel, and built declarations). Coin allocation
+  and adoption/reroll pricing are host-application policy, not library policy.
+- `BlobbonautProfile.coins` — the parsed profile no longer represents legacy
+  profile Coins as active state. `parseBlobbonautEvent` does not read the
+  `coins` tag into the typed model.
+- `coins` is no longer a member of `MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES`.
+  Typed profile writers (`updateBlobbonautTags`,
+  `mergeBlobbonautTagsForRepublish`) can no longer create, replace, or delete
+  a `coins` tag.
+
+### Compatibility — legacy `coins` tags are tolerated and preserved
+
+An existing kind:11125 tag such as `["coins", "200"]` is obsolete historical
+data. It now behaves exactly like legacy `storage` tags:
+
+- events carrying it (including malformed or duplicate variants) still parse;
+- it reaches callers only via `allTags`/`event.tags`, as an opaque unknown tag;
+- republishing an existing profile (name, `has`, companion, onboarding,
+  progression updates, normalization) preserves it **verbatim** — never
+  normalized, renumbered, deduplicated, or dropped;
+- a `coins` key passed to an update helper is ignored with a dev-time warning
+  (mirroring the `storage` guard): it can neither write a new Coin tag nor
+  modify a pre-existing one.
+
+### Versions
+
+| Package | 0.3.1 | 0.4.0 |
+| --- | --- | --- |
+| `@blobbi-kit/core` | 0.3.1 | 0.4.0 |
+| `@blobbi-kit/react` | 0.3.1 | 0.4.0 |
+| `@blobbi-kit/react` peer `@blobbi-kit/core` | `^0.3.1` | `^0.4.0` |
+
+`@blobbi-kit/react` has no code change of its own beyond tests; it moves in
+lockstep because it re-uses core's `BlobbonautProfile` type, so the `coins`
+field removal flows through its hook parameter types.
+
+### Migration
+
+Hosts that still read `profile.coins` should read their own Coin state instead
+(it is host-owned data, outside blobbi-kit). Hosts that need the raw legacy tag
+for display or migration can still find it in `profile.allTags`.
+
+---
+
 ## 0.3.1 — Accept Nostrify 0.54 (packaging fix)
 
 **Packaging only.** No Blobbi runtime, API, type, or protocol behavior change.

@@ -64,7 +64,6 @@ describe('kind 11125 profile parsing no longer exposes consumable storage', () =
   it('still parses every non-inventory profile field', () => {
     const profile = parseBlobbonautEvent(legacyProfileEvent())!;
 
-    expect(profile.coins).toBe(250);
     expect(profile.xp).toBe(1200);
     expect(profile.level).toBe(5);
     expect(profile.has).toEqual(['blobbi-abc']);
@@ -92,7 +91,6 @@ describe('profile republish preserves legacy storage opaquely', () => {
     const before = event.tags.filter(([n]) => n === 'storage');
 
     const republished = updateBlobbonautTags(profile.allTags, {
-      coins: '300',
       xp: '1500',
       level: '6',
     });
@@ -100,8 +98,9 @@ describe('profile republish preserves legacy storage opaquely', () => {
     expect(republished.filter(([n]) => n === 'storage')).toEqual(before);
     // The `inv` accessory tag is untouched by the same republish.
     expect(republished.filter(([n]) => n === 'inv')).toEqual([['inv', 'hat-001']]);
+    // The legacy `coins` tag rides through opaquely, exactly like storage.
+    expect(republished.filter(([n]) => n === 'coins')).toEqual([['coins', '250']]);
     // ...and the managed updates actually landed.
-    expect(republished.find(([n]) => n === 'coins')?.[1]).toBe('300');
     expect(republished.find(([n]) => n === 'level')?.[1]).toBe('6');
   });
 
@@ -167,16 +166,16 @@ describe('profile normalization does not manage storage', () => {
 describe('the kit cannot create or actively update kind 11125 storage', () => {
   it('drops a `storage` write on a profile that has none', () => {
     const tags = buildBlobbonautTags(PUBKEY);
-    const updated = updateBlobbonautTags(tags, { coins: '10', storage: 'food_cake:5' });
+    const updated = updateBlobbonautTags(tags, { xp: '10', storage: 'food_cake:5' });
 
     expect(updated.some(([n]) => n === 'storage')).toBe(false);
-    expect(updated.find(([n]) => n === 'coins')?.[1]).toBe('10');
+    expect(updated.find(([n]) => n === 'xp')?.[1]).toBe('10');
   });
 
   it('drops a `storage` write without disturbing pre-existing storage tags', () => {
     const before = legacyProfileEvent().tags.filter(([n]) => n === 'storage');
     const updated = updateBlobbonautTags(legacyProfileEvent().tags, {
-      coins: '10',
+      xp: '10',
       storage: ['food_cake:99', 'toy-ball:99'],
     });
 
@@ -217,7 +216,6 @@ describe('removed public API surface', () => {
       'mergeBlobbonautTagsForRepublish',
       'MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES',
       'KIND_BLOBBONAUT_PROFILE',
-      'INITIAL_BLOBBONAUT_COINS',
     ]) {
       expect(coreBarrel).toHaveProperty(name);
     }

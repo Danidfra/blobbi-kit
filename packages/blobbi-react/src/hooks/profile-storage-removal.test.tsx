@@ -277,7 +277,6 @@ describe('profile republish from a hook result preserves legacy storage and inv'
     // The canonical host pattern: take profileAllTags, apply managed updates,
     // republish kind 11125.
     const republished = updateBlobbonautTags(canonical.profileAllTags, {
-      coins: '250',
       xp: '900',
     });
 
@@ -286,7 +285,8 @@ describe('profile republish from a hook result preserves legacy storage and inv'
       ['storage', 'medicine-basic:1'],
     ]);
     expect(republished.filter(([n]) => n === 'inv')).toEqual([['inv', 'hat-001']]);
-    expect(republished.find(([n]) => n === 'coins')?.[1]).toBe('250');
+    // Legacy `coins` is opaque now: it rides through untouched, like storage.
+    expect(republished.filter(([n]) => n === 'coins')).toEqual([['coins', '100']]);
     expect(KIND_BLOBBONAUT_PROFILE).toBe(11125);
   });
 });

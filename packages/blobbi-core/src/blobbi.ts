@@ -59,16 +59,11 @@ export const DEFAULT_EGG_STATS = {
  */
 export const DEFAULT_INCUBATION_TIME = 345600;
 
-// ─── Onboarding Constants ─────────────────────────────────────────────────────
-
-/** Initial coins given to new Blobbonauts */
-export const INITIAL_BLOBBONAUT_COINS = 200;
-
-/** Cost to reroll/generate another egg preview during onboarding */
-export const BLOBBI_PREVIEW_REROLL_COST = 10;
-
-/** Cost to adopt a Blobbi from the preview */
-export const BLOBBI_ADOPTION_COST = 100;
+// NOTE: the onboarding economy constants (INITIAL_BLOBBONAUT_COINS,
+// BLOBBI_PREVIEW_REROLL_COST, BLOBBI_ADOPTION_COST) were removed in 0.4.0.
+// The kit owns no Coin economy: active Blobbi Coin balances are host-owned
+// and live outside blobbi-kit entirely, and adoption/onboarding here is not
+// coupled to currency. Do NOT re-add economy constants to this package.
 
 // ─── Date/Time Utilities ──────────────────────────────────────────────────────
 
@@ -350,8 +345,6 @@ export interface BlobbonautProfile {
   name: string | undefined;
   /** List of owned Blobbi d-tags */
   has: string[];
-  /** In-game currency balance */
-  coins: number;
   /** Petting level (interaction counter) */
   pettingLevel: number;
   /** Player lifetime XP (source of truth for progression) */
@@ -1314,14 +1307,14 @@ export function parseBlobbonautEvent(event: NostrEvent): BlobbonautProfile | und
       || parseBooleanTag(tags, 'onboarding_done', false),
     name: getTagValue(tags, 'name'),
     has: getTagValues(tags, 'has'),
-    coins: parseNumericTag(tags, 'coins') ?? 0,
     pettingLevel: pettingLevelValue,
     xp: parseNumericTag(tags, 'xp') ?? 0,
     level: parseNumericTag(tags, 'level') ?? 1,
     room: getTagValue(tags, 'room') ?? undefined,
-    // NOTE: consumable inventory is NOT modeled here. Legacy `storage` tags are
-    // never parsed or surfaced — they reach callers only through `allTags`, as
-    // opaque unknown extension tags (see MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES).
+    // NOTE: consumable inventory and Coins are NOT modeled here. Legacy
+    // `storage` and `coins` tags are never parsed or surfaced — they reach
+    // callers only through `allTags`, as opaque unknown extension tags (see
+    // MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES).
     content: event.content,
     allTags: tags,
   };
@@ -1476,12 +1469,13 @@ export const DEPRECATED_BLOBBI_TAG_NAMES = new Set([
  * Tags managed by the client for Kind 11125 (Blobbonaut Profile).
  * These tags are controlled by the application and may be overwritten.
  *
- * NOTE: `storage` (legacy consumable inventory) is intentionally NOT managed.
- * Consumable inventory is not modeled on kind 11125 at all — the kit does not
- * parse, expose, create, update, normalize, or delete `storage` tags. Any
- * pre-existing `storage` tags are opaque, host-owned extension tags: preserved
- * verbatim on republish exactly like `inv` and any other unknown tag. Do NOT
- * re-add `storage` here.
+ * NOTE: `storage` (legacy consumable inventory) and `coins` (legacy profile
+ * currency) are intentionally NOT managed. Neither is modeled on kind 11125 at
+ * all — the kit does not parse, expose, create, update, normalize, or delete
+ * `storage` or `coins` tags. Any pre-existing tags of either name are opaque,
+ * host-owned extension tags: preserved verbatim on republish exactly like
+ * `inv` and any other unknown tag. Active Blobbi Coin balances live outside
+ * blobbi-kit entirely. Do NOT re-add `storage` or `coins` here.
  */
 export const MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES = new Set([
   'd', 'b', 'name', 'current_companion', 'blobbi_onboarding_done', 'onboarding_done', 'has',
@@ -1490,7 +1484,7 @@ export const MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES = new Set([
   // Room persistence
   'room',
   // Legacy player progress tags (preserved for compatibility)
-  'coins', 'petting_level', 'pettingLevel', 'lifetime_blobbis', 'lifetimeBlobbis',
+  'petting_level', 'pettingLevel', 'lifetime_blobbis', 'lifetimeBlobbis',
   'starter_blobbi', 'starterBlobbi', 'favorite_blobbi', 'favoriteBlobbi',
 ]);
 
@@ -1708,27 +1702,32 @@ export function mergeBlobbiStateTagsForRepublish(
  * Merge tags for republishing a Kind 11125 Blobbonaut Profile event.
  * Preserves unknown tags, applies updates, and deduplicates repeated tags like 'has'.
  *
- * Consumable inventory note: `storage` is NOT a managed tag and is not part of
- * the profile model. Any pre-existing `storage` tags are preserved verbatim
- * (opaque passthrough, like `inv`), but the kit refuses to WRITE `storage` tags
- * — a `storage` key in `updates` is dropped (with a dev-time warning) so a
- * profile republish can never create or mutate consumable inventory on kind
- * 11125.
+ * Legacy-data note: `storage` (consumable inventory) and `coins` (legacy
+ * profile currency) are NOT managed tags and are not part of the profile
+ * model. Any pre-existing `storage` or `coins` tags are preserved verbatim
+ * (opaque passthrough, like `inv`), but the kit refuses to WRITE them — a
+ * `storage` or `coins` key in `updates` is dropped (with a dev-time warning)
+ * so a profile republish can never create or mutate consumable inventory or
+ * Coin balances on kind 11125. Active Blobbi Coin balances live outside
+ * blobbi-kit entirely.
  */
 export function mergeBlobbonautTagsForRepublish(
   existingTags: string[][],
   updates: Record<string, string | string[]>
 ): string[][] {
-  // Guard: the kit must never generate new consumable `storage` tags on kind
-  // 11125. Drop any `storage` update key so it cannot be written. Existing
-  // `storage` tags are still preserved below via the unknown-tags passthrough.
+  // Guard: the kit must never generate new `storage` (consumable inventory) or
+  // `coins` (legacy currency) tags on kind 11125. Drop those update keys so
+  // they cannot be written. Existing tags of either name are still preserved
+  // below via the unknown-tags passthrough.
   let effectiveUpdates = updates;
-  if ('storage' in updates) {
-    blobbiLogger.warn(
-      '[Blobbi] Ignoring `storage` update on kind 11125: consumable inventory is not modeled by the kit. Existing storage tags are preserved opaquely.',
-    );
-    effectiveUpdates = { ...updates };
-    delete effectiveUpdates.storage;
+  for (const retired of ['storage', 'coins'] as const) {
+    if (retired in effectiveUpdates) {
+      blobbiLogger.warn(
+        `[Blobbi] Ignoring \`${retired}\` update on kind 11125: it is not modeled by the kit. Existing ${retired} tags are preserved opaquely.`,
+      );
+      if (effectiveUpdates === updates) effectiveUpdates = { ...updates };
+      delete effectiveUpdates[retired];
+    }
   }
 
   const newTags: string[][] = [];
@@ -1757,9 +1756,10 @@ export function mergeBlobbonautTagsForRepublish(
   //
   // INVARIANT: unknown/unmanaged extension tags MUST survive republish. Host
   // apps attach their own tags to kind 11125 profiles (e.g. Blobbi Island's
-  // accessory/cosmetic `inv` tags, and legacy consumable `storage` tags). Core
-  // must never clobber them. Only `has` is deduped below; all other unmanaged
-  // tags — including `inv` and legacy `storage` — are passed through verbatim.
+  // accessory/cosmetic `inv` tags, legacy consumable `storage` tags, and
+  // legacy `coins` tags). Core must never clobber them. Only `has` is deduped
+  // below; all other unmanaged tags — including `inv`, legacy `storage`, and
+  // legacy `coins` — are passed through verbatim.
   const unknownTags = existingTags.filter(tag => !MANAGED_BLOBBONAUT_PROFILE_TAG_NAMES.has(tag[0]));
   
   // Deduplicate 'has' tags
