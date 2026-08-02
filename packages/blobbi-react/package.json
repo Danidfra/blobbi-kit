@@ -1,6 +1,6 @@
 {
   "name": "@blobbi-kit/react",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Portable, app-agnostic React hooks for Blobbi, built on @blobbi-kit/core.",
   "type": "module",
   "license": "MIT",
@@ -48,7 +48,7 @@
     }
   },
   "peerDependencies": {
-    "@blobbi-kit/core": "^0.3.1",
+    "@blobbi-kit/core": "^0.4.0",
     "@nostrify/nostrify": "^0.53.0 || ^0.54.0",
     "@nostrify/react": "^0.6.3",
     "@tanstack/react-query": "^5.56.2",

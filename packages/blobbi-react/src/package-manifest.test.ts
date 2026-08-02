@@ -38,13 +38,13 @@ const EXPECTED_NOSTRIFY_PEER = '^0.53.0 || ^0.54.0';
 describe('@blobbi-kit/react package manifest', () => {
   it('is the expected package at the expected version', () => {
     expect(manifest.name).toBe('@blobbi-kit/react');
-    expect(manifest.version).toBe('0.3.1');
+    expect(manifest.version).toBe('0.4.0');
   });
 
   describe('peer dependency set', () => {
     it('declares exactly the expected peers and ranges', () => {
       expect(manifest.peerDependencies).toEqual({
-        '@blobbi-kit/core': '^0.3.1',
+        '@blobbi-kit/core': '^0.4.0',
         '@nostrify/nostrify': EXPECTED_NOSTRIFY_PEER,
         '@nostrify/react': '^0.6.3',
         '@tanstack/react-query': '^5.56.2',
@@ -113,15 +113,16 @@ describe('@blobbi-kit/react package manifest', () => {
     });
 
     it('pins the core peer to the version being released', () => {
-      // The Nostrify peer fix lives in core, so pairing react@0.3.1 with
-      // core@0.3.0 would silently reintroduce the narrow `^0.53.0` peer.
+      // The economy removal (0.4.0) is a breaking change that lives in core,
+      // so pairing this react release with an older core would silently
+      // reintroduce the removed Coin surface through the shared types.
       expect(manifest.peerDependencies?.['@blobbi-kit/core']).toBe(
         `^${coreManifest.version}`,
       );
       expect(satisfies(coreManifest.version, manifest.peerDependencies!['@blobbi-kit/core'])).toBe(
         true,
       );
-      expect(satisfies('0.3.0', manifest.peerDependencies!['@blobbi-kit/core'])).toBe(false);
+      expect(satisfies('0.3.1', manifest.peerDependencies!['@blobbi-kit/core'])).toBe(false);
     });
 
     it('declares the same Nostrify peer range as core', () => {

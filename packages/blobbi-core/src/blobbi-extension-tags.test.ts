@@ -103,10 +103,10 @@ describe('extension tag preservation — kind 11125 (Blobbonaut profile)', () =>
       ['inv', 'key:1'],
     ];
 
-    const updated = updateBlobbonautTags(withInv, { coins: '150' });
+    const updated = updateBlobbonautTags(withInv, { xp: '150' });
 
     expect(valuesFor(updated, 'inv')).toEqual(['potion:3', 'key:1']);
-    expect(updated.find(([n]) => n === 'coins')?.[1]).toBe('150');
+    expect(updated.find(([n]) => n === 'xp')?.[1]).toBe('150');
   });
 
   it('preserves repeated inv tags through mergeBlobbonautTagsForRepublish', () => {
@@ -159,11 +159,11 @@ describe('consumable storage decoupling — kind 11125 (Blobbonaut profile)', ()
       ['storage', 'medicine-basic:1'],
     ];
 
-    const updated = updateBlobbonautTags(withStorage, { coins: '150' });
+    const updated = updateBlobbonautTags(withStorage, { xp: '150' });
 
     // Legacy storage passes through opaquely (like inv), unchanged and unordered-merged.
     expect(valuesFor(updated, 'storage')).toEqual(['food_cake:3', 'medicine-basic:1']);
-    expect(updated.find(([n]) => n === 'coins')?.[1]).toBe('150');
+    expect(updated.find(([n]) => n === 'xp')?.[1]).toBe('150');
   });
 
   it('preserves legacy storage tags through mergeBlobbonautTagsForRepublish', () => {
@@ -180,29 +180,29 @@ describe('consumable storage decoupling — kind 11125 (Blobbonaut profile)', ()
     const base = buildBlobbonautTags(PUBKEY);
 
     const updated = updateBlobbonautTags(base, {
-      coins: '10',
+      xp: '10',
       storage: 'food_cake:5',
     });
 
     // The kit never generates new consumable storage tags on kind 11125.
     expect(valuesFor(updated, 'storage')).toEqual([]);
     // The non-storage update still applied.
-    expect(updated.find(([n]) => n === 'coins')?.[1]).toBe('10');
+    expect(updated.find(([n]) => n === 'xp')?.[1]).toBe('10');
   });
 
   it('drops a `storage` update key but still preserves pre-existing storage tags', () => {
     const base = buildBlobbonautTags(PUBKEY);
     const withStorage = [...base, ['storage', 'food_cake:3']];
 
-    // Attempt to overwrite storage AND update coins.
+    // Attempt to overwrite storage AND update xp.
     const updated = updateBlobbonautTags(withStorage, {
-      coins: '20',
+      xp: '20',
       storage: 'food_cake:99',
     });
 
     // The update value is ignored; the original legacy tag survives unchanged.
     expect(valuesFor(updated, 'storage')).toEqual(['food_cake:3']);
-    expect(updated.find(([n]) => n === 'coins')?.[1]).toBe('20');
+    expect(updated.find(([n]) => n === 'xp')?.[1]).toBe('20');
   });
 
   it('keeps `inv` and legacy `storage` independent and both untouched', () => {
@@ -235,7 +235,7 @@ describe('consumable storage decoupling — kind 11125 (Blobbonaut profile)', ()
     ];
     const withStorage = [...base, ...legacyStorage];
 
-    const merged = mergeBlobbonautTagsForRepublish(withStorage, { xp: '9', coins: '12' });
+    const merged = mergeBlobbonautTagsForRepublish(withStorage, { xp: '9', level: '12' });
 
     // Identical tags, identical order, identical arity — nothing normalized away.
     expect(merged.filter(([n]) => n === 'storage')).toEqual(legacyStorage);
@@ -270,7 +270,6 @@ describe('consumable storage decoupling — kind 11125 (Blobbonaut profile)', ()
 
     // Every managed field the kit actually writes, in one republish.
     const merged = mergeBlobbonautTagsForRepublish([...base, ...extensions], {
-      coins: '999',
       xp: '4200',
       level: '7',
       room: 'kitchen',
@@ -281,7 +280,6 @@ describe('consumable storage decoupling — kind 11125 (Blobbonaut profile)', ()
       pettingLevel: '11',
     });
 
-    expect(merged.find(([n]) => n === 'coins')?.[1]).toBe('999');
     expect(merged.find(([n]) => n === 'xp')?.[1]).toBe('4200');
     expect(merged.find(([n]) => n === 'level')?.[1]).toBe('7');
     expect(merged.find(([n]) => n === 'room')?.[1]).toBe('kitchen');
@@ -302,7 +300,7 @@ describe('consumable storage decoupling — kind 11125 (Blobbonaut profile)', ()
   it('never invents a storage tag on a profile that has none', () => {
     const base = buildBlobbonautTags(PUBKEY);
     const merged = mergeBlobbonautTagsForRepublish([...base, ['inv', 'hat-001']], {
-      coins: '5',
+      level: '5',
       xp: '10',
     });
     expect(valuesFor(merged, 'storage')).toEqual([]);

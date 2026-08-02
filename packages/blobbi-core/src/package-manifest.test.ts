@@ -43,7 +43,7 @@ const EXPECTED_NOSTRIFY_PEER = '^0.53.0 || ^0.54.0';
 describe('@blobbi-kit/core package manifest', () => {
   it('is the expected package at the expected version', () => {
     expect(manifest.name).toBe('@blobbi-kit/core');
-    expect(manifest.version).toBe('0.3.1');
+    expect(manifest.version).toBe('0.4.0');
   });
 
   describe('Nostrify is a peer dependency, not a regular dependency', () => {
