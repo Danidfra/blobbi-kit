@@ -1,6 +1,6 @@
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from './nostr-protocol';
 
 import { blobbiLogger } from '@blobbi-kit/core/logger';
 

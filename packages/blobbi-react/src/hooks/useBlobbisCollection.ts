@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useNostr } from '@nostrify/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 
 import {
   KIND_BLOBBI_STATE,

@@ -10,7 +10,6 @@
  */
 
 import { readFile, readdir } from 'node:fs/promises';
-import { satisfies } from 'semver';
 
 const runtimeEntries = [
   '@blobbi-kit/core',
@@ -163,11 +162,14 @@ for (const { file, patterns } of REMOVED_TYPE_DECLARATIONS) {
 }
 // ─── Packaged-artifact contract ───────────────────────────────────────────────
 //
-// 0.3.0 shipped `peer @nostrify/nostrify: ^0.53.0`, which for a pre-1.0 package
-// means `>=0.53.0 <0.54.0` and so excluded Nostrify 0.54; hosts had to suppress
-// the resulting ERESOLVE with an npm `overrides` entry. The lesson is that a
-// dependency *classification* mistake is invisible to unit tests, so it needs an
-// assertion of its own.
+// Both packages once declared `peer @nostrify/nostrify`, and for a pre-1.0
+// package the caret pins the minor — so every Nostrify minor release broke
+// `npm install` for hosts, who suppressed the ERESOLVE with an npm `overrides`
+// entry. Widening the range each time only reset the clock; the dependency was
+// misclassified, not mis-ranged. Nostrify is now gone from both manifests and
+// the kit declares its own protocol contracts in `@blobbi-kit/core`'s
+// `nostr-protocol` module. The lesson stands: a dependency *classification*
+// mistake is invisible to unit tests, so it needs assertions of its own.
 //
 // Division of labour, to keep exactly one owner per fact:
 //
@@ -267,38 +269,159 @@ for (const dir of ['packages/blobbi-core', 'packages/blobbi-react']) {
     );
   }
 
-  // Nostrify is consumed via `import type` only. If it ever reaches the emitted
-  // JavaScript it has become a real runtime coupling, and the host could end up
-  // with a second copy — `NPool` declares `private` members, so two copies are
-  // nominally distinct types and break assignability.
+  // Nostrify is not a dependency of either package in any form. If it ever
+  // reaches the emitted JavaScript it has become a real runtime coupling that
+  // no manifest declares, and the host would have to supply a matching copy.
   if (externals.has(NOSTRIFY)) {
-    fail(`${manifest.name} dist imports ${NOSTRIFY} at runtime; it must remain type-only`);
+    fail(`${manifest.name} dist imports ${NOSTRIFY} at runtime, but declares no dependency on it`);
   }
 
   console.log(
     `  ok  ${manifest.name} dist imports only declared externals ` +
-      `(${[...externals].sort().join(', ')}); ${NOSTRIFY} type-only`,
+      `(${[...externals].sort().join(', ')}); no ${NOSTRIFY}`,
   );
 }
 
-// ─── Installed-tree sanity: exactly one Nostrify ──────────────────────────────
+// ─── Declaration-surface contract ─────────────────────────────────────────────
 //
-// `@nostrify/react` pins `@nostrify/nostrify` to an EXACT version (0.6.3→0.53.0,
-// 0.6.4→0.54.0), so the two must be upgraded as a matched pair. Bumping one alone
-// leaves a second Nostrify nested under `@nostrify/react`, and because `NPool`
-// declares `private` members it is nominally typed — the duplicate then surfaces
-// as a pile of baffling `TS2345: NPool is not assignable to NPool` errors that
-// mimic a version incompatibility. Fail with the real reason instead.
+// The emitted JavaScript never referenced Nostrify even before this refactor —
+// the imports were all `import type`. What actually forced consumers to install
+// it was the *declaration* surface: `dist/**/*.d.ts` carried
+// `import { NPool, NostrEvent } from '@nostrify/nostrify'`, so typechecking a
+// consumer's app required the module to resolve. tsup's declaration rollup also
+// emitted a bare `import '@nostrify/nostrify';` into modules that used no
+// Nostrify symbol at all, widening the coupling past the files that imported one.
 //
-// The range is read from core's manifest rather than restated, so this stays
-// correct when the peer range next changes.
+// This is therefore the assertion that proves the peer is genuinely gone rather
+// than merely undeclared. Comments are stripped first and the remaining *code*
+// is substring-scanned, rather than matching an import-statement regex: a stray
+// bare import, a re-exported type, and an inlined `import('...')` type query all
+// have to be caught, while a docblock that merely names the package in prose is
+// not a module reference and must not trip the check.
+
+/**
+ * Remove `//` and block comments, leaving string literals intact.
+ *
+ * Deliberately small rather than a real parser: `.d.ts` output is generated, so
+ * it has no regex literals or template-literal nesting to confuse the scan.
+ */
+function stripComments(src) {
+  let out = '';
+  let i = 0;
+  let quote = null;
+  while (i < src.length) {
+    const ch = src[i];
+    const next = src[i + 1];
+
+    if (quote) {
+      if (ch === '\\') {
+        out += ch + (next ?? '');
+        i += 2;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      out += ch;
+      i++;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+      out += ch;
+      i++;
+      continue;
+    }
+
+    if (ch === '/' && next === '/') {
+      while (i < src.length && src[i] !== '\n') i++;
+      continue;
+    }
+
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+async function declarationFiles(distDir) {
+  const found = [];
+  const walk = async (dir) => {
+    let entries;
+    try {
+      entries = await readdir(new URL(`../${dir}/`, import.meta.url), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        await walk(`${dir}/${entry.name}`);
+        continue;
+      }
+      if (entry.name.endsWith('.d.ts')) found.push(`${dir}/${entry.name}`);
+    }
+  };
+  await walk(distDir);
+  return found;
+}
+
+for (const dir of ['packages/blobbi-core', 'packages/blobbi-react']) {
+  const files = await declarationFiles(`${dir}/dist`);
+
+  if (files.length === 0) {
+    fail(`${dir}/dist contains no .d.ts files — is dist/ built?`);
+    continue;
+  }
+
+  const offenders = [];
+  for (const file of files) {
+    const dts = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
+    if (stripComments(dts).includes(NOSTRIFY)) offenders.push(file);
+  }
+
+  if (offenders.length) {
+    fail(
+      `${dir} publishes declarations that reference ${NOSTRIFY}: ${offenders.join(', ')}. ` +
+        `Consumers would need it installed to typecheck. Import the kit's own ` +
+        `NostrEvent/NostrFilter/NostrQuerier from @blobbi-kit/core/nostr-protocol instead.`,
+    );
+  } else {
+    console.log(
+      `  ok  ${dir} declarations are Nostrify-free (${files.length} .d.ts files scanned)`,
+    );
+  }
+}
+
+// ─── Dev-fixture sanity: exactly one Nostrify in the workspace ───────────────
+//
+// Neither published package depends on Nostrify any more, so nothing here is a
+// consumer-facing constraint. Nostrify remains a *root devDependency* purely as
+// a compatibility fixture: `packages/blobbi-core/src/nostr-protocol.test.ts`
+// typechecks the kit's own `NostrEvent`/`NostrFilter`/`NostrQuerier` against the
+// real ones, which is what keeps the local declarations structurally
+// interchangeable with the ecosystem.
+//
+// That fixture is only meaningful if there is exactly one copy to check against.
+// `@nostrify/react` pins `@nostrify/nostrify` to an EXACT version
+// (0.6.3 -> 0.53.0, 0.6.4 -> 0.54.0, 0.6.5 -> 0.54.1), so bumping one without the
+// other leaves a second copy nested under `@nostrify/react` — and the compat test
+// would then be validating against a version the React peer does not use.
+//
+// No version range is asserted. There is no longer one to assert.
 {
-  const declaredRange = (await readJson('packages/blobbi-core/package.json'))
-    .peerDependencies?.[NOSTRIFY];
   const root = await readJson(`node_modules/${NOSTRIFY}/package.json`).catch(() => null);
 
   if (!root) {
-    fail(`${NOSTRIFY} is not installed — run npm install`);
+    fail(
+      `${NOSTRIFY} is not installed — it is the dev-only compatibility fixture for ` +
+        `nostr-protocol.test.ts. Run npm install.`,
+    );
   } else {
     // Any copy nested one level deep under another installed package.
     const nested = [];
@@ -321,20 +444,49 @@ for (const dir of ['packages/blobbi-core', 'packages/blobbi-react']) {
 
     if (nested.length) {
       fail(
-        `duplicate ${NOSTRIFY} in the installed tree: root ${root.version}, also nested under ` +
-          `${nested.join(', ')}. Upgrade ${NOSTRIFY} and @nostrify/react together ` +
+        `duplicate ${NOSTRIFY} in the dev tree: root ${root.version}, also nested under ` +
+          `${nested.join(', ')}. The compatibility fixture must match the copy ` +
+          `@nostrify/react resolves; upgrade ${NOSTRIFY} and @nostrify/react together ` +
           `(@nostrify/react pins nostrify exactly).`,
-      );
-    } else if (!satisfies(root.version, declaredRange)) {
-      fail(
-        `installed ${NOSTRIFY} ${root.version} is outside the declared peer range ` +
-          `"${declaredRange}", so typecheck/test are not validating a supported version`,
       );
     } else {
       console.log(
-        `  ok  exactly one ${NOSTRIFY} installed (${root.version}), within the declared peer range "${declaredRange}"`,
+        `  ok  exactly one ${NOSTRIFY} in the dev tree (${root.version}), ` +
+          `usable as the type-compatibility fixture`,
       );
     }
+  }
+}
+
+// ─── Published manifests declare no Nostrify ─────────────────────────────────
+//
+// The unit tests own this too (packages/*/src/package-manifest.test.ts), but
+// asserting it here as well is cheap and keeps `npm run smoke` a complete
+// standalone gate for the packaging contract.
+for (const dir of ['packages/blobbi-core', 'packages/blobbi-react']) {
+  const manifest = await readJson(`${dir}/package.json`).catch(() => null);
+  if (!manifest) {
+    fail(`cannot read ${dir}/package.json`);
+    continue;
+  }
+  const fields = [
+    'dependencies',
+    'peerDependencies',
+    'optionalDependencies',
+    'devDependencies',
+    'bundledDependencies',
+    'bundleDependencies',
+  ];
+  const declaredIn = fields.filter((field) => {
+    const value = manifest[field];
+    const names = Array.isArray(value) ? value : Object.keys(value ?? {});
+    return names.includes(NOSTRIFY);
+  });
+
+  if (declaredIn.length) {
+    fail(`${manifest.name} declares ${NOSTRIFY} under ${declaredIn.join(', ')}; it must declare none`);
+  } else {
+    console.log(`  ok  ${manifest.name} declares no ${NOSTRIFY} dependency`);
   }
 }
 

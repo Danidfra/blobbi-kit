@@ -8,19 +8,25 @@ import coreManifest from '../package.json';
 /**
  * Manifest contract tests for the *published* shape of `@blobbi-kit/core`.
  *
- * These assert packaging, not behavior. They exist because 0.3.0 shipped a peer
- * range (`@nostrify/nostrify: ^0.53.0`) that excluded Nostrify 0.54 — for a
- * pre-1.0 package the caret pins the minor, so `^0.53.0` is `>=0.53.0 <0.54.0`.
- * Host apps had to paper over the resulting ERESOLVE with an npm `overrides`
- * entry. A unit test can't catch that; only the manifest can.
+ * These assert packaging, not behavior.
+ *
+ * History worth keeping, because it is why this file exists: core used to
+ * declare `peerDependencies["@nostrify/nostrify"]`, first as `^0.53.0` and then
+ * as `^0.53.0 || ^0.54.0`. For a pre-1.0 package the caret pins the minor, so
+ * every Nostrify minor release broke `npm install` for host apps, who papered
+ * over the ERESOLVE with an npm `overrides` entry. Widening the range each time
+ * only reset the clock.
+ *
+ * The actual defect was a misclassification, not a bad range: core imports no
+ * Nostrify symbol at runtime and never did. It now declares its own
+ * protocol-level contracts in `./nostr-protocol` (`NostrEvent`, `NostrFilter`,
+ * `NostrQuerier`), so the dependency is gone rather than re-ranged.
  *
  * The invariants locked in here:
- *   1. Nostrify is a PEER, never a regular/bundled dependency. Core imports it
- *      `import type` only, so a host must be free to supply its own copy and
- *      there must never be a second one in the tree.
- *   2. The peer range accepts both supported Nostrify lines (0.53.x, 0.54.x) and
- *      still REJECTS the next unreviewed minor (0.55.0). A blanket
- *      `>=0.53.0 <1.0.0` would silently accept a future breaking change.
+ *   1. `@nostrify/nostrify` appears in NO host-facing dependency field. Not as a
+ *      peer, not as a regular dependency, not optional, not bundled. A range is
+ *      never the right answer for a package core does not use.
+ *   2. No `@nostrify/*` package is a regular dependency either.
  *   3. `@noble/hashes` stays the sole regular dependency, pinned to ^1.x.
  *   4. The packaged file list / exports map stay correct.
  */
@@ -38,52 +44,65 @@ const manifest: {
 } = coreManifest;
 
 const NOSTRIFY = '@nostrify/nostrify';
-const EXPECTED_NOSTRIFY_PEER = '^0.53.0 || ^0.54.0';
+
+/**
+ * Every manifest field npm reads when installing this package into a host.
+ * `devDependencies` is deliberately included: it is not installed for consumers,
+ * but core declaring one would still signal that the package expects Nostrify.
+ */
+const HOST_FACING_FIELDS = [
+  'dependencies',
+  'peerDependencies',
+  'optionalDependencies',
+  'devDependencies',
+  'bundledDependencies',
+  'bundleDependencies',
+] as const;
 
 describe('@blobbi-kit/core package manifest', () => {
   it('is the expected package at the expected version', () => {
     expect(manifest.name).toBe('@blobbi-kit/core');
-    expect(manifest.version).toBe('0.4.0');
+    expect(manifest.version).toBe('0.5.0');
   });
 
-  describe('Nostrify is a peer dependency, not a regular dependency', () => {
-    it('declares Nostrify under peerDependencies', () => {
-      expect(manifest.peerDependencies?.[NOSTRIFY]).toBeDefined();
+  describe('core does not depend on Nostrify at all', () => {
+    it.each(HOST_FACING_FIELDS)('does not declare Nostrify under %s', (field) => {
+      const declared = (manifest as unknown as Record<string, unknown>)[field];
+      // Array form (bundledDependencies) and object form both have to be clean.
+      const names = Array.isArray(declared)
+        ? declared
+        : Object.keys((declared as Record<string, string>) ?? {});
+      expect(names).not.toContain(NOSTRIFY);
     });
 
-    it('does not declare Nostrify as a regular or dev dependency', () => {
-      // A regular dependency would let npm install a *second* Nostrify nested
-      // under core, giving the host two copies of NPool/NostrEvent.
-      expect(manifest.dependencies ?? {}).not.toHaveProperty(NOSTRIFY);
-      expect(manifest.devDependencies ?? {}).not.toHaveProperty(NOSTRIFY);
+    it('declares no @nostrify/* package in any host-facing field', () => {
+      // Core is framework- and library-agnostic: the React integration (and its
+      // genuine @nostrify/react peer) lives in @blobbi-kit/react.
+      const names = HOST_FACING_FIELDS.flatMap((field) => {
+        const declared = (manifest as unknown as Record<string, unknown>)[field];
+        return Array.isArray(declared)
+          ? declared
+          : Object.keys((declared as Record<string, string>) ?? {});
+      });
+      expect(names.filter((name) => name.startsWith('@nostrify/'))).toEqual([]);
     });
 
-    it('does not declare any @nostrify/* package as a regular dependency', () => {
-      const regular = Object.keys(manifest.dependencies ?? {});
-      expect(regular.filter((name) => name.startsWith('@nostrify/'))).toEqual([]);
-    });
-  });
-
-  describe('Nostrify peer range', () => {
-    it('is exactly the reviewed union range', () => {
-      expect(manifest.peerDependencies?.[NOSTRIFY]).toBe(EXPECTED_NOSTRIFY_PEER);
+    it('declares no peer dependencies whatsoever', () => {
+      // Nothing core uses is a host-owned singleton, so there is no peer to
+      // negotiate. If a peer is ever added, it needs its own justification here.
+      expect(manifest.peerDependencies).toBeUndefined();
     });
 
-    it.each(['0.53.0', '0.53.1', '0.53.9', '0.54.0', '0.54.1', '0.54.7'])(
-      'accepts Nostrify %s',
-      (version) => {
-        expect(satisfies(version, EXPECTED_NOSTRIFY_PEER)).toBe(true);
-      },
-    );
-
-    it.each(['0.52.9', '0.55.0', '0.55.1', '1.0.0'])(
-      'rejects Nostrify %s',
-      (version) => {
-        // 0.55.0 in particular: the range must not blanket-accept the next
-        // pre-1.0 minor, which is where breaking changes land.
-        expect(satisfies(version, EXPECTED_NOSTRIFY_PEER)).toBe(false);
-      },
-    );
+    it('imposes no Nostrify version constraint on hosts', () => {
+      // The point of the whole exercise. A host on 0.53.x, 0.55.0, a future
+      // 1.x, or no Nostrify at all resolves identically, because there is no
+      // range left to satisfy — and so no npm `overrides` entry to write.
+      const constraint =
+        manifest.peerDependencies?.[NOSTRIFY] ??
+        manifest.dependencies?.[NOSTRIFY] ??
+        manifest.devDependencies?.[NOSTRIFY];
+      expect(constraint).toBeUndefined();
+    });
   });
 
   describe('regular dependencies', () => {

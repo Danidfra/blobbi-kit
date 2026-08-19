@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from './nostr-protocol';
 
 import * as coreBarrel from './index';
 import * as blobbiModule from './blobbi';

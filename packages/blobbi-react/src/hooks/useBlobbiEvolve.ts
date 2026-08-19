@@ -17,7 +17,7 @@
  */
 
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 
 import type { BlobbiCompanion, BlobbonautProfile, BlobbiStage } from '@blobbi-kit/core/blobbi';
 import {

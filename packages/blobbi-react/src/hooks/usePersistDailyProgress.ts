@@ -19,7 +19,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useNostr } from '@nostrify/react';
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 
 import { KIND_BLOBBONAUT_PROFILE } from '@blobbi-kit/core/blobbi';
 import { serializeProfileContent } from '@blobbi-kit/core/missions';

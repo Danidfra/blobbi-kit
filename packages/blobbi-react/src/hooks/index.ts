@@ -2,7 +2,7 @@
  * @blobbi-kit/react public hooks.
  *
  * App-agnostic React hooks built on @blobbi-kit/core, React, TanStack Query, and
- * Nostrify. Many rely on a `window`-based `daily-missions-updated` event bus and
+ * @nostrify/react. Many rely on a `window`-based `daily-missions-updated` event bus and
  * `document.visibilityState`; they are DOM-only and run in browser hosts.
  *
  * Collision handling (avoids TS2308 against sibling modules and the `lib`

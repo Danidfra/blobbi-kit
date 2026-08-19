@@ -9,12 +9,23 @@ import coreManifestJson from '../../blobbi-core/package.json';
 /**
  * Manifest contract tests for the *published* shape of `@blobbi-kit/react`.
  *
- * Companion to `packages/blobbi-core/src/package-manifest.test.ts`; see that file
- * for why these exist. The react package carries four peers instead of one, so
- * the additional invariant here is that **every** host-owned singleton stays a
- * peer: React, TanStack Query, `@nostrify/react`, and `@blobbi-kit/core`. Any of
- * them slipping into `dependencies` would let npm install a duplicate copy and
- * break hook context / cache identity at runtime.
+ * Companion to `packages/blobbi-core/src/package-manifest.test.ts`; see that
+ * file for the history behind them.
+ *
+ * Two invariants, and the distinction between them is the whole point:
+ *
+ *   1. Every host-owned *singleton* stays a peer — React, TanStack Query,
+ *      `@nostrify/react`, and `@blobbi-kit/core`. Each is genuinely shared with
+ *      the host: this package calls `useNostr()` at runtime and must read the
+ *      host's provider context, so a duplicate copy in `dependencies` would
+ *      break hook context and cache identity.
+ *
+ *   2. `@nostrify/nostrify` is NOT one of them and must appear nowhere. It was
+ *      only ever a type-only import, and the types now come from
+ *      `@blobbi-kit/core/nostr-protocol`. It also arrives transitively anyway:
+ *      `@nostrify/react` declares it as an exact-version dependency, so the kit
+ *      declaring a second, narrower range could only ever create conflicts it
+ *      had no standing to impose.
  */
 
 interface Manifest {
@@ -33,19 +44,28 @@ const manifest: Manifest = reactManifestJson;
 const coreManifest: Manifest = coreManifestJson;
 
 const NOSTRIFY = '@nostrify/nostrify';
-const EXPECTED_NOSTRIFY_PEER = '^0.53.0 || ^0.54.0';
+const NOSTRIFY_REACT = '@nostrify/react';
+
+/** Every manifest field npm reads when installing this package into a host. */
+const HOST_FACING_FIELDS = [
+  'dependencies',
+  'peerDependencies',
+  'optionalDependencies',
+  'devDependencies',
+  'bundledDependencies',
+  'bundleDependencies',
+] as const;
 
 describe('@blobbi-kit/react package manifest', () => {
   it('is the expected package at the expected version', () => {
     expect(manifest.name).toBe('@blobbi-kit/react');
-    expect(manifest.version).toBe('0.4.0');
+    expect(manifest.version).toBe('0.5.0');
   });
 
   describe('peer dependency set', () => {
     it('declares exactly the expected peers and ranges', () => {
       expect(manifest.peerDependencies).toEqual({
-        '@blobbi-kit/core': '^0.4.0',
-        '@nostrify/nostrify': EXPECTED_NOSTRIFY_PEER,
+        '@blobbi-kit/core': '^0.5.0',
         '@nostrify/react': '^0.6.3',
         '@tanstack/react-query': '^5.56.2',
         react: '^18.0.0 || ^19.0.0',
@@ -77,28 +97,61 @@ describe('@blobbi-kit/react package manifest', () => {
     });
   });
 
-  describe('Nostrify is a peer dependency, not a regular dependency', () => {
-    it('does not declare any @nostrify/* package as a regular dependency', () => {
-      const regular = Object.keys(manifest.dependencies ?? {});
-      expect(regular.filter((name) => name.startsWith('@nostrify/'))).toEqual([]);
+  describe('@nostrify/nostrify is not a dependency of any kind', () => {
+    it.each(HOST_FACING_FIELDS)('does not declare Nostrify under %s', (field) => {
+      const declared = (manifest as unknown as Record<string, unknown>)[field];
+      const names = Array.isArray(declared)
+        ? declared
+        : Object.keys((declared as Record<string, string>) ?? {});
+      expect(names).not.toContain(NOSTRIFY);
     });
 
-    it.each(['0.53.0', '0.53.9', '0.54.0', '0.54.7'])('accepts Nostrify %s', (version) => {
-      expect(satisfies(version, EXPECTED_NOSTRIFY_PEER)).toBe(true);
+    it('imposes no Nostrify version constraint on hosts', () => {
+      // A host on Nostrify 0.55.0 (or any other version) must install cleanly
+      // without an npm `overrides` entry. The kit has no standing to constrain
+      // a package it does not import.
+      const constraint =
+        manifest.peerDependencies?.[NOSTRIFY] ??
+        manifest.dependencies?.[NOSTRIFY] ??
+        manifest.devDependencies?.[NOSTRIFY];
+      expect(constraint).toBeUndefined();
     });
 
-    it.each(['0.52.9', '0.55.0', '1.0.0'])('rejects Nostrify %s', (version) => {
-      expect(satisfies(version, EXPECTED_NOSTRIFY_PEER)).toBe(false);
+    it('declares @nostrify/react as the only @nostrify/* package it needs', () => {
+      const names = HOST_FACING_FIELDS.flatMap((field) => {
+        const declared = (manifest as unknown as Record<string, unknown>)[field];
+        return Array.isArray(declared)
+          ? declared
+          : Object.keys((declared as Record<string, string>) ?? {});
+      });
+      expect(names.filter((name) => name.startsWith('@nostrify/'))).toEqual([NOSTRIFY_REACT]);
+    });
+  });
+
+  describe('@nostrify/react is a genuine runtime peer', () => {
+    it('is declared as a peer, never a regular dependency', () => {
+      // This package calls `useNostr()` at runtime and must resolve the host's
+      // NostrProvider context, so the host has to own the single copy.
+      expect(manifest.peerDependencies?.[NOSTRIFY_REACT]).toBe('^0.6.3');
+      expect(manifest.dependencies ?? {}).not.toHaveProperty(NOSTRIFY_REACT);
     });
 
-    it('accepts the @nostrify/react versions in use without widening', () => {
-      const range = manifest.peerDependencies!['@nostrify/react'];
-      expect(range).toBe('^0.6.3');
-      expect(satisfies('0.6.3', range)).toBe(true);
-      expect(satisfies('0.6.4', range)).toBe(true);
-      expect(satisfies('0.7.0', range)).toBe(false);
-    });
+    it.each(['0.6.3', '0.6.4', '0.6.5', '0.6.7'])(
+      'accepts @nostrify/react %s',
+      (version) => {
+        // 0.6.7 is the version Ditto ships; it must resolve without widening.
+        expect(satisfies(version, manifest.peerDependencies![NOSTRIFY_REACT])).toBe(true);
+      },
+    );
 
+    it('does not blanket-accept the next @nostrify/react minor', () => {
+      // Unlike Nostrify, this one is a real runtime contract: `useNostr`'s
+      // context shape is API this package consumes, so 0.7.0 needs a review.
+      expect(satisfies('0.7.0', manifest.peerDependencies![NOSTRIFY_REACT])).toBe(false);
+    });
+  });
+
+  describe('other host-owned singletons', () => {
     it('accepts current TanStack Query without widening', () => {
       const range = manifest.peerDependencies!['@tanstack/react-query'];
       expect(range).toBe('^5.56.2');
@@ -113,22 +166,25 @@ describe('@blobbi-kit/react package manifest', () => {
     });
 
     it('pins the core peer to the version being released', () => {
-      // The economy removal (0.4.0) is a breaking change that lives in core,
-      // so pairing this react release with an older core would silently
-      // reintroduce the removed Coin surface through the shared types.
+      // Every breaking change so far has lived in core and reached this
+      // package through the shared types — 0.4.0 removed the Coin surface,
+      // 0.5.0 moved the Nostr protocol types out of Nostrify. Pairing this
+      // release with an older core would silently reintroduce the old contract,
+      // so the peer must pin the version being released.
       expect(manifest.peerDependencies?.['@blobbi-kit/core']).toBe(
         `^${coreManifest.version}`,
       );
       expect(satisfies(coreManifest.version, manifest.peerDependencies!['@blobbi-kit/core'])).toBe(
         true,
       );
-      expect(satisfies('0.3.1', manifest.peerDependencies!['@blobbi-kit/core'])).toBe(false);
+      expect(satisfies('0.4.0', manifest.peerDependencies!['@blobbi-kit/core'])).toBe(false);
     });
 
-    it('declares the same Nostrify peer range as core', () => {
-      expect(manifest.peerDependencies?.[NOSTRIFY]).toBe(
-        coreManifest.peerDependencies?.[NOSTRIFY],
-      );
+    it('agrees with core that Nostrify is not a dependency', () => {
+      // Both packages source their Nostr types from core's `nostr-protocol`
+      // module, so neither may reintroduce a Nostrify constraint on its own.
+      expect(manifest.peerDependencies?.[NOSTRIFY]).toBeUndefined();
+      expect(coreManifest.peerDependencies?.[NOSTRIFY]).toBeUndefined();
     });
 
     it('links core only as a workspace devDependency', () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 import type { ReactNode } from 'react';
 
 import {

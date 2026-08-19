@@ -10,7 +10,7 @@
  * publish hooks that will use these adapters are wired up in a later wave.
  */
 
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 import type { CareItemEffect } from '@blobbi-kit/core/blobbi-social-projection';
 
 /**

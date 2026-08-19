@@ -9,6 +9,116 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## 0.5.0 — Remove the `@nostrify/nostrify` dependency (breaking)
+
+**Breaking (type-level only).** No runtime behavior, protocol behavior, or
+emitted JavaScript changes. The public `.d.ts` surface changes: signatures that
+named Nostrify's types now name Blobbi Kit's own, structurally identical ones.
+A **minor** bump under the `0.x` convention, because the published declaration
+contract changes even though nothing executable does.
+
+### Why
+
+Both packages declared `peerDependencies["@nostrify/nostrify"]`. For a pre-1.0
+package the caret pins the minor, so `^0.53.0 || ^0.54.0` means
+`>=0.53.0 <0.55.0`. Every Nostrify minor release therefore broke `npm install`
+for host apps, who had to suppress the `ERESOLVE` with an npm `overrides` entry.
+0.3.1 widened the range once already; doing it again only resets the clock.
+
+The dependency was misclassified, not mis-ranged. Neither package ever imported
+a Nostrify symbol at runtime — every import was `import type`, and the emitted
+JavaScript has never contained one. A peer dependency states that host and
+library must *share one instance* of something; that was true of React, TanStack
+Query, and `@nostrify/react`, and never true of `@nostrify/nostrify`.
+
+### Added — `@blobbi-kit/core`
+
+- `./nostr-protocol`, exporting `NostrEvent`, `NostrFilter`, `NostrQuerier`, and
+  `NostrQueryOptions`. Also re-exported from the package barrel, and from
+  `@blobbi-kit/react` for hooks consumers.
+
+  `NostrEvent` and `NostrFilter` are the NIP-01 wire types, declared
+  field-for-field. `NostrQuerier` is the single method the kit actually needs
+  from a relay pool: `query(filters, opts?)`.
+
+### Changed — `@blobbi-kit/core`
+
+- `fetchFreshEvent` and `fetchFreshBlobbonautProfile` accept `NostrQuerier`
+  instead of Nostrify's `NPool`. **This is a widening**: `NPool` is a class with
+  `private` members, so it was nominally typed and only that exact class from
+  that exact installed copy satisfied it. Every existing caller keeps compiling;
+  callers that previously could not pass a store, cache, wrapper, or test double
+  now can.
+
+### Removed — both packages
+
+- `peerDependencies["@nostrify/nostrify"]`. `@blobbi-kit/core` now declares no
+  peer dependencies at all.
+
+### Unchanged
+
+- `@nostrify/react` remains a peer of `@blobbi-kit/react` at `^0.6.3`. It is a
+  genuine runtime integration — the hooks call `useNostr()` and must resolve the
+  host's provider context. Its range is untouched and already accepts the 0.6.5
+  and 0.6.7 releases in use.
+- `@noble/hashes` stays core's sole regular dependency at `^1.3.1`.
+- No change to any Blobbi kind, tag, parsing rule, or the legacy `storage` /
+  `coins` tag preservation guarantees.
+
+### Versions
+
+| Package | 0.4.0 | 0.5.0 |
+| --- | --- | --- |
+| `@blobbi-kit/core` | 0.4.0 | 0.5.0 |
+| `@blobbi-kit/react` | 0.4.0 | 0.5.0 |
+| `@blobbi-kit/react` peer `@blobbi-kit/core` | `^0.4.0` | `^0.5.0` |
+| `@blobbi-kit/core` peer `@nostrify/nostrify` | `^0.53.0 \|\| ^0.54.0` | *(removed)* |
+| `@blobbi-kit/react` peer `@nostrify/nostrify` | `^0.53.0 \|\| ^0.54.0` | *(removed)* |
+| `@blobbi-kit/react` peer `@nostrify/react` | `^0.6.3` | `^0.6.3` |
+
+Both packages move in lockstep, as in every prior release. The `@blobbi-kit/core`
+pin is load-bearing here: the new `nostr-protocol` module lives in core, so
+`react@0.5.0` paired with `core@0.4.0` would resolve its type imports against a
+core that does not export them.
+
+### Migration
+
+For most hosts, none — delete any npm `overrides` entry that pinned Nostrify for
+Blobbi Kit's sake, and `@nostrify/nostrify` becomes a normal direct dependency of
+your app (or disappears, if only `@nostrify/react` needed it).
+
+Hosts that explicitly annotated a variable with Nostrify's `NostrEvent` before
+passing it to the kit still compile: the types are mutually assignable, which
+`packages/blobbi-core/src/nostr-protocol.test.ts` asserts against the real
+Nostrify types on every run.
+
+### Tests
+
+- `fetchFreshEvent.test.ts` and `fetchFreshBlobbonautProfile.test.ts` (new, 34
+  tests) pin the two helpers' behavior — query shape, `limit: 1` injection,
+  abort-signal merging, newest-version selection, current-kind-over-legacy
+  preference, empty and invalid results. Written and run green *before* the
+  refactor, so they pin existing behavior rather than the new code.
+- `nostr-protocol.test.ts` (new, 16 tests) typechecks the local declarations
+  against the real `@nostrify/nostrify` / `@nostrify/types` in both directions,
+  and proves `NPool`, `NRelay`, `NStore`, and a bare `{ query }` object all
+  satisfy `NostrQuerier`.
+- `packages/*/src/package-manifest.test.ts` no longer assert a Nostrify range.
+  They now assert Nostrify appears in *no* host-facing dependency field, and
+  that `@nostrify/react` remains the React package's genuine peer.
+- `scripts/smoke.mjs` keeps the "Nostrify absent from emitted JS" check and adds
+  a declaration-surface check: no published `dist/**/*.d.ts` may reference the
+  module. Comments are stripped before scanning, so prose naming the package is
+  not a false positive.
+
+### Development
+
+`@nostrify/nostrify` remains a **root devDependency**. It is not published by
+either package, and now serves only as the compatibility fixture that
+`nostr-protocol.test.ts` typechecks against.
+
+---
+
 ## 0.4.0 — Remove the obsolete profile-Coin economy surface (breaking)
 
 **Breaking.** The kit no longer defines or exposes any Blobbi Coin economy.

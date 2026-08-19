@@ -1,4 +1,4 @@
-import type { NostrEvent, NostrFilter, NPool } from '@nostrify/nostrify';
+import type { NostrEvent, NostrFilter, NostrQuerier } from './nostr-protocol';
 
 interface FetchFreshEventOptions {
   /** Abort signal merged with the internal 10s timeout. */
@@ -35,7 +35,7 @@ interface FetchFreshEventOptions {
  * ```
  */
 export async function fetchFreshEvent(
-  nostr: NPool,
+  nostr: NostrQuerier,
   filter: NostrFilter,
   opts: FetchFreshEventOptions = {},
 ): Promise<NostrEvent | null> {

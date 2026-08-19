@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 
 import {
   KIND_BLOBBONAUT_PROFILE,

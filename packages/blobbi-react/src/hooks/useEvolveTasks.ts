@@ -12,7 +12,7 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNostr } from '@nostrify/react';
-import type { NostrFilter } from '@nostrify/nostrify';
+import type { NostrFilter } from '@blobbi-kit/core/nostr-protocol';
 
 import type { BlobbiCompanion } from '@blobbi-kit/core/blobbi';
 import type { Mission } from '@blobbi-kit/core/missions';

@@ -16,6 +16,15 @@
  * flat names continue to deep-import `@blobbi-kit/core/types/blobbi` etc.
  */
 
+// Protocol-level Nostr contracts owned by this package. Declared locally so no
+// consumer has to install or version-match a particular Nostr library.
+export type {
+  NostrEvent,
+  NostrFilter,
+  NostrQuerier,
+  NostrQueryOptions,
+} from './nostr-protocol';
+
 // Logger (package-safe, no-op by default; host apps can inject their own).
 export { blobbiLogger, setBlobbiLogger, type BlobbiLogger } from './logger';
 

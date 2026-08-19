@@ -16,7 +16,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useNostr } from '@nostrify/react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 
 import { KIND_BLOBBI_STATE } from '@blobbi-kit/core/blobbi';
 import { serializeEvolutionContent } from '@blobbi-kit/core/missions';

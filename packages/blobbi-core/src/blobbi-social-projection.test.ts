@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from './nostr-protocol';
 
 // Raw source of the module under test, so we can assert on its import graph
 // without depending on Node fs / file-URL resolution under jsdom.

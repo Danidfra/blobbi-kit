@@ -19,7 +19,7 @@
  * @module blobbi-interaction
  */
 
-import type { NostrEvent } from '@nostrify/nostrify';
+import type { NostrEvent } from './nostr-protocol';
 
 import { buildBlobbiAddress, parseBlobbiAddress, type BlobbiCompanion } from './blobbi';
 

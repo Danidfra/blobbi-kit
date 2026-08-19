@@ -19,7 +19,7 @@ import { useMemo } from 'react';
 import { useNostr } from '@nostrify/react';
 import { useQuery } from '@tanstack/react-query';
 
-import type { NostrFilter } from '@nostrify/nostrify';
+import type { NostrFilter } from '@blobbi-kit/core/nostr-protocol';
 import type { BlobbiCompanion } from '@blobbi-kit/core/blobbi';
 import { buildBlobbiAddress } from '@blobbi-kit/core/blobbi';
 import {

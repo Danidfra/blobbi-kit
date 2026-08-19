@@ -1,4 +1,4 @@
-import type { NPool } from '@nostrify/nostrify';
+import type { NostrQuerier } from './nostr-protocol';
 
 import {
   BLOBBONAUT_PROFILE_KINDS,
@@ -23,7 +23,7 @@ import {
  * tags with stale cached data.
  */
 export async function fetchFreshBlobbonautProfile(
-  nostr: NPool,
+  nostr: NostrQuerier,
   pubkey: string,
 ): Promise<BlobbonautProfile | null> {
   const dValues = getBlobbonautQueryDValues(pubkey);
