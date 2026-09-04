@@ -1,0 +1,13 @@
+{
+  "name": "@blobbi/renderer-consumer-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Test-only external consumer of @blobbi/renderer. Proves the package renders with no host application, no kit package and no host CSS around it.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@blobbi/renderer": "*"
+  }
+}

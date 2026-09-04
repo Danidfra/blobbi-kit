@@ -1,159 +1,68 @@
-# `@blobbi/react`
+# `@blobbi/renderer`
 
-The portable Blobbi renderer: a React component that draws a Blobbi from plain,
-serializable data.
+The canonical, host-independent Blobbi renderer: a React component (and a
+string function) that draws a Blobbi from plain, serializable visual data.
 
-**Publication status: local and private. Not released to npm.** This package
-lives in `packages/` and is consumed by Blobbi Island through the npm workspace
-link. See [Publication status](#publication-status) for what still stands
-between it and a release.
+> **Publication status: private, unpublished.** The intended name is
+> `@blobbi/renderer`. At the time of writing the `@blobbi` npm scope holds no
+> packages and its ownership could not be verified without logging in, so the
+> manifest is `"private": true` until a maintainer confirms the scope (or
+> chooses another name). Nothing else in the package depends on the name; a
+> rename is one string in `package.json` and one in this README.
 
 ---
 
-## 1. What this package is for
-
-Rendering a Blobbi used to require being Blobbi Island: a relay connection, a
-logged-in user, an equipment hook, a world coordinate system and a specific
-`public/` directory layout. This package is the part of that with none of it.
+## 1. Responsibility
 
 ```
-                    plain data in
-                          │
-                          ▼
-   ┌──────────────────────────────────────────┐
-   │  @blobbi/react                           │
-   │    visual  ──►  SVG body (synchronous)   │
-   │    accessories ─►  positioned <img>s     │
-   └──────────────────────────────────────────┘
-                          │
-                          ▼
-                      markup out
+                    plain visual data + visual state
+                                  │
+                                  ▼
+             ┌─────────────────────────────────────────┐
+             │  @blobbi/renderer                       │
+             │    body   ──►  inline SVG (synchronous) │
+             │    accessories ──► positioned <img>s    │
+             │    effects ──► deterministic CSS pieces │
+             └─────────────────────────────────────────┘
+                                  │
+                                  ▼
+                              markup out
 ```
 
-**Non-goals**, stated up front so nobody looks for them here:
+**Given Blobbi visual data and visual state, deterministically render the
+Blobbi.** That is the whole contract.
 
-- no data fetching of any kind, and no network at runtime;
-- no Nostr, no relay, no protocol, no tag parsing;
-- no inventory, equipment persistence, or accessory editor;
+**Non-responsibilities**, stated up front so nobody looks for them here:
+
+- no Nostr, relays, `NostrEvent`, signing, publishing or kinds (31124, 31633,
+  31634, …);
+- no `BlobbiCompanion` or any other domain object: hosts map their model to
+  the plain [visual model](#4-the-visual-model);
+- no authentication, profiles, inventory or equipment fetching, economy,
+  missions, care mutations or routing;
 - no world position, ground anchor, depth scale, shadow, z-index or movement;
-- no presence, chat, name labels or interaction affordances;
-- no asset directory conventions;
-- no state. The component is a function of its props.
+- no host CSS: geometry is inline, nothing here needs Tailwind or a reset;
+- no state, timers, animation frames, randomness or network. The component is
+  a function of its props.
 
-Everything in that list is a legitimate concern; it just belongs to whoever is
-building the world, not to whatever draws the character.
-
-## 2. Installation in this workspace
-
-The repository root declares `"workspaces": ["packages/*"]`, so:
+## 2. Installation
 
 ```bash
-npm install          # links packages/blobbi-react into node_modules/@blobbi/react
+npm install @blobbi/renderer react        # once published
 ```
 
-The application imports it by name:
+Inside this repository the package is a workspace member: `npm install` at the
+root links it, and `@blobbi/renderer` resolves to `packages/blobbi-renderer`.
 
-```ts
-import { BlobbiRendererView } from '@blobbi/react';
-```
+Peer dependency: `react ^18.0.0 || ^19.0.0`. There are no runtime
+dependencies.
 
-Resolution goes to **TypeScript source**, not a build artifact
-(`package.json` `main`/`types`/`exports` all point at `src/index.ts`). That is
-deliberate for a local, unpublished package: no build ordering in `npm run
-build`, and no stale `dist/` silently shadowing an edit. The publishable
-artifact is produced separately:
-
-```bash
-npm run build:package             # from the repo root
-npm run build --workspace @blobbi/react
-```
-
-which emits ESM + `.d.ts` + source maps into `dist/` (gitignored).
-
-## 3. Public API
-
-Everything is exported from the package root. There are no deep imports, and
-`src/index.ts` contains no `export *`: the surface is a hand-written list,
-asserted exactly by `package-api.test.ts`.
-
-### Component
-
-| Export | What it is |
-| --- | --- |
-| `BlobbiRendererView` | The renderer. The whole point. |
-| `AccessoryLayerView` | One accessory layer group (`behind` / `front`). *Provisional*; only for consumers composing their own stack. |
-| `BlobbiRendererViewProps` | Props type, for typed wrapping. |
-
-### Visual normalization
-
-| Export | What it is |
-| --- | --- |
-| `normalizeBlobbiRenderModel` | The single pure function from loose input to fully-resolved state. |
-| `normalizeInstanceId` | The SVG-id sanitizer, as contract rather than implementation detail. |
-| `DEFAULT_STAGE`, `DEFAULT_ADULT_TYPE`, `FALLBACK_INSTANCE_ID` | The documented fallbacks, so a caller's tooltip copy can agree with the drawing. |
-| `BlobbiRenderVisual`, `BlobbiRenderModel`, `BlobbiRenderModelInput`, `BlobbiRenderView` | Types. |
-
-### The canonical box
-
-| Export | What it is |
-| --- | --- |
-| `BLOBBI_RENDER_SIZE_PX` | The framework-neutral source of truth: token → pixels. |
-| `BLOBBI_RENDER_SIZE_CLASSES` | Its Tailwind projection (see §7). |
-| `ACCESSORY_BASE_RATIO`, `ACCESSORY_BASE_PERCENT` | Accessory base size as a fraction of the box, what an editor needs to share the coordinate space. |
-| `blobbiRenderSizePx`, `accessoryBasePx` | Convenience lookups. |
-| `BlobbiRenderSize` | `'sm' \| 'md' \| 'lg' \| 'xl' \| '2xl' \| '3xl'`. |
-
-### Accessories
-
-| Export | What it is |
-| --- | --- |
-| `normalizeAccessoryPlacements` | Placement input → deterministic, render-ready placements. |
-| `ACCESSORY_SLOT_RANK`, `REAR_VIEW_HIDDEN_SLOTS` | Paint order and rear-view visibility, so custom UI can reproduce them. |
-| `DEFAULT_ACCESSORY_SOURCES` | The neutral source resolver (§5). |
-| `AccessorySlot`, `AccessoryPlacementInput`, `NormalizedAccessoryPlacement`, `AccessoryLayer`, `NormalizeAccessoryOptions`, `AccessorySourceRequest`, `AccessorySourceResolver` | Types. |
-
-### Visual effects
-
-| Export | What it is |
-| --- | --- |
-| `BLOBBI_VISUAL_EFFECT_IDS` | The twelve effects this package can draw. |
-| `normalizeBlobbiVisualEffects` | Effect input → the deterministic, slot-resolved list the renderer draws. |
-| `EFFECT_SLOTS`, `EFFECT_SLOT_ORDER` | Which slot each effect occupies, and the canonical render order. |
-| `isBlobbiVisualEffectId` | Type guard for a string from outside. |
-| `getBlobbiVisualEffectInfo` | Id, slot, display name, description, piece count, enough to build a picker. |
-| `DEFAULT_EFFECT_INTENSITY`, `MIN_EFFECT_INTENSITY`, `MAX_EFFECT_INTENSITY` | The intensity contract. |
-| `MAX_PIECES_PER_EFFECT`, `MAX_PIECES_TOTAL` | The particle caps this package holds itself to. |
-| `BLOBBI_EFFECT_STYLESHEET` | The full effect CSS, for consumers who prefer to mount it once (§7). |
-| `BlobbiVisualEffect`, `BlobbiVisualEffectId`, `BlobbiEffectSlot`, `ResolvedBlobbiVisualEffect`, `BlobbiVisualEffectInfo` | Types. |
-
-### Rendering without React
-
-| Export | What it is |
-| --- | --- |
-| `loadBlobbiSvg` | The same SVG pipeline as a string. Synchronous. |
-| `applyGazeMarkup`, `applyRearView`, `uniquifySvgIds` | *Provisional* string→string transforms, for custom pipelines. They encode an artwork convention and may change with the artwork. |
-| `BlobbiView` | `'front' \| 'rear'`. |
-
-### Deliberately **not** exported
-
-The artwork modules and their customizers, `cn`, the colour helpers, the SVG id
-internals, `findRearViewRemovals` and the removal/keep block lists. They are all
-used internally; none is a promise.
-
-The effect **presets** are likewise internal. An effect is named by its id; the
-particle geometry, timings and palettes behind that id are implementation, and
-exporting them would make somebody's hand-edited copy a supported input.
-
-## 4. Rendering from plain data
+## 3. Basic use
 
 ```tsx
-import {
-  BlobbiRendererView,
-  normalizeAccessoryPlacements,
-  type BlobbiRenderVisual,
-} from '@blobbi/react';
+import { BlobbiRenderer, normalizeAccessoryPlacements, type BlobbiVisual } from '@blobbi/renderer';
 
-const visual: BlobbiRenderVisual = {
+const visual: BlobbiVisual = {
   stage: 'adult',
   adultType: 'bloomi',
   baseColor: '#F2A0C0',
@@ -166,225 +75,216 @@ const accessories = normalizeAccessoryPlacements([
   { code: 'headwear-8', slot: 'headwear', x: 50, y: 20, scale: 1, rot: 0, url: '/hat.png' },
 ]);
 
-<BlobbiRendererView
+<BlobbiRenderer
   visual={visual}
-  instanceId="rosa"
-  size="xl"
-  accessories={accessories}
+  instanceId="rosa"           // required: namespaces every SVG id
+  size={240}                  // or a token: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl', or '100%'
+  facing="front"              // or 'back'
+  isSleeping={false}
   eyeOffset={{ x: 0.4, y: -0.2 }}
-  // Visual effects are named, never described. `{ id, intensity? }` and nothing
-  // else: no component, class name, CSS or animation expression is accepted.
+  accessories={accessories}
   effects={[{ id: 'celestial-aura' }, { id: 'golden-sparkles', intensity: 0.8 }]}
+  label="Rosa, an adult Bloomi"
 />;
 ```
 
 Every value above survives `JSON.parse(JSON.stringify(…))`. That is the actual
 contract: whatever crosses the boundary can have come off a wire.
 
-Incomplete input is handled rather than rejected:
+## 4. The visual model
+
+```ts
+interface BlobbiVisual {
+  stage?: 'egg' | 'baby' | 'adult';
+  adultType?: string;         // 'bloomi' | 'breezy' | … (16 forms); adult only
+  baseColor?: string;
+  secondaryColor?: string;
+  eyeColor?: string;
+  pattern?: string;           // carried as data; not drawn by the current bodies
+  specialMark?: string;       // carried as data; not drawn by the current bodies
+  theme?: string;             // carried as data only
+  name?: string;              // tooltip text only
+}
+```
+
+Incomplete input is handled rather than rejected (`normalizeBlobbiRenderModel`
+is the single pure function that does it):
 
 | Input | Result |
 | --- | --- |
 | absent / unrecognized `stage` | `'baby'` |
-| `stage: 'egg'` | kept as `egg`; draws the baby body (historical) |
+| `stage: 'egg'` | accepted; draws the baby body (a dedicated egg drawing is a later milestone) |
 | `stage: 'adult'` with no `adultType` | `'bloomi'` |
-| `adultType` on a non-adult stage | dropped |
+| unknown `adultType` | corrected to the default form by the artwork resolver |
 | absent colors | the artwork's own colors |
 | non-finite gaze axis | `0`; finite axes clamp to ±1 |
 | gaze with `facing: 'back'` | dropped (that drawing has no pupils) |
 | blank / punctuation-only `instanceId` | `'blobbi'` |
 | non-finite accessory `x`/`y`/`scale`/`rot` | `50` / `50` / `1` / `0` |
-| unknown effect id | ignored (never drawn as something else) |
-| duplicate effect id | first occurrence wins, with its intensity |
-| two effects in one slot | first in the supplied order wins; at most one per slot |
+| unknown effect id | ignored |
 | non-finite / out-of-range `intensity` | `1` / clamped to 0…1.5 |
-| `effects` absent, empty, or all-unknown | no effect markup and no stylesheet at all |
 
-Effects are decoration only: every element is `position: absolute` with
-`pointer-events: none`, so nothing they draw changes a measurement or takes a
-click, and the canonical box is byte-identical with and without them. Reduced
-motion is handled in CSS (`@media (prefers-reduced-motion: reduce)`) with no
-hook and no wiring; each effect falls back to a still, visible resting state.
+`BlobbiRenderVisual` is a deprecated alias of `BlobbiVisual`, kept for one
+migration cycle.
 
-## 5. Accessory source contract
+## 5. Sizes: the canonical box
 
-The package never builds an image path. It receives, per accessory, an **ordered
-list of candidate URLs**, paints the first, advances on `onError`, and hides the
-image when the list is exhausted.
+The renderer box is a square, and it is the single coordinate space for the
+body, the accessories and the effects. It is applied as an **inline**
+`width`/`height`, so no consumer build has to generate a class for it.
 
-```ts
-type AccessorySourceResolver = (req: {
-  code: string;
-  slot: AccessorySlot;
-  url?: string;
-}) => readonly string[];
-```
+| `size` | Box |
+| --- | --- |
+| `'sm'` `'md'` `'lg'` `'xl'` `'2xl'` `'3xl'` | 32 / 56 / 96 / 128 / 224 / 288 px (`BLOBBI_RENDER_SIZE_PX`) |
+| a number | that many pixels |
+| a string | used verbatim as a CSS length (`'100%'`, `'12rem'`) |
 
-The default is `DEFAULT_ACCESSORY_SOURCES`: *"use the URL you gave me"*:
+Default is `'lg'`. `data-blobbi-size` carries the token or the CSS length.
+`style` merges after the box, so a host may override it; a host that does
+should not render accessories, whose sizes are fractions of the box
+(`ACCESSORY_BASE_RATIO = 60/128`).
 
-```ts
-normalizeAccessoryPlacements(items);                       // sources = [item.url] or []
-normalizeAccessoryPlacements(items, { resolveSources });   // your layout, your fallbacks
-```
+## 6. Facing, sleeping, gaze
 
-There is deliberately no built-in extension-guessing or CDN convention. A
-package that guessed would force every consumer to mirror somebody else's
-`public/` tree: which is exactly what this boundary exists to prevent. Blobbi
-Island supplies its own resolver (`island-accessory-sources.ts`) and keeps its
-asset layout entirely on its side of the line.
+- `facing: 'back'` derives the rear drawing from the front artwork by removing
+  its face blocks (`applyRearView`). Face-only accessory slots are hidden
+  (`REAR_VIEW_HIDDEN_SLOTS`).
+- `isSleeping` selects the closed-eye artwork. `eyesClosed` is a legacy alias
+  that produces byte-identical markup.
+- `eyeOffset` (each axis −1…1) moves only the pupils, through two CSS
+  variables on the body wrapper. The SVG string is generated once per visual
+  change, never per gaze change, which is what makes per-frame gaze cheap.
 
-## 6. Body asset strategy: bundled, synchronous
+## 7. Accessories
 
-Blobbi bodies are **inlined SVG string modules** compiled into the package
-(`src/artwork/`). `loadBlobbiSvg` selects and customizes one synchronously.
-
-- no fetch, no filesystem, no async, no loading state;
-- deterministic: same input, same markup, in any runtime;
-- no consumer setup; nothing to copy into `public/`.
-
-The cost is size: the adult artwork is ~138 kB of source (all 17 forms and
-their sleeping variants), which is the dominant term in the ~233 kB of emitted
-JS. All of it is reachable through one lookup table, so tree-shaking a subset of
-forms is **not** currently possible. That is a deliberate trade, synchronous,
-zero-setup rendering was the requirement, and it is the first thing to revisit
-if the package is ever published for size-sensitive consumers.
-
-Front/rear and awake/sleeping are all derived from the same bundled artwork:
-sleeping variants ship as their own drawings, rear views are derived by removing
-the face comment-blocks (`applyRearView`).
-
-## 7. CSS requirements
-
-The package ships **no stylesheet**. It emits class names and expects the
-consumer's Tailwind build to supply them.
-
-**Required.** The canonical square box is expressed as literal Tailwind classes
-(`h-8 w-8` … `h-72 w-72`, matching `BLOBBI_RENDER_SIZE_PX` exactly), plus stock
-utilities: `relative`, `absolute inset-0`, `object-contain`, `max-w-none`,
-`select-none`, `pointer-events-none`. A Tailwind consumer must include this
-package in its `content` globs:
+The renderer draws exactly the accessories it is handed, already normalized:
 
 ```ts
-content: ['./src/**/*.{ts,tsx}', './packages/*/src/**/*.{ts,tsx}'],
+normalizeAccessoryPlacements(items, { facing, resolveSources });
 ```
 
-Without that glob the box collapses to 0×0, and no test in jsdom would notice,
-so `package-css.test.ts` asserts the glob is present in this repository's
-config.
+`x`/`y` are percentages of the box to the accessory's center; `scale`
+multiplies the box-relative base size; paint order is deterministic by slot
+(`ACCESSORY_SLOT_RANK`: aura and back behind the body, everything else in
+front). Artwork is resolved by an `AccessorySourceResolver` that returns an
+ordered list of candidate URLs; the renderer paints the first and advances on
+load failure. The default resolver is "use the URL you gave me". The package
+knows no asset layout, inventory or equipment event.
 
-Classes rather than inline styles is a contract decision: it is what lets a
-caller override the box through `className` (the shell's account chip passes
-`size-full`) via `tailwind-merge` semantics.
+## 8. Visual effects
 
-**Optional.** Three decoration class names appear only behind
-`transparent={false}` / `interactive`: `blobbi-gradient-frame`, `blobbi-hover`,
-`theme-transition`. A consumer may define them or ignore them, the geometry is
-identical either way. No other custom class names are emitted; no Island card,
-gradient, room-grade or world vocabulary exists in this package.
+Twelve deterministic CSS effects, named by id (`BLOBBI_VISUAL_EFFECT_IDS`),
+each in a slot (`EFFECT_SLOTS`), at most one per slot, drawn in
+`EFFECT_SLOT_ORDER`. Effects are `position: absolute; pointer-events: none`
+decoration: they change no measurement and take no click, and a Blobbi with
+no effects emits no effect markup and no `<style>` at all. Particle placement
+is seeded by `instanceId:effectId`, so re-renders never move anything.
+Reduced motion is honored in CSS. `BLOBBI_EFFECT_STYLESHEET` lets a host mount
+the rules once instead of carrying a `<style>` per effect-bearing Blobbi.
 
-**Non-Tailwind consumers** can use `BLOBBI_RENDER_SIZE_PX` directly and pass
-their own `className`.
+## 9. String API
 
-**Visual effects need no configuration at all.** They emit no Tailwind class and
-require no keyframes from you: the effect system carries its own namespaced
-(`blobbi-fx-*`) CSS and renders the subset it needs into a `<style>` element
-beside the effect layers. A Blobbi with no effects emits nothing. If you render
-many effect-bearing Blobbis at once and would rather not carry one `<style>`
-each, mount `BLOBBI_EFFECT_STYLESHEET` yourself; it is additive, not a
-replacement.
+```ts
+loadBlobbiSvg(stage, adultType, baseColor, secondaryColor, eyeColor, isSleeping, instanceId, view);
+```
 
-## 8. Instance ids and multiple Blobbis
+The same synchronous pipeline the component uses, as a string: for canvas
+compositing, server thumbnails or a non-React card. `applyGazeMarkup`,
+`applyRearView` and `uniquifySvgIds` are exported as **provisional**
+string-to-string transforms over the artwork's comment-block convention.
 
-Several Blobbis routinely share a page, and SVG ids are global to the document.
+## 10. Accessibility
 
-- `instanceId` is **required**. Every `id`, `url(#…)`, `href="#…"` and
-  `xlink:href` inside the body SVG is prefixed with `b_<instanceId>_`.
-- Caller-supplied ids always win and stay stable.
-- Sanitization (`[^a-zA-Z0-9_-]` → `_`) is part of the contract via
-  `normalizeInstanceId`, and is idempotent with the internal uniquifier.
-- A blank or punctuation-only id falls back to `blobbi` rather than collapsing
-  several unrelated Blobbis onto one prefix.
-- Two renderers given the *same* id share a namespace. That is the caller
-  getting what they asked for, and it is tested as such.
+The root is `role="img"`. `label` sets its accessible name; `title` sets the
+tooltip and is used as the name when `label` is absent. A Blobbi with neither,
+that is not clickable, is treated as decoration and marked `aria-hidden`. A
+clickable Blobbi is never hidden. Accessory images carry their code as `alt`;
+effect pieces carry no text.
 
-If you have no meaningful id, React's `useId()` is the right fallback: unique
-per instance, and stable across a server render and its hydration.
+## 11. Styling boundary
 
-## 9. Browser and SSR assumptions
+Geometry is inline. The only class names the renderer emits are
+`blobbi-renderer`, the optional modifiers `blobbi-renderer--interactive`
+(when `interactive`) and `blobbi-renderer--framed` (when
+`transparent={false}`), and whatever the host passes in `className`.
 
-- Every non-React module is pure and runs in a plain Node process. No `window`,
-  `document`, `localStorage`, `location`, `Image`, `fetch`, or
-  `import.meta.env` anywhere in the package (asserted by
-  `package-purity.test.ts`).
-- The component touches the DOM only through React, plus
-  `dangerouslySetInnerHTML` for the body SVG and an `onError` handler on
-  accessory images. Both are SSR-safe; the handler simply never fires on the
-  server.
-- Structurally safe to server-render. **No SSR infrastructure is provided or
-  tested here**: the claim is about the absence of hazards, not the presence of
-  support.
+The modifiers do nothing unless a host mounts `BLOBBI_RENDERER_STYLESHEET`
+(hover lift, circular frame) or styles them itself. `interactive` also sets
+`cursor: pointer` inline. The frame's gradient fill has always been
+host-defined and still is.
 
-## 10. What stays with the consumer
+## 12. Sanitization boundary
 
-For Blobbi Island specifically, all of this is on the other side of the line and
-is not coming back:
+The body artwork is package data compiled into the bundle. Every external
+input that reaches it is a validated color, a clamped number or a sanitized id
+(`normalizeInstanceId`), so the renderer ships no sanitizer and takes no
+dependency on one.
 
-`BlobbiActor` (ground anchor, depth scale, shadow, z-index, float) ·
-`MovableBlobbi` and the movement controller · `CurrentBlobbiDisplay` /
-`CurrentBlobbiPreview` (local companion data) · `MultiplayerLayer` and presence ·
-`AccessoryOverlay` (the drag editor) · `BlobbiInfoModal` · equipment tag parsing
-and persistence · `island-accessory-sources` and `asset-paths` · world
-coordinates, boundaries, room and theater configuration · name labels, chat
-anchors and interaction affordances.
+Hosts that want defense in depth, or that post-process the markup, pass a pure
+`sanitize?: (svg: string) => string`. It runs once per structural change on
+the finished body SVG (after gaze markup) and its output is what reaches the
+DOM; pass a stable function reference, since its identity is a memo
+dependency. A host that renders SVG it did **not** get from this package
+(user-supplied artwork, remote files) must sanitize that content itself before
+it reaches any `dangerouslySetInnerHTML`, this renderer included. The renderer
+never fetches or accepts remote SVG.
 
-## 11. Publication status
+## 13. Instance ids
 
-**This package is a LOCAL, PRIVATE workspace package and must not be published
-under its current identity.** `package.json` sets `"private": true`,
-`package-purity.test.ts` asserts it, and the CI pipeline builds the package but
-never publishes it. `@blobbi/react` is a placeholder identity chosen so the
-extraction could happen without shadowing the already-installed
-`@blobbi-kit/react`; the final scope is an open decision (blocker 4 below).
-Nothing may be released until that decision is made.
+Several Blobbis routinely share a page, and SVG ids are global to the
+document. `instanceId` is required: every `id`, `url(#…)` and `href="#…"` is
+prefixed `b_<instanceId>_`. Sanitization (`[^a-zA-Z0-9_-]` → `_`) is part of
+the contract via `normalizeInstanceId`. Two renderers given the same id share a
+namespace, which is the caller getting what they asked for. With no meaningful
+id, React's `useId()` is the right fallback.
 
-### Dependency policy: decided vs. open
+## 14. Public API
 
-The current manifest declares **everything** as a peer dependency. That is the
-right default for a workspace package consumed from source by exactly one
-application, and the wrong default for a published one. What each entry should
-become:
+Everything is exported from the package root; there are no deep imports and no
+`export *`. The exact surface is asserted by `package-api.test.ts`.
 
-| Dependency | Now | On publication | Why |
-| --- | --- | --- | --- |
-| `react` | peer | **stays a peer**: decided | React is a singleton. Bundling or hard-depending on it gives a consumer two copies, two dispatchers, and hooks that throw. This repository already dedupes React in `vite.config.ts` for the same reason. Not an open question. |
-| `clsx` | peer | **should likely become a dependency** | An implementation detail of `internal/cn.ts`, not part of the contract. A consumer has no reason to install it, and no reason to care which version resolves; nothing is shared across the boundary. ~0.5 kB. |
-| `tailwind-merge` | peer | **should likely become a dependency** | Same reasoning, with one caveat worth checking before flipping: `tailwind-merge` semantics *are* part of the public contract (callers override the canonical box through `className`, §7), and a consumer on a very different Tailwind major could want to pin it. Ship as a dependency unless that turns out to matter in practice. |
-| `@blobbi-kit/core` | peer | **undecided; not this repository's call** | Used for one subpath (`color-guardrails`, in the adult SVG customizer). Whether it is a peer or a dependency depends on how the `blobbi-kit` repository versions and releases its own packages, and on whether this package ends up living inside that repository. **That policy must be decided in the real `blobbi-kit` repository, not here.** |
+| Group | Exports |
+| --- | --- |
+| Component | `BlobbiRenderer`, `AccessoryLayerView` (provisional), `BlobbiRendererProps`, `BlobbiSvgSanitizer`; deprecated aliases `BlobbiRendererView`, `BlobbiRendererViewProps` |
+| Visual model | `BlobbiVisual`, `normalizeBlobbiRenderModel`, `normalizeInstanceId`, `DEFAULT_STAGE`, `DEFAULT_ADULT_TYPE`, `FALLBACK_INSTANCE_ID`, `BlobbiRenderModel`, `BlobbiRenderModelInput`, `BlobbiRenderView` |
+| Box | `BLOBBI_RENDER_SIZE_PX`, `resolveBlobbiRenderSize`, `blobbiRenderSizePx`, `accessoryBasePx`, `ACCESSORY_BASE_RATIO`, `ACCESSORY_BASE_PERCENT`, `BlobbiRenderSize`, `BlobbiRendererSize` |
+| Accessories | `normalizeAccessoryPlacements`, `ACCESSORY_SLOT_RANK`, `REAR_VIEW_HIDDEN_SLOTS`, `DEFAULT_ACCESSORY_SOURCES`, and their types |
+| Effects | `BLOBBI_VISUAL_EFFECT_IDS`, `EFFECT_SLOTS`, `EFFECT_SLOT_ORDER`, `normalizeBlobbiVisualEffects`, `isBlobbiVisualEffectId`, `getBlobbiVisualEffectInfo`, intensity and piece-cap constants, and their types |
+| Stylesheets | `BLOBBI_RENDERER_STYLESHEET`, `BLOBBI_EFFECT_STYLESHEET` |
+| String API | `loadBlobbiSvg`, `applyGazeMarkup`, `applyRearView`, `uniquifySvgIds`, `BlobbiView` |
 
-Neither `clsx` nor `tailwind-merge` is changed now: as peers they resolve from
-the application's own `node_modules`, which is correct while the package is
-workspace-local, and moving them early would add hoisting noise for no benefit.
+Deliberately **not** exported: the artwork modules and customizers, the color
+helpers, the SVG id internals, the effect presets, and any Tailwind class map.
 
-### Known blockers before this could be published to npm
+## 15. Build and compatibility
 
-1. **Extensionless relative specifiers in `dist/`.** The build uses `tsc` with
-   `moduleResolution: "bundler"` (required to resolve
-   `@blobbi-kit/core/color-guardrails`, an `exports`-map subpath). The emitted
-   JS therefore keeps `from './svg'`, which every bundler resolves and bare Node
-   ESM does not. Publishing needs an extension-rewriting build step (tsup or
-   rollup) first.
-2. **`exports` points at source.** Correct for a workspace-local package;
-   a release must flip it to `./dist/index.js` + `./dist/index.d.ts` and add the
-   build to a `prepublishOnly` hook.
-3. **Bundle size / tree-shaking.** All adult forms load together (§6).
-4. **Package identity is not settled.** `@blobbi` is not a scope this project
-   owns on npm, and the adjacent published packages use `@blobbi-kit`. A release
-   must first settle whether this becomes `@blobbi-kit/react`'s render entry
-   point or claims its own scope. Until then the name is local-only and the
-   package stays `private`.
-5. **Dependency policy.** `clsx` and `tailwind-merge` should move from peer to
-   regular dependencies, and the `@blobbi-kit/core` peer-vs-dependency question
-   belongs to the `blobbi-kit` repository. See the table above.
-6. **CSS contract is documentation, not code.** A published package would want
-   to ship an optional stylesheet for the three decoration classes rather than
-   describing them in a README.
+- ESM only, one file per source module, explicit `.js` specifiers, `.d.ts`
+  and source maps, built with tsup. `sideEffects: false`.
+- React 18 and 19 are both declared. The package uses `useMemo` and plain
+  JSX only: no `use`, no ref-as-prop, no React 19-only API. The repository
+  typechecks and tests against React 19; React 18 is validated by the
+  consuming hosts (Blobbi Island) until a CI matrix exists.
+- Bundle: all 16 adult forms and their sleeping variants are inlined
+  (`artwork/adult-blobbi/lib/adult-svg-data.ts`, ~138 kB of source) behind
+  one lookup table, so a subset of forms is not currently tree-shakeable.
+
+## 16. Lineage
+
+- The SVG engine (inlined artwork, per-form color customizers, id
+  uniquification) was written in **Ditto** (`src/blobbi/adult-blobbi`,
+  `src/blobbi/baby-blobbi`, March–April 2026).
+- **Blobbi Island** adopted it in May 2026 (`7e6ccaf`), added the render
+  model, accessory normalization, rear view, gaze markup and the effect
+  system, and extracted the host-independent package `@blobbi/react` in July
+  2026 (`b12b2e5`).
+- This package imports that extraction with its history (`git subtree` of
+  Island `packages/blobbi-react` at production `b3f9940`) and becomes the
+  canonical shared implementation. The boundary changes made here: no
+  `@blobbi-kit/core` dependency (the two color conversions are local), inline
+  geometry instead of Tailwind utilities, numeric and CSS-length sizes, image
+  semantics, and the optional sanitizer hook.
+
+One behavioral note for hosts coming from `@blobbi/react`: the box is no
+longer overridable through Tailwind class merging; pass `size` (a token,
+number or CSS length) or `style` instead. `BLOBBI_RENDER_SIZE_CLASSES` is not
+exported.

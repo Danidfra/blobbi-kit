@@ -9,6 +9,21 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## Unreleased — `@blobbi/renderer` 0.1.0 (new package, private)
+
+A third workspace package, `packages/blobbi-renderer`, versioned
+independently of the two kit packages and **not yet published**: the
+intended `@blobbi/renderer` name needs the `@blobbi` npm scope confirmed
+first, and the manifest stays `"private": true` until then.
+
+It is the canonical Blobbi renderer: Blobbi Island's `@blobbi/react`
+extraction (itself built on the SVG engine Ditto wrote), imported with its
+git history and adapted to a package boundary. It depends on React alone and
+imports neither `@blobbi-kit/core` nor `@blobbi-kit/react`; it knows no
+Nostr, no inventory, no host. See `packages/blobbi-renderer/README.md`.
+
+---
+
 ## 0.5.1 — Branding tags no longer imply a legacy event (fix)
 
 **Fix, no API change.** `isUnsupportedLegacyBlobbiEvent` (and therefore

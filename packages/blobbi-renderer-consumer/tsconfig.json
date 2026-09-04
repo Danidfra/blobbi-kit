@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    /* Typecheck against the renderer's SOURCE so `npm run typecheck` needs no
+       prior build; the same convention @blobbi-kit/react uses for core. The
+       runtime artifact is exercised separately by `npm run smoke`. */
+    "baseUrl": ".",
+    "paths": {
+      "@blobbi/renderer": ["../blobbi-renderer/src/index.ts"]
+    }
+  },
+  "include": ["fixtures", "src"]
+}

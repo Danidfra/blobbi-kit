@@ -3,6 +3,8 @@
   "include": [
     "packages/blobbi-core/src",
     "packages/blobbi-react/src",
-    "packages/blobbi-renderer/src"
+    "packages/blobbi-renderer/src",
+    "packages/blobbi-renderer-consumer/src",
+    "packages/blobbi-renderer-consumer/fixtures"
   ]
 }
