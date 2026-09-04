@@ -4,13 +4,13 @@
  * Centralized exports for all SVG manipulation utilities.
  *
  * This module provides:
- * - Color manipulation (lighten/darken)
+ * - Color manipulation (lighten/darken, hex<->HSL)
  * - ID uniquification (prevent gradient collisions)
  * - Container sizing adjustments
  * - Rear ("facing away") view derivation
  */
 
-export { lightenColor, darkenColor } from './colors';
+export { lightenColor, darkenColor, hexToHsl, hslToHex } from './colors';
 export { uniquifySvgIds } from './ids';
 export { ensureSvgFillsContainer } from './container';
 export { applyGazeMarkup } from './gaze';

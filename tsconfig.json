@@ -2,6 +2,7 @@
   "files": [],
   "include": [
     "packages/blobbi-core/src",
-    "packages/blobbi-react/src"
+    "packages/blobbi-react/src",
+    "packages/blobbi-renderer/src"
   ]
 }

@@ -11,8 +11,14 @@
  */
 
 import type { Blobbi } from '../../core/blobbi-domain-types';
-import { hexToHsl, hslToHex } from '@blobbi-kit/core/color-guardrails';
-import { lightenColor, darkenColor, uniquifySvgIds, ensureSvgFillsContainer } from '../../../svg';
+import {
+  lightenColor,
+  darkenColor,
+  hexToHsl,
+  hslToHex,
+  uniquifySvgIds,
+  ensureSvgFillsContainer,
+} from '../../../svg';
 import type { AdultForm, AdultSvgCustomization } from '../types/adult.types';
 
 // ─── Gradient Builders ────────────────────────────────────────────────────────

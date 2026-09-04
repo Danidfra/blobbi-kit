@@ -27,22 +27,47 @@
  */
 import type { NormalizedAccessoryPlacement } from './accessory-normalize';
 
-/** The visual identity of a Blobbi; everything the pure renderer needs. */
-export interface BlobbiRenderVisual {
+/**
+ * The visual identity of a Blobbi: the plain, serializable input the renderer
+ * draws from. Every field is optional and every value survives
+ * `JSON.parse(JSON.stringify(...))`; nothing here is a domain object, a Nostr
+ * event or a parsed companion. Hosts map their own model to this shape.
+ */
+export interface BlobbiVisual {
+  /**
+   * Life stage. `'egg'` is accepted as data but currently draws the baby body
+   * (the historical fallback); a dedicated egg drawing is a later milestone.
+   */
   stage?: 'egg' | 'baby' | 'adult';
+  /** Adult form (`'bloomi'`, `'catti'`, ...). Ignored unless `stage` is `'adult'`. */
   adultType?: string;
   baseColor?: string;
   secondaryColor?: string;
   eyeColor?: string;
+  /**
+   * Seed-derived pattern (`'solid' | 'spotted' | ...`). Carried as plain data
+   * for hosts and future artwork; the current body drawings do not render it.
+   */
+  pattern?: string;
+  /**
+   * Seed-derived special mark (`'star' | 'heart' | ...`). Carried as plain data;
+   * the current body drawings do not render it.
+   */
+  specialMark?: string;
+  /** Theme variant (e.g. a crossover theme). Carried as plain data only. */
+  theme?: string;
   /** Display name; used only for the title/tooltip. */
   name?: string;
 }
+
+/** @deprecated Renamed to {@link BlobbiVisual}; kept for one migration cycle. */
+export type BlobbiRenderVisual = BlobbiVisual;
 
 /** Which drawing to produce. `'rear'` is derived from the front artwork. */
 export type BlobbiRenderView = 'front' | 'rear';
 
 export interface BlobbiRenderModelInput {
-  visual: BlobbiRenderVisual;
+  visual: BlobbiVisual;
   instanceId: string;
   facing?: 'front' | 'back';
   isSleeping?: boolean;

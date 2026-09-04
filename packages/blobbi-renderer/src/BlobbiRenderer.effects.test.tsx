@@ -15,8 +15,8 @@ import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 
 import {
-  BlobbiRendererView,
-  BLOBBI_RENDER_SIZE_CLASSES,
+  BlobbiRenderer,
+  BLOBBI_RENDER_SIZE_PX,
   BLOBBI_VISUAL_EFFECT_IDS,
   EFFECT_SLOTS,
   normalizeAccessoryPlacements,
@@ -67,7 +67,7 @@ const ALL: BlobbiVisualEffectId[] = [...BLOBBI_VISUAL_EFFECT_IDS];
 
 function draw(effects: BlobbiVisualEffect[] | undefined, overrides: Record<string, unknown> = {}) {
   return render(
-    <BlobbiRendererView
+    <BlobbiRenderer
       visual={BABY}
       instanceId="fx"
       size="xl"
@@ -107,20 +107,20 @@ describe('every effect renders from plain data', () => {
 
   it.each(ALL)('%s renders on a baby and on an adult alike', (id) => {
     const baby = render(
-      <BlobbiRendererView visual={BABY} instanceId="same" size="xl" effects={[{ id }]} />,
+      <BlobbiRenderer visual={BABY} instanceId="same" size="xl" effects={[{ id }]} />,
     );
     const adult = render(
-      <BlobbiRendererView visual={ADULT} instanceId="same" size="xl" effects={[{ id }]} />,
+      <BlobbiRenderer visual={ADULT} instanceId="same" size="xl" effects={[{ id }]} />,
     );
     expect(pieces(adult.container).length).toBe(pieces(baby.container).length);
   });
 
   it.each(ALL)('%s renders at every size token without changing the box', (id) => {
-    for (const size of Object.keys(BLOBBI_RENDER_SIZE_CLASSES) as BlobbiRenderSize[]) {
+    for (const size of Object.keys(BLOBBI_RENDER_SIZE_PX) as BlobbiRenderSize[]) {
       const { container } = draw([{ id }], { size });
-      // The size class is the box. An effect that touched it would resize the
+      // The inline size is the box. An effect that touched it would resize the
       // Blobbi, which is the one thing decoration must never do.
-      expect(box(container).className).toContain(BLOBBI_RENDER_SIZE_CLASSES[size]);
+      expect(box(container).style.width).toBe(`${BLOBBI_RENDER_SIZE_PX[size]}px`);
       expect(pieces(container).length).toBeGreaterThan(0);
     }
   });
@@ -164,10 +164,10 @@ describe('a Blobbi with no effects is byte-identical to the pre-Phase-8 renderer
     );
 
     const bare = render(
-      <BlobbiRendererView visual={BABY} instanceId="acc" size="xl" accessories={accessories} />,
+      <BlobbiRenderer visual={BABY} instanceId="acc" size="xl" accessories={accessories} />,
     );
     const withFx = render(
-      <BlobbiRendererView
+      <BlobbiRenderer
         visual={BABY}
         instanceId="acc"
         size="xl"
@@ -213,7 +213,7 @@ describe('effect layers sit in the intended places in the DOM', () => {
     );
 
     const { container } = render(
-      <BlobbiRendererView
+      <BlobbiRenderer
         visual={BABY}
         instanceId="order"
         size="xl"
@@ -349,7 +349,7 @@ describe('effects are decoration and cannot behave like anything else', () => {
     const fancy = draw(ALL.map((id) => ({ id })));
     for (const container of [bare.container, fancy.container]) {
       const el = box(container);
-      expect(el.className).toContain(BLOBBI_RENDER_SIZE_CLASSES.xl);
+      expect(el.style.width).toBe(`${BLOBBI_RENDER_SIZE_PX.xl}px`);
       expect(el.dataset.blobbiSize).toBe('xl');
       expect(container.querySelector('[data-blobbi-body-box]')).not.toBeNull();
     }
@@ -383,11 +383,11 @@ describe('effect markup is deterministic and instance-isolated', () => {
 
   it('re-rendering the same component does not move a particle', () => {
     const view = render(
-      <BlobbiRendererView visual={BABY} instanceId="stable" effects={[{ id: 'golden-sparkles' }]} />,
+      <BlobbiRenderer visual={BABY} instanceId="stable" effects={[{ id: 'golden-sparkles' }]} />,
     );
     const before = layers(view.container).map((l) => l.outerHTML).join();
     view.rerender(
-      <BlobbiRendererView visual={BABY} instanceId="stable" effects={[{ id: 'golden-sparkles' }]} />,
+      <BlobbiRenderer visual={BABY} instanceId="stable" effects={[{ id: 'golden-sparkles' }]} />,
     );
     expect(layers(view.container).map((l) => l.outerHTML).join()).toBe(before);
   });
@@ -395,8 +395,8 @@ describe('effect markup is deterministic and instance-isolated', () => {
   it('gives two Blobbis on one page different scatters, both stable', () => {
     const { container } = render(
       <div>
-        <BlobbiRendererView visual={BABY} instanceId="alpha" effects={[{ id: 'firefly-friends' }]} />
-        <BlobbiRendererView visual={BABY} instanceId="beta" effects={[{ id: 'firefly-friends' }]} />
+        <BlobbiRenderer visual={BABY} instanceId="alpha" effects={[{ id: 'firefly-friends' }]} />
+        <BlobbiRenderer visual={BABY} instanceId="beta" effects={[{ id: 'firefly-friends' }]} />
       </div>,
     );
     const [first, second] = [...container.children[0].children] as HTMLElement[];
@@ -432,8 +432,8 @@ describe('effect markup is deterministic and instance-isolated', () => {
 
     const two = render(
       <div>
-        <BlobbiRendererView visual={BABY} instanceId="one" effects={[{ id: 'electric-charge' }]} />
-        <BlobbiRendererView visual={BABY} instanceId="two" effects={[{ id: 'electric-charge' }]} />
+        <BlobbiRenderer visual={BABY} instanceId="one" effects={[{ id: 'electric-charge' }]} />
+        <BlobbiRenderer visual={BABY} instanceId="two" effects={[{ id: 'electric-charge' }]} />
       </div>,
     );
     const idsOf = (instance: number) => [

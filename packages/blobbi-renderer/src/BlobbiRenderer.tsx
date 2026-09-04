@@ -1,62 +1,76 @@
 /**
- * BlobbiRendererView: the PURE Blobbi renderer.
+ * BlobbiRenderer: the PURE Blobbi renderer.
  *
  * Renders exclusively from explicit props: no Nostr hooks, no profile hooks,
- * no equipment subscriptions, no location/world knowledge. Remote players,
- * previews and the local-player wrapper (`CurrentBlobbiDisplay`) all end here.
+ * no equipment subscriptions, no location/world knowledge, no host CSS. Given
+ * plain visual data and visual state, it draws the Blobbi; that is the entire
+ * contract.
  *
- * Geometry contract (docs/blobbi-renderer-contract.md):
- *  - ONE square renderer box per size token (`BLOBBI_RENDER_SIZE_CLASSES`,
- *    fixed px, no viewport breakpoints);
- *  - the body SVG fills the box exactly (absolute inset-0 + the SVG's own
- *    width/height 100% and square viewBox);
+ * Geometry contract (see README, "The canonical box"):
+ *  - ONE square renderer box per render, sized INLINE from `size` (a token, a
+ *    pixel number or a CSS length), so no consumer build has to generate a
+ *    class for it;
+ *  - the body SVG fills the box exactly (an absolutely positioned wrapper plus
+ *    the SVG's own width/height 100% and square viewBox);
  *  - accessories position by percentages of the SAME box and size as a
- *    fraction of it ({@link ACCESSORY_BASE_PERCENT} × saved scale);
+ *    fraction of it ({@link ACCESSORY_BASE_PERCENT} x saved scale);
  *  - accessories paint in normalized layer order: behind-body placements,
  *    then the body, then front placements (see `accessory-normalize.ts`);
  *  - accessories may overflow the box; the renderer clips nothing.
  *
- * Visual EFFECTS (Phase 8) interleave with that order without disturbing it:
+ * Visual EFFECTS interleave with that order without disturbing it:
  *
- *   [fx behind] → accessories behind → BODY → [fx mid] → accessories front
- *   → [fx front]
+ *   [fx behind] -> accessories behind -> BODY -> [fx mid] -> accessories front
+ *   -> [fx front]
  *
  * They are decoration only: every effect element is absolutely positioned and
  * `pointer-events: none`, so nothing an effect does can change a measurement,
- * move the ground anchor or intercept a click. See `effects/` and
- * `docs/blobbi-visual-effects.md`.
+ * move an anchor or intercept a click. See `effects/`.
+ *
+ * Styling boundary: everything that affects geometry is an inline style.
+ * The only class names emitted are `blobbi-renderer` plus the two optional
+ * decoration modifiers (`--interactive`, `--framed`) that
+ * `BLOBBI_RENDERER_STYLESHEET` styles if a host mounts it, and whatever the
+ * host passes in `className`.
  */
 import { useMemo, type CSSProperties } from 'react';
 import { loadBlobbiSvg } from './artwork/load-blobbi-svg';
 import { applyGazeMarkup } from './svg';
-import { cn } from './internal/cn';
 import {
-  BLOBBI_RENDER_SIZE_CLASSES,
   ACCESSORY_BASE_PERCENT,
-  type BlobbiRenderSize,
+  resolveBlobbiRenderSize,
+  type BlobbiRendererSize,
 } from './blobbi-render-size';
-import { normalizeBlobbiRenderModel } from './blobbi-render-model';
+import { normalizeBlobbiRenderModel, type BlobbiVisual } from './blobbi-render-model';
 import type { NormalizedAccessoryPlacement } from './accessory-normalize';
-import {
-  BlobbiEffectLayer,
-  BlobbiEffectStyles,
-} from './effects/BlobbiEffectLayers';
+import { BlobbiEffectLayer, BlobbiEffectStyles } from './effects/BlobbiEffectLayers';
 import {
   normalizeBlobbiVisualEffects,
   type BlobbiVisualEffect,
 } from './effects/effect-model';
 
-export type { BlobbiRenderVisual } from './blobbi-render-model';
-import type { BlobbiRenderVisual } from './blobbi-render-model';
+/**
+ * A string-to-string hook applied to the finished body SVG before it reaches
+ * the DOM. The bundled artwork is trusted package data, so the renderer ships
+ * no sanitizer of its own; a host that wants defense in depth (or that
+ * post-processes the markup itself) passes one here. It MUST be pure: the
+ * output is memoized on the function's identity, so pass a stable reference.
+ */
+export type BlobbiSvgSanitizer = (svg: string) => string;
 
-export interface BlobbiRendererViewProps {
-  visual: BlobbiRenderVisual;
+export interface BlobbiRendererProps {
+  /** Plain visual data. See {@link BlobbiVisual}. */
+  visual: BlobbiVisual;
   /**
    * Stable id namespace for the inline SVG's gradient/clip ids. Two rendered
    * Blobbis must never share an instance id (their gradients would collide).
    */
   instanceId: string;
-  size?: BlobbiRenderSize;
+  /**
+   * Box size: a token (`'sm'`..`'3xl'`), a pixel number, or a CSS length
+   * string such as `'100%'`. Defaults to `'lg'` (96px).
+   */
+  size?: BlobbiRendererSize;
   isSleeping?: boolean;
   /** Kept distinct from sleeping for the seated legacy prop; both close eyes. */
   eyesClosed?: boolean;
@@ -66,29 +80,71 @@ export interface BlobbiRendererViewProps {
   /** Pre-normalized accessory placements (already sorted; see accessory-normalize). */
   accessories?: readonly NormalizedAccessoryPlacement[];
   /**
-   * Visual effects to draw around this Blobbi, plain, serializable
+   * Visual effects to draw around this Blobbi: plain, serializable
    * `{ id, intensity? }` data and nothing else. No component, class name, CSS
    * or animation expression is accepted here, and an id this package does not
    * implement is ignored rather than rendered as something arbitrary.
    *
    * Normalized INSIDE the renderer (unlike accessories, which arrive
-   * pre-normalized) because effect resolution contains no host policy at all:
-   * dropping unknown ids, clamping intensity and picking one winner per slot
-   * are decisions the package can make correctly on its own. See
-   * `effects/effect-model.ts`.
+   * pre-normalized) because effect resolution contains no host policy at all.
    */
   effects?: readonly BlobbiVisualEffect[];
-  className?: string;
+  /** Optional pure post-processor for the body SVG string. */
+  sanitize?: BlobbiSvgSanitizer;
+  /**
+   * Accessible name for the image (`aria-label`). When neither `label` nor
+   * `title` is given and the renderer is not clickable, the Blobbi is treated
+   * as decorative and hidden from assistive technology.
+   */
+  label?: string;
+  /** Tooltip text (`title`). Also used as the accessible name if `label` is absent. */
   title?: string;
+  className?: string;
+  /**
+   * Extra inline styles merged AFTER the renderer's own. A host may override
+   * the box (`{ width: '100%', height: '100%' }`); doing so is the host's
+   * responsibility and only makes sense without accessories.
+   */
+  style?: CSSProperties;
   onClick?: () => void;
+  /** Adds the `blobbi-renderer--interactive` class and a pointer cursor. */
   interactive?: boolean;
   /**
-   * false adds the legacy circular gradient frame around the same geometry.
-   * The box and body fill are identical in both modes; only decoration
-   * differs.
+   * `false` adds the `blobbi-renderer--framed` class (the legacy circular
+   * frame). The box and body fill are identical in both modes; only decoration
+   * differs, and only if the host mounts `BLOBBI_RENDERER_STYLESHEET`.
    */
   transparent?: boolean;
 }
+
+/** Join class names, skipping falsy entries. No dependency needed for this. */
+function classNames(...parts: Array<string | false | undefined>): string {
+  return parts.filter(Boolean).join(' ');
+}
+
+/** `position: absolute; inset: 0` spelled out, so every CSS engine agrees. */
+const FILL_PARENT: CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+};
+
+const ACCESSORY_LAYER_STYLE: CSSProperties = {
+  ...FILL_PARENT,
+  pointerEvents: 'none',
+};
+
+const ACCESSORY_IMAGE_STYLE: CSSProperties = {
+  // `display: block` and `max-width: none` are what a Tailwind preflight would
+  // give an <img>; stated inline so hosts without a reset render identically.
+  display: 'block',
+  width: '100%',
+  height: '100%',
+  maxWidth: 'none',
+  objectFit: 'contain',
+};
 
 /**
  * Static (non-editing) accessory image, sized as a fraction of the box.
@@ -96,15 +152,15 @@ export interface BlobbiRendererViewProps {
  * Source selection is DATA, not policy: the placement arrives with an ordered
  * `sources` list (resolved by the accessory normalizer's asset adapter) and
  * this component only walks it. That is why the renderer imports no asset-path
- * module and knows nothing about Island's `public/` layout.
+ * module and knows nothing about any host's asset layout.
  */
 function AccessoryPlacementView({ placement }: { placement: NormalizedAccessoryPlacement }) {
   return (
     <div
-      className="absolute select-none pointer-events-none"
       data-accessory-code={placement.code}
       data-accessory-layer={placement.layer}
       style={{
+        position: 'absolute',
         left: `${placement.xPercent}%`,
         top: `${placement.yPercent}%`,
         // The box is square, so identical width/height percentages stay square.
@@ -112,13 +168,15 @@ function AccessoryPlacementView({ placement }: { placement: NormalizedAccessoryP
         height: ACCESSORY_BASE_PERCENT,
         transform: `translate(-50%, -50%) scale(${placement.scale}) rotate(${placement.rotationDeg}deg) ${placement.flipX ? 'scaleX(-1)' : ''}`,
         transformOrigin: 'center',
+        userSelect: 'none',
+        pointerEvents: 'none',
       }}
       title={placement.code}
     >
       <img
         src={placement.imageUrl}
         alt={placement.code}
-        className="h-full w-full max-w-none object-contain"
+        style={ACCESSORY_IMAGE_STYLE}
         draggable={false}
         data-source-index="0"
         onError={(e) => {
@@ -157,7 +215,8 @@ export function AccessoryLayerView({
 
   return (
     <div
-      className={cn('absolute inset-0 pointer-events-none', className)}
+      className={className}
+      style={ACCESSORY_LAYER_STYLE}
       data-accessory-layer-group={layer}
     >
       {layerPlacements.map((placement) => (
@@ -167,7 +226,7 @@ export function AccessoryLayerView({
   );
 }
 
-export function BlobbiRendererView({
+export function BlobbiRenderer({
   visual,
   instanceId,
   size = 'lg',
@@ -177,15 +236,18 @@ export function BlobbiRendererView({
   eyeOffset,
   accessories = [],
   effects,
-  className,
+  sanitize,
+  label,
   title,
+  className,
+  style,
   onClick,
   interactive = false,
   transparent = true,
-}: BlobbiRendererViewProps) {
+}: BlobbiRendererProps) {
   // ALL defaulting, validation and clamping happens in one pure function
-  // (lib/blobbi-render-model.ts). Below this line there are no domain rules,
-  // only geometry and markup.
+  // (blobbi-render-model.ts). Below this line there are no domain rules, only
+  // geometry and markup.
   //
   // Not memoized on purpose: it is plain object construction, and its inputs
   // (`visual`, `accessories`, `eyeOffset`) are freshly built by callers on most
@@ -202,10 +264,9 @@ export function BlobbiRendererView({
     accessories,
   });
 
-  // Effect resolution: pure, total and cheap (at most four survivors from a
-  // handful of candidates), and it returns a shared frozen empty array when
-  // there is nothing to draw, so the common case, a Blobbi with no effects,
-  // allocates nothing and renders exactly the DOM it did before Phase 8.
+  // Effect resolution: pure, total and cheap, and it returns a shared frozen
+  // empty array when there is nothing to draw, so the common case, a Blobbi
+  // with no effects, allocates nothing.
   const resolvedEffects = normalizeBlobbiVisualEffects(effects);
 
   // Whether gaze markup must be injected. A BOOLEAN, deliberately: gaze
@@ -229,7 +290,8 @@ export function BlobbiRendererView({
       // When gaze is enabled, mark the pupils/highlights once so they can be
       // moved via CSS variables. Static contexts (no eyeOffset) keep the SVG
       // untouched, so previews/modals/cards render exactly as before.
-      return gazeEnabled ? applyGazeMarkup(customizedSvg) : customizedSvg;
+      const withGaze = gazeEnabled ? applyGazeMarkup(customizedSvg) : customizedSvg;
+      return sanitize ? sanitize(withGaze) : withGaze;
     } catch (err) {
       console.error('Failed to load Blobbi SVG:', err);
       return '';
@@ -244,67 +306,78 @@ export function BlobbiRendererView({
     model.instanceId,
     model.view,
     gazeEnabled,
+    sanitize,
   ]);
 
   if (!svgContent) return null;
 
+  const box = resolveBlobbiRenderSize(size);
+
   // Gaze CSS variables on the body wrapper: only the pupils/highlights move
   // (via the injected `.blobbi-pupil` style), never the whole SVG.
-  const gazeStyle: CSSProperties | undefined = model.gaze
+  const bodyStyle: CSSProperties = model.gaze
     ? ({
+        ...FILL_PARENT,
         ['--blobbi-eye-x' as string]: `${model.gaze.x}`,
         ['--blobbi-eye-y' as string]: `${model.gaze.y}`,
       } as CSSProperties)
-    : undefined;
+    : FILL_PARENT;
+
+  const rootStyle: CSSProperties = {
+    position: 'relative',
+    width: box.css,
+    height: box.css,
+    boxSizing: 'border-box',
+    ...(interactive ? { cursor: 'pointer' } : null),
+    ...style,
+  };
+
+  // Image semantics. A named Blobbi is an image with that name; an unnamed,
+  // non-clickable one is decoration and is hidden from assistive technology
+  // rather than announced as an anonymous graphic.
+  const accessibleName = label ?? title;
+  const decorative = accessibleName === undefined && onClick === undefined;
 
   return (
     <div
-      className={cn(
-        'relative',
-        // Decoration only: geometry is identical in both modes.
-        !transparent && 'rounded-full blobbi-gradient-frame shadow-lg theme-transition',
-        interactive &&
-          (transparent
-            ? 'cursor-pointer hover:scale-105 transition-all duration-200'
-            : 'cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-200 blobbi-hover'),
-        BLOBBI_RENDER_SIZE_CLASSES[size],
+      className={classNames(
+        'blobbi-renderer',
+        interactive && 'blobbi-renderer--interactive',
+        !transparent && 'blobbi-renderer--framed',
         className,
       )}
+      style={rootStyle}
+      role="img"
+      aria-label={accessibleName}
+      aria-hidden={decorative ? true : undefined}
       data-blobbi-renderer=""
-      data-blobbi-size={size}
+      data-blobbi-size={box.label}
       title={title}
       onClick={onClick}
     >
       <BlobbiEffectStyles effects={resolvedEffects} />
-      <BlobbiEffectLayer
-        effects={resolvedEffects}
-        layer="behind"
-        instanceId={model.instanceId}
-      />
+      <BlobbiEffectLayer effects={resolvedEffects} layer="behind" instanceId={model.instanceId} />
       <AccessoryLayerView placements={model.accessories} layer="behind" />
-      {/* The body fills the renderer box exactly: the wrapper is inset-0 and
-          the SVG carries width/height="100%" with its square viewBox
-          (xMidYMid meet), so it neither distorts nor overflows. */}
+      {/* The body fills the renderer box exactly: the wrapper is absolutely
+          positioned over the whole box and the SVG carries width/height="100%"
+          with its square viewBox (xMidYMid meet), so it neither distorts nor
+          overflows. */}
       <div
-        className="absolute inset-0"
         data-blobbi-body-box=""
-        style={gazeStyle}
+        style={bodyStyle}
         dangerouslySetInnerHTML={{ __html: svgContent }}
       />
       {/* Between the body and the front accessories: where a body-overlay
           effect (Pixel Glitch, Electric Charge) belongs. It paints ON the
           Blobbi without ever painting over its hat. */}
-      <BlobbiEffectLayer
-        effects={resolvedEffects}
-        layer="mid"
-        instanceId={model.instanceId}
-      />
+      <BlobbiEffectLayer effects={resolvedEffects} layer="mid" instanceId={model.instanceId} />
       <AccessoryLayerView placements={model.accessories} layer="front" />
-      <BlobbiEffectLayer
-        effects={resolvedEffects}
-        layer="front"
-        instanceId={model.instanceId}
-      />
+      <BlobbiEffectLayer effects={resolvedEffects} layer="front" instanceId={model.instanceId} />
     </div>
   );
 }
+
+/** @deprecated Renamed to {@link BlobbiRenderer}; kept for one migration cycle. */
+export const BlobbiRendererView = BlobbiRenderer;
+/** @deprecated Renamed to {@link BlobbiRendererProps}; kept for one migration cycle. */
+export type BlobbiRendererViewProps = BlobbiRendererProps;

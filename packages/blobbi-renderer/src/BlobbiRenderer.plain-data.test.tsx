@@ -1,7 +1,7 @@
 /**
  * The PORTABILITY proof for the pure renderer (Phase 4).
  *
- * Everything below renders `BlobbiRendererView` from plain, serializable data
+ * Everything below renders `BlobbiRenderer` from plain, serializable data
  * with NO providers at all; no `TestApp`, no QueryClient, no Nostr provider,
  * no router, no world/presence context, no mocks. Nothing is stubbed out,
  * because there is nothing to stub: if the renderer's subtree reached any of
@@ -13,14 +13,14 @@
  * dependency a static scan could miss (a global read, a context consumed
  * through a re-export).
  *
- * Every case here is also a case a future `@blobbi/react` consumer will hit on
+ * Every case here is also a case a `@blobbi/renderer` consumer will hit on
  * day one: incomplete relay data, a stage nobody sent, an accessory whose
  * numbers are broken, several Blobbis on one page.
  */
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 
-import { BlobbiRendererView } from './index';
+import { BlobbiRenderer } from './index';
 import { normalizeAccessoryPlacements } from './index';
 import type { AccessoryPlacementInput } from './index';
 import type { BlobbiRenderSize } from './index';
@@ -62,16 +62,16 @@ describe('renders from plain data with no providers whatsoever', () => {
     ['adult', ADULT],
   ])('renders the %s stage', (label, visual) => {
     const { container } = render(
-      <BlobbiRendererView visual={visual} instanceId={`plain-${label}`} />,
+      <BlobbiRenderer visual={visual} instanceId={`plain-${label}`} />,
     );
     expect(svgOf(container), `${label} produced no body`).not.toBeNull();
     expect(box(container)).not.toBeNull();
   });
 
   it('renders front and rear facing, and the rear drawing carries no face', () => {
-    const front = render(<BlobbiRendererView visual={BABY} instanceId="plain-front" />);
+    const front = render(<BlobbiRenderer visual={BABY} instanceId="plain-front" />);
     const rear = render(
-      <BlobbiRendererView visual={BABY} instanceId="plain-rear" facing="back" />,
+      <BlobbiRenderer visual={BABY} instanceId="plain-rear" facing="back" />,
     );
 
     expect(svgOf(front.container)).not.toBeNull();
@@ -82,12 +82,12 @@ describe('renders from plain data with no providers whatsoever', () => {
   });
 
   it('renders the sleeping and seated-eyes-closed poses', () => {
-    const awake = render(<BlobbiRendererView visual={BABY} instanceId="plain-awake" />);
+    const awake = render(<BlobbiRenderer visual={BABY} instanceId="plain-awake" />);
     const sleeping = render(
-      <BlobbiRendererView visual={BABY} instanceId="plain-awake" isSleeping />,
+      <BlobbiRenderer visual={BABY} instanceId="plain-awake" isSleeping />,
     );
     const seated = render(
-      <BlobbiRendererView visual={BABY} instanceId="plain-awake" eyesClosed />,
+      <BlobbiRenderer visual={BABY} instanceId="plain-awake" eyesClosed />,
     );
 
     expect(sleeping.container.innerHTML).not.toBe(awake.container.innerHTML);
@@ -99,10 +99,10 @@ describe('renders from plain data with no providers whatsoever', () => {
 
   it('renders gaze as CSS variables only, leaving the body markup shared', () => {
     const left = render(
-      <BlobbiRendererView visual={BABY} instanceId="plain-gaze" eyeOffset={plain({ x: -1, y: 0.4 })} />,
+      <BlobbiRenderer visual={BABY} instanceId="plain-gaze" eyeOffset={plain({ x: -1, y: 0.4 })} />,
     );
     const right = render(
-      <BlobbiRendererView visual={BABY} instanceId="plain-gaze" eyeOffset={plain({ x: 1, y: -0.4 })} />,
+      <BlobbiRenderer visual={BABY} instanceId="plain-gaze" eyeOffset={plain({ x: 1, y: -0.4 })} />,
     );
 
     const varsOf = (c: HTMLElement) => {
@@ -122,7 +122,7 @@ describe('renders from plain data with no providers whatsoever', () => {
 
   it('renders multiple accessories, and none at all', () => {
     const many = render(
-      <BlobbiRendererView
+      <BlobbiRenderer
         visual={BABY}
         instanceId="plain-acc"
         accessories={normalizeAccessoryPlacements([
@@ -135,7 +135,7 @@ describe('renders from plain data with no providers whatsoever', () => {
     expect(many.container.querySelectorAll('[data-accessory-code]')).toHaveLength(3);
 
     const none = render(
-      <BlobbiRendererView visual={BABY} instanceId="plain-none" accessories={[]} />,
+      <BlobbiRenderer visual={BABY} instanceId="plain-none" accessories={[]} />,
     );
     expect(none.container.querySelectorAll('[data-accessory-code]')).toHaveLength(0);
     // No accessories means no empty layer wrappers either.
@@ -144,13 +144,13 @@ describe('renders from plain data with no providers whatsoever', () => {
 
   it('renders an incomplete visual, the minimum a consumer can send', () => {
     // No stage, no colors, no name: everything a relay might omit.
-    const { container } = render(<BlobbiRendererView visual={{}} instanceId="plain-empty" />);
+    const { container } = render(<BlobbiRenderer visual={{}} instanceId="plain-empty" />);
     expect(svgOf(container)).not.toBeNull();
 
     // An unknown stage falls back to the same drawing rather than rendering
     // nothing. (The prop type forbids it; external JSON does not.)
     const bogus = render(
-      <BlobbiRendererView
+      <BlobbiRenderer
         visual={{ stage: 'wormhole' } as never}
         instanceId="plain-bogus"
       />,
@@ -161,7 +161,7 @@ describe('renders from plain data with no providers whatsoever', () => {
   it('renders every size token, each a fixed square box with no breakpoints', () => {
     for (const size of ['sm', 'md', 'lg', 'xl', '2xl', '3xl'] as BlobbiRenderSize[]) {
       const { container } = render(
-        <BlobbiRendererView visual={BABY} instanceId={`plain-${size}`} size={size} />,
+        <BlobbiRenderer visual={BABY} instanceId={`plain-${size}`} size={size} />,
       );
       const root = box(container);
       expect(root.getAttribute('data-blobbi-size')).toBe(size);
@@ -183,7 +183,7 @@ describe('accessory image sources are data, not renderer policy', () => {
       ].filter(Boolean),
     });
     const { container } = render(
-      <BlobbiRendererView visual={BABY} instanceId="plain-src" accessories={placements} />,
+      <BlobbiRenderer visual={BABY} instanceId="plain-src" accessories={placements} />,
     );
     const img = container.querySelector('[data-accessory-code="headwear-1"] img') as HTMLImageElement;
 
@@ -205,7 +205,7 @@ describe('accessory image sources are data, not renderer policy', () => {
       resolveSources: ({ code }) => [`cdn://mine/${code}.avif`],
     });
     const { container } = render(
-      <BlobbiRendererView visual={BABY} instanceId="plain-cdn" accessories={placements} />,
+      <BlobbiRenderer visual={BABY} instanceId="plain-cdn" accessories={placements} />,
     );
     const img = container.querySelector('[data-accessory-code="headwear-1"] img')!;
     expect(img.getAttribute('src')).toBe('cdn://mine/headwear-1.avif');
@@ -216,10 +216,10 @@ describe('independent simultaneous instances stay isolated', () => {
   it('four Blobbis on one page share no SVG id, gradient, clip path or gaze marker', () => {
     const { container } = render(
       <div>
-        <BlobbiRendererView visual={BABY} instanceId="multi-a" />
-        <BlobbiRendererView visual={ADULT} instanceId="multi-b" eyeOffset={{ x: 1, y: 0 }} />
-        <BlobbiRendererView visual={BABY} instanceId="multi-c" facing="back" />
-        <BlobbiRendererView visual={BABY} instanceId="multi-d" isSleeping />
+        <BlobbiRenderer visual={BABY} instanceId="multi-a" />
+        <BlobbiRenderer visual={ADULT} instanceId="multi-b" eyeOffset={{ x: 1, y: 0 }} />
+        <BlobbiRenderer visual={BABY} instanceId="multi-c" facing="back" />
+        <BlobbiRenderer visual={BABY} instanceId="multi-d" isSleeping />
       </div>,
     );
 
@@ -243,8 +243,8 @@ describe('independent simultaneous instances stay isolated', () => {
     // callers that intentionally render the same Blobbi twice may share one.
     const { container } = render(
       <div>
-        <BlobbiRendererView visual={BABY} instanceId="same" />
-        <BlobbiRendererView visual={BABY} instanceId="same" />
+        <BlobbiRenderer visual={BABY} instanceId="same" />
+        <BlobbiRenderer visual={BABY} instanceId="same" />
       </div>,
     );
     const ids = Array.from(container.querySelectorAll('svg [id]')).map((el) => el.id);
@@ -254,8 +254,8 @@ describe('independent simultaneous instances stay isolated', () => {
   it('normalizes hostile or punctuation-only instance ids into safe SVG ids', () => {
     const { container } = render(
       <div>
-        <BlobbiRendererView visual={BABY} instanceId='a"/><script>x</script>' />
-        <BlobbiRendererView visual={BABY} instanceId="" />
+        <BlobbiRenderer visual={BABY} instanceId='a"/><script>x</script>' />
+        <BlobbiRenderer visual={BABY} instanceId="" />
       </div>,
     );
     expect(container.querySelector('script')).toBeNull();

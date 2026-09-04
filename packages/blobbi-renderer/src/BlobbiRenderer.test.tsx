@@ -2,16 +2,15 @@
  * Phase 1 coverage: the canonical renderer-box geometry contract and renderer
  * purity (docs/blobbi-renderer-contract.md).
  *
- * Every test renders `BlobbiRendererView` BARE; no providers, no mocks. That
+ * Every test renders `BlobbiRenderer` BARE; no providers, no mocks. That
  * is itself the purity proof: if the pure renderer called any Nostr, profile,
  * or equipment hook, these renders would throw.
  */
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 
-import { BlobbiRendererView } from './index';
+import { BlobbiRenderer } from './index';
 import {
-  BLOBBI_RENDER_SIZE_CLASSES,
   BLOBBI_RENDER_SIZE_PX,
   ACCESSORY_BASE_PERCENT,
   ACCESSORY_BASE_RATIO,
@@ -51,14 +50,19 @@ const bodyBox = (container: HTMLElement) =>
   container.querySelector('[data-blobbi-body-box]') as HTMLElement;
 
 describe('renderer-box geometry contract', () => {
-  it('size tokens resolve deterministically, with no viewport breakpoints anywhere', () => {
-    for (const [token, classes] of Object.entries(BLOBBI_RENDER_SIZE_CLASSES)) {
-      expect(classes, `${token} must not contain responsive variants`).not.toMatch(
-        /(sm|md|lg|xl|2xl):/,
+  it('size tokens resolve to fixed inline pixel boxes, with no viewport breakpoints anywhere', () => {
+    for (const token of Object.keys(BLOBBI_RENDER_SIZE_PX) as BlobbiRenderSize[]) {
+      const { container } = render(
+        <BlobbiRenderer visual={VISUAL} instanceId={`t-size-${token}`} size={token} />,
       );
-      expect(BLOBBI_RENDER_SIZE_PX[token as BlobbiRenderSize]).toBeGreaterThan(0);
+      const root = box(container);
+      expect(root.style.width).toBe(`${BLOBBI_RENDER_SIZE_PX[token]}px`);
+      expect(root.style.height).toBe(`${BLOBBI_RENDER_SIZE_PX[token]}px`);
+      expect(root.getAttribute('data-blobbi-size')).toBe(token);
+      // No utility class carries the box: nothing here for a consumer's CSS
+      // build to generate, so nothing can collapse to 0x0.
+      expect(root.className).not.toMatch(/\b[hw]-\d/);
     }
-    // The class ladder and the px table agree (h-8=32 … h-72=288).
     expect(BLOBBI_RENDER_SIZE_PX).toEqual({
       sm: 32, md: 56, lg: 96, xl: 128, '2xl': 224, '3xl': 288,
     });
@@ -67,26 +71,29 @@ describe('renderer-box geometry contract', () => {
   it('the body layout box IS the accessory coordinate box (both fill the renderer box)', () => {
     const accessories = normalizeAccessoryPlacements([equip('headwear-1'), equip('back-1')]);
     const { container } = render(
-      <BlobbiRendererView visual={VISUAL} instanceId="t-geom" size="lg" accessories={accessories} />,
+      <BlobbiRenderer visual={VISUAL} instanceId="t-geom" size="lg" accessories={accessories} />,
     );
 
     const root = box(container);
-    expect(root.className).toContain('h-24');
-    expect(root.className).toContain('w-24');
+    expect(root.style.width).toBe('96px');
+    expect(root.style.height).toBe('96px');
 
-    // Body and both accessory layer groups are inset-0 children of the SAME
-    // box: one shared local coordinate space.
+    // Body and both accessory layer groups fill the SAME box (absolutely
+    // positioned, all four edges at 0): one shared local coordinate space.
+    const fillsParent = (el: HTMLElement) =>
+      el.style.position === 'absolute' &&
+      ['top', 'right', 'bottom', 'left'].every((side) => el.style.getPropertyValue(side) === '0px');
     expect(bodyBox(container).parentElement).toBe(root);
-    expect(bodyBox(container).className).toContain('inset-0');
+    expect(fillsParent(bodyBox(container))).toBe(true);
     for (const group of Array.from(root.querySelectorAll('[data-accessory-layer-group]'))) {
       expect(group.parentElement).toBe(root);
-      expect((group as HTMLElement).className).toContain('inset-0');
+      expect(fillsParent(group as HTMLElement)).toBe(true);
     }
   });
 
   it('the body SVG fills the box (width/height 100%, no distortion)', () => {
     const { container } = render(
-      <BlobbiRendererView visual={VISUAL} instanceId="t-fill" size="lg" />,
+      <BlobbiRenderer visual={VISUAL} instanceId="t-fill" size="lg" />,
     );
     const svg = bodyBox(container).querySelector('svg')!;
     expect(svg.getAttribute('width')).toBe('100%');
@@ -96,21 +103,24 @@ describe('renderer-box geometry contract', () => {
 
   it('transparent and framed modes share identical geometry', () => {
     const transparent = render(
-      <BlobbiRendererView visual={VISUAL} instanceId="t-a" size="xl" transparent />,
+      <BlobbiRenderer visual={VISUAL} instanceId="t-a" size="xl" transparent />,
     );
     const framed = render(
-      <BlobbiRendererView visual={VISUAL} instanceId="t-b" size="xl" transparent={false} />,
+      <BlobbiRenderer visual={VISUAL} instanceId="t-b" size="xl" transparent={false} />,
     );
 
     for (const view of [transparent, framed]) {
       const root = box(view.container);
-      expect(root.className).toContain('h-32');
-      expect(root.className).toContain('w-32');
-      expect(bodyBox(view.container).className).toContain('inset-0');
+      expect(root.style.width).toBe('128px');
+      expect(root.style.height).toBe('128px');
+      expect(bodyBox(view.container).style.position).toBe('absolute');
     }
-    // Only decoration differs.
-    expect(box(framed.container).className).toContain('blobbi-gradient-frame');
-    expect(box(transparent.container).className).not.toContain('blobbi-gradient-frame');
+    // Only decoration differs, and only as an optional class the host may style.
+    expect(box(framed.container).className).toContain('blobbi-renderer--framed');
+    expect(box(transparent.container).className).not.toContain('blobbi-renderer--framed');
+    expect(box(framed.container).getAttribute('style')).toBe(
+      box(transparent.container).getAttribute('style'),
+    );
   });
 });
 
@@ -119,7 +129,7 @@ describe('accessory sizing contract', () => {
     for (const size of ['lg', 'xl'] as const) {
       const accessories = normalizeAccessoryPlacements([equip('headwear-1')]);
       const { container } = render(
-        <BlobbiRendererView
+        <BlobbiRenderer
           visual={VISUAL}
           instanceId={`t-ratio-${size}`}
           size={size}
@@ -142,7 +152,7 @@ describe('accessory sizing contract', () => {
   it("the accessory's own scale is applied exactly once (in the transform, not the size)", () => {
     const accessories = normalizeAccessoryPlacements([equip('headwear-1', { scale: 1.2 })]);
     const { container } = render(
-      <BlobbiRendererView visual={VISUAL} instanceId="t-scale" size="lg" accessories={accessories} />,
+      <BlobbiRenderer visual={VISUAL} instanceId="t-scale" size="lg" accessories={accessories} />,
     );
     const item = container.querySelector('[data-accessory-code="headwear-1"]') as HTMLElement;
     expect(item.style.transform).toContain('scale(1.2)');
@@ -161,7 +171,7 @@ describe('accessory paint order in the DOM', () => {
       equip('back-1', { slot: 'back' }),
     ]);
     const { container } = render(
-      <BlobbiRendererView visual={VISUAL} instanceId="t-order" size="lg" accessories={accessories} />,
+      <BlobbiRenderer visual={VISUAL} instanceId="t-order" size="lg" accessories={accessories} />,
     );
     const children = Array.from(box(container).children);
     const behindIdx = children.findIndex(
@@ -186,7 +196,7 @@ describe('accessory paint order in the DOM', () => {
       );
 
     const front = render(
-      <BlobbiRendererView
+      <BlobbiRenderer
         visual={VISUAL} instanceId="t-rear-a" size="lg"
         accessories={accessories('front')}
       />,
@@ -194,7 +204,7 @@ describe('accessory paint order in the DOM', () => {
     expect(front.container.querySelector('[data-accessory-code="eyewear-1"]')).not.toBeNull();
 
     const rear = render(
-      <BlobbiRendererView
+      <BlobbiRenderer
         visual={VISUAL} instanceId="t-rear-b" size="lg" facing="back"
         accessories={accessories('back')}
       />,
@@ -206,38 +216,38 @@ describe('accessory paint order in the DOM', () => {
 
 describe('SVG behavior preserved (baby/adult, sleep, facing, gaze, instance ids)', () => {
   it('renders a baby and an adult form', () => {
-    const baby = render(<BlobbiRendererView visual={VISUAL} instanceId="t-baby" />);
-    const adult = render(<BlobbiRendererView visual={ADULT_VISUAL} instanceId="t-adult" />);
+    const baby = render(<BlobbiRenderer visual={VISUAL} instanceId="t-baby" />);
+    const adult = render(<BlobbiRenderer visual={ADULT_VISUAL} instanceId="t-adult" />);
     expect(baby.container.querySelector('svg')).not.toBeNull();
     expect(adult.container.querySelector('svg')).not.toBeNull();
     expect(adult.container.innerHTML).not.toBe(baby.container.innerHTML);
   });
 
   it('sleeping selects different markup than awake', () => {
-    const awake = render(<BlobbiRendererView visual={VISUAL} instanceId="t-awake" />);
+    const awake = render(<BlobbiRenderer visual={VISUAL} instanceId="t-awake" />);
     const asleep = render(
-      <BlobbiRendererView visual={VISUAL} instanceId="t-awake" isSleeping />,
+      <BlobbiRenderer visual={VISUAL} instanceId="t-awake" isSleeping />,
     );
     expect(asleep.container.innerHTML).not.toBe(awake.container.innerHTML);
   });
 
   it('rear facing removes the face (no pupils survive in the markup)', () => {
     const rear = render(
-      <BlobbiRendererView visual={VISUAL} instanceId="t-rear" facing="back" eyeOffset={{ x: 1, y: 0 }} />,
+      <BlobbiRenderer visual={VISUAL} instanceId="t-rear" facing="back" eyeOffset={{ x: 1, y: 0 }} />,
     );
     expect(rear.container.innerHTML).not.toContain('blobbi-pupil');
   });
 
   it('gaze sets CSS variables and marks pupils; static render stays untouched', () => {
     const gazing = render(
-      <BlobbiRendererView visual={VISUAL} instanceId="t-gaze" eyeOffset={{ x: 0.5, y: -0.25 }} />,
+      <BlobbiRenderer visual={VISUAL} instanceId="t-gaze" eyeOffset={{ x: 0.5, y: -0.25 }} />,
     );
     const wrapper = bodyBox(gazing.container);
     expect(wrapper.style.getPropertyValue('--blobbi-eye-x')).toBe('0.5');
     expect(wrapper.style.getPropertyValue('--blobbi-eye-y')).toBe('-0.25');
     expect(gazing.container.innerHTML).toContain('blobbi-pupil');
 
-    const still = render(<BlobbiRendererView visual={VISUAL} instanceId="t-still" />);
+    const still = render(<BlobbiRenderer visual={VISUAL} instanceId="t-still" />);
     expect(bodyBox(still.container).style.getPropertyValue('--blobbi-eye-x')).toBe('');
     expect(still.container.innerHTML).not.toContain('blobbi-pupil');
   });
@@ -245,8 +255,8 @@ describe('SVG behavior preserved (baby/adult, sleep, facing, gaze, instance ids)
   it('two instances never share SVG ids', () => {
     const { container } = render(
       <div>
-        <BlobbiRendererView visual={VISUAL} instanceId="inst-one" />
-        <BlobbiRendererView visual={VISUAL} instanceId="inst-two" />
+        <BlobbiRenderer visual={VISUAL} instanceId="inst-one" />
+        <BlobbiRenderer visual={VISUAL} instanceId="inst-two" />
       </div>,
     );
     const ids = Array.from(container.querySelectorAll('svg [id]')).map((el) => el.id);

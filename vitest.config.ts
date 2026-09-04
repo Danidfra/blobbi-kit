@@ -10,6 +10,7 @@ export default defineConfig({
       { find: /^@blobbi-kit\/core\/(.*)$/, replacement: r('./packages/blobbi-core/src') + '/$1' },
       { find: /^@blobbi-kit\/react$/, replacement: r('./packages/blobbi-react/src/index.ts') },
       { find: /^@blobbi-kit\/react\/(.*)$/, replacement: r('./packages/blobbi-react/src') + '/$1' },
+      { find: /^@blobbi\/renderer$/, replacement: r('./packages/blobbi-renderer/src/index.ts') },
     ],
   },
   test: {

@@ -1,5 +1,5 @@
 /**
- * The PUBLIC API of `@blobbi/react`, asserted exactly.
+ * The PUBLIC API of `@blobbi/renderer`, asserted exactly.
  *
  * An export list is a promise, and promises made by accident are the expensive
  * kind. This test exists so that widening the surface is a deliberate edit to a
@@ -11,16 +11,18 @@
  * because supporting them forever is a real cost and nobody has asked.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import * as api from './index';
 
 const PACKAGE_ROOT = resolve(__dirname, '..');
 
-/** The complete, intentional export surface. */
+/** The complete, intentional RUNTIME export surface (types are not values). */
 const PUBLIC_API = [
   // The component
   'AccessoryLayerView',
+  'BlobbiRenderer',
+  // Migration aliases (deprecated, removed at 1.0)
   'BlobbiRendererView',
   // Visual normalization
   'DEFAULT_ADULT_TYPE',
@@ -31,17 +33,16 @@ const PUBLIC_API = [
   // The canonical box
   'ACCESSORY_BASE_PERCENT',
   'ACCESSORY_BASE_RATIO',
-  'BLOBBI_RENDER_SIZE_CLASSES',
   'BLOBBI_RENDER_SIZE_PX',
   'accessoryBasePx',
   'blobbiRenderSizePx',
+  'resolveBlobbiRenderSize',
   // Accessories
   'ACCESSORY_SLOT_RANK',
   'DEFAULT_ACCESSORY_SOURCES',
   'REAR_VIEW_HIDDEN_SLOTS',
   'normalizeAccessoryPlacements',
   // Visual effects
-  'BLOBBI_EFFECT_STYLESHEET',
   'BLOBBI_VISUAL_EFFECT_IDS',
   'DEFAULT_EFFECT_INTENSITY',
   'EFFECT_SLOTS',
@@ -53,6 +54,9 @@ const PUBLIC_API = [
   'getBlobbiVisualEffectInfo',
   'isBlobbiVisualEffectId',
   'normalizeBlobbiVisualEffects',
+  // Optional stylesheets
+  'BLOBBI_EFFECT_STYLESHEET',
+  'BLOBBI_RENDERER_STYLESHEET',
   // Rendering without React
   'loadBlobbiSvg',
   // SVG post-processing (provisional)
@@ -68,10 +72,10 @@ describe('the public API is exactly what it claims to be', () => {
 
   it('keeps implementation details private', () => {
     // Each of these exists and is used INSIDE the package. None of them is a
-    // promise: the artwork can be re-cut, the customizers can change signature,
-    // and `cn` is an implementation choice, not an interface.
+    // promise: the artwork can be re-cut, the customizers can change signature.
     for (const internal of [
       'cn',
+      'classNames',
       'customizeAdultSvg',
       'customizeBabySvg',
       'getAdultBaseSvg',
@@ -81,12 +85,16 @@ describe('the public API is exactly what it claims to be', () => {
       'ensureSvgFillsContainer',
       'lightenColor',
       'darkenColor',
+      'hexToHsl',
+      'hslToHex',
       'findRearViewRemovals',
       'REAR_VIEW_REMOVED_BLOCKS',
+      // The Tailwind class ladder of the extracted Island package. Gone on
+      // purpose: the box is inline now, and exporting a utility-class map would
+      // re-invite the hidden dependency on a consumer's CSS build.
+      'BLOBBI_RENDER_SIZE_CLASSES',
       // Effect INTERNALS. The presets are particle geometry, timings and
-      // palettes: the implementation of an effect, not its interface. A
-      // consumer names an effect by id; if the preset were public, a
-      // hand-edited copy of one would become somebody's supported input.
+      // palettes: the implementation of an effect, not its interface.
       'BLOBBI_VISUAL_EFFECT_PRESETS',
       'BlobbiEffectLayer',
       'BlobbiEffectStyles',
@@ -113,11 +121,13 @@ describe('the public API is exactly what it claims to be', () => {
     for (const [name, value] of Object.entries(api)) {
       expect(value, `${name} is exported but undefined`).toBeDefined();
     }
-    expect(typeof api.BlobbiRendererView).toBe('function');
+    expect(typeof api.BlobbiRenderer).toBe('function');
+    expect(api.BlobbiRendererView).toBe(api.BlobbiRenderer);
     expect(typeof api.AccessoryLayerView).toBe('function');
     expect(typeof api.normalizeBlobbiRenderModel).toBe('function');
     expect(typeof api.normalizeAccessoryPlacements).toBe('function');
     expect(typeof api.loadBlobbiSvg).toBe('function');
+    expect(typeof api.BLOBBI_RENDERER_STYLESHEET).toBe('string');
     expect(api.BLOBBI_RENDER_SIZE_PX).toEqual({
       sm: 32, md: 56, lg: 96, xl: 128, '2xl': 224, '3xl': 288,
     });
@@ -125,17 +135,24 @@ describe('the public API is exactly what it claims to be', () => {
 
   it('resolves from the package name, not from a relative path', async () => {
     // Proves the workspace wiring works the way a consumer would use it. If the
-    // package.json `exports`/`types` entry ever stops resolving, this fails
-    // here rather than in a downstream application build.
-    const byName = await import('@blobbi/react');
+    // package name ever stops resolving, this fails here rather than in a
+    // downstream application build.
+    const byName = await import('@blobbi/renderer');
     expect(Object.keys(byName).sort()).toEqual(PUBLIC_API);
-    expect(byName.BlobbiRendererView).toBe(api.BlobbiRendererView);
+    expect(byName.BlobbiRenderer).toBe(api.BlobbiRenderer);
   });
 
-  it('points its manifest entry points at files that exist', () => {
+  it('points its manifest at the built entry points, with a root export only', () => {
     const manifest = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
-    for (const entry of [manifest.main, manifest.types, manifest.exports['.'].default]) {
-      expect(readFileSync(join(PACKAGE_ROOT, entry), 'utf8').length).toBeGreaterThan(0);
-    }
+    expect(manifest.main).toBe('./dist/index.js');
+    expect(manifest.types).toBe('./dist/index.d.ts');
+    expect(Object.keys(manifest.exports)).toEqual(['.']);
+    expect(manifest.exports['.']).toEqual({
+      types: './dist/index.d.ts',
+      import: './dist/index.js',
+    });
+    expect(manifest.files).toEqual(['dist', 'LICENSE']);
+    expect(manifest.sideEffects).toBe(false);
+    expect(existsSync(join(PACKAGE_ROOT, 'src/index.ts'))).toBe(true);
   });
 });
