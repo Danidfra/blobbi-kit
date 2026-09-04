@@ -265,9 +265,9 @@ export interface BlobbiCompanion {
    *
    * This is true when EITHER:
    * - the event carries old-app / old-schema markers (deprecated egg/incubation/
-   *   fee tags, or a `t`/`client` tag equal to the old-app value) — this catches
-   *   old-app events even when the d-tag looks canonical and a seed is present;
-   *   OR
+   *   fee tags) — this catches old-app events even when the d-tag looks
+   *   canonical and a seed is present. Branding tags (`client`, `t`) are not
+   *   markers; OR
    * - the event has a non-canonical d-tag, a missing/short seed, or a missing
    *   name.
    *
@@ -873,15 +873,18 @@ export function deriveSeedIdentity(seed: string): BlobbiVisualTraits {
  * Old-app schema markers that identify a Blobbi event produced by the
  * legacy ("old app") client, *even when its d-tag looks canonical*.
  *
- * Current Ditto-created canonical events are not expected to write any of
- * these tags into a Kind 31124 event: the egg/incubation/fee fields were
- * removed from the schema, and the `t`/`client` tags are stripped on republish
- * (the NIP-89 client tag is added by useNostrPublish as `["client", "Ditto"]`,
- * not stored in the event tags).
+ * Current canonical events are not expected to write any of these tags into a
+ * Kind 31124 event: the egg/incubation/fee fields were removed from the schema.
  *
  * Presence of ANY of these tag NAMES is therefore a strong, d-tag-independent
  * signal that the event came from the old app and should be treated as
  * unsupported (never migrated, normalized, or republished).
+ *
+ * Legacy detection is SCHEMA/STRUCTURE based. Branding tags (`client`, `t`)
+ * are deliberately NOT in this set: they say which client wrote an event, not
+ * which schema it follows. Current hosts legitimately publish
+ * `["client", "blobbi"]` (Blobbi Island) or a NIP-89 `["client", "Ditto", …]`
+ * tag on fully canonical events, so a branding value is never schema evidence.
  *
  * NOTE: This intentionally does NOT include the new-app progression timing
  * tags. `start_incubation` IS an old-app field (the new app uses
@@ -899,13 +902,6 @@ const OLD_APP_SCHEMA_TAG_NAMES = new Set<string>([
 ]);
 
 /**
- * The `t` / `client` tag values the old app used. Current Ditto-created
- * canonical events are not expected to store these in the event tags, but we
- * match defensively on the old value.
- */
-const OLD_APP_CLIENT_VALUE = 'blobbi';
-
-/**
  * Detect a Blobbi event that originated from the old app / old schema, even
  * when its d-tag is in the current canonical format and it carries a valid
  * seed.
@@ -914,22 +910,18 @@ const OLD_APP_CLIENT_VALUE = 'blobbi';
  * shown/selected, never synced (canonical or seed/tag), and never republished
  * into a cleaned/current format. Opening one must not produce a new 31124.
  *
- * Detection is based on old-app/deprecated schema markers, NOT the d-tag:
- * - any old-app-only egg/incubation/fee schema tag (incubation_time,
- *   incubation_progress, egg_temperature, egg_status, shell_integrity, fees,
- *   start_incubation, interact_6_progress)
- * - a `t` tag equal to the old-app value ("blobbi")
- * - a `client` tag equal to the old-app value ("blobbi")
+ * Detection is based on old-app/deprecated schema markers ONLY, NOT the d-tag
+ * and NOT branding: any old-app-only egg/incubation/fee schema tag
+ * (incubation_time, incubation_progress, egg_temperature, egg_status,
+ * shell_integrity, fees, start_incubation, interact_6_progress).
  *
- * Current Ditto-created canonical events (including freshly-created eggs) are
- * not expected to carry any of these, so they are not classified as
- * unsupported. The mere presence of a `seed` is NOT a marker.
+ * `client` / `t` tags, whatever their value, are never a marker: a canonical
+ * event branded `["client", "blobbi"]` or `["t", "blobbi"]` is a current event.
+ * The mere presence of a `seed` is NOT a marker either.
  */
 export function isUnsupportedLegacyBlobbiEvent(event: NostrEvent): boolean {
-  for (const [name, value] of event.tags) {
+  for (const [name] of event.tags) {
     if (OLD_APP_SCHEMA_TAG_NAMES.has(name)) return true;
-    if (name === 't' && value === OLD_APP_CLIENT_VALUE) return true;
-    if (name === 'client' && value === OLD_APP_CLIENT_VALUE) return true;
   }
   return false;
 }

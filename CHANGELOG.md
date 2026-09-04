@@ -9,6 +9,49 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## 0.5.1 — Branding tags no longer imply a legacy event (fix)
+
+**Fix, no API change.** `isUnsupportedLegacyBlobbiEvent` (and therefore
+`isLegacyBlobbiEvent`, `parseBlobbiEvent(...).isLegacy` and the
+`useBlobbisCollection` filter) no longer treats `["client", "blobbi"]` or
+`["t", "blobbi"]` as evidence of the old app. Legacy detection is now purely
+schema/structure based: the old-app schema tag names (`incubation_time`,
+`incubation_progress`, `egg_temperature`, `egg_status`, `shell_integrity`,
+`fees`, `start_incubation`, `interact_6_progress`), the canonical `d` shape,
+the 64-char `seed` and the `name` tag. None of those checks changed.
+
+### Why
+
+Branding tags say which client wrote an event, not which schema it follows.
+Blobbi Island brands every event it publishes with `["client", "blobbi"]`, the
+same value the old app once used, so every fully canonical Island-created
+Blobbi was classified as unsupported: dropped from `useBlobbisCollection`,
+skipped by the care hooks that early-return on `isLegacy`, and recoverable in
+Ditto only through a host-side workaround. A genuine old-app event still fails
+the structural checks (non-canonical `d`, no seed) or carries one of the old
+schema tags, so nothing that was correctly excluded before is admitted now.
+
+### Tests
+
+- `blobbi-legacy-filter.test.ts`: canonical event + `client=blobbi` and
+  + `t=blobbi` are not legacy; an old incubation tag on a canonical-looking
+  event is still legacy; branding next to an old schema tag does not rescue it;
+  bad `d`, missing/short `seed` and missing `name` stay legacy with or without
+  branding; an Island-shaped kind 31124 fixture passes the visibility path and
+  is retained next to a Ditto-created Blobbi.
+- `blobbi.test.ts`: the per-marker test now lists only schema markers (and
+  gains `interact_6_progress`); a new case asserts `t`/`client` alone stay
+  current.
+
+### Versions
+
+Both packages move to 0.5.1 in lockstep, and `@blobbi-kit/react`'s peer range
+on core moves to `^0.5.1` (the repository rule: the peer pins the core version
+being released). Hosts that carry their own recovery for Island-branded
+events can delete it once on 0.5.1.
+
+---
+
 ## 0.5.0 — Remove the `@nostrify/nostrify` dependency (breaking)
 
 **Breaking (type-level only).** No runtime behavior, protocol behavior, or

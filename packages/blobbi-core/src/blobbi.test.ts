@@ -365,7 +365,7 @@ describe('old-app Blobbi with canonical-looking d-tag (schema-marker detection)'
     expect(companion.isLegacy).toBe(true);
   });
 
-  it('detection is marker-based, not just one tag: each old-app marker alone flags it', () => {
+  it('detection is marker-based, not just one tag: each old-app schema marker alone flags it', () => {
     const markers: Array<[string, string]> = [
       ['incubation_time', '1'],
       ['incubation_progress', '1'],
@@ -374,14 +374,30 @@ describe('old-app Blobbi with canonical-looking d-tag (schema-marker detection)'
       ['shell_integrity', '1'],
       ['fees', '0'],
       ['start_incubation', '1'],
-      ['t', 'blobbi'],
-      ['client', 'blobbi'],
+      ['interact_6_progress', '1'],
     ];
     for (const marker of markers) {
       const event = makeCanonicalEggEvent();
       event.tags = [...event.tags, marker];
       expect(isUnsupportedLegacyBlobbiEvent(event)).toBe(true);
       expect(isLegacyBlobbiEvent(event)).toBe(true);
+    }
+  });
+
+  it('branding tags alone are NOT markers: `t`/`client` = "blobbi" on a canonical event stays current', () => {
+    // Blobbi Island brands every event `["client", "blobbi"]`; the old app used
+    // the same value. Branding names a client, not a schema, so it must not
+    // classify an otherwise canonical event as unsupported.
+    const brandings: Array<[string, string]> = [
+      ['t', 'blobbi'],
+      ['client', 'blobbi'],
+    ];
+    for (const branding of brandings) {
+      const event = makeCanonicalEggEvent();
+      event.tags = [...event.tags, branding];
+      expect(isUnsupportedLegacyBlobbiEvent(event)).toBe(false);
+      expect(isLegacyBlobbiEvent(event)).toBe(false);
+      expect(parseBlobbiEvent(event)!.isLegacy).toBe(false);
     }
   });
 
