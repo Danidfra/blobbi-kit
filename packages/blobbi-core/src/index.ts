@@ -40,6 +40,9 @@ export * from './missions';
 export * from './progression';
 export * from './color-guardrails';
 
+// Pure domain -> renderer visual identity projection (no renderer import).
+export * from './blobbi-visual-identity';
+
 // Async Nostr helpers.
 export * from './fetchFreshEvent';
 export * from './fetchFreshBlobbonautProfile';

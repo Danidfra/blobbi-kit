@@ -58,6 +58,17 @@ schema tags, so nothing that was correctly excluded before is admitted now.
   gains `interact_6_progress`); a new case asserts `t`/`client` alone stay
   current.
 
+### Added — `@blobbi-kit/core`
+
+- `./blobbi-visual-identity`, exporting `BlobbiVisualIdentity`,
+  `BlobbiVisualIdentitySource` and `getBlobbiVisualIdentity(blobbi)`: the pure
+  projection of a parsed companion's domain state (`stage`, `adultType`, the
+  three colors, `pattern`, `specialMark`, the `theme` extension tag, `name`)
+  onto the plain visual identity a renderer draws from. Structurally
+  compatible with `@blobbi/renderer`'s `BlobbiVisual` by design; neither
+  package imports the other. Also re-exported from the package barrel. Hosts
+  that hand-copied `visualTraits.*` into renderer input can call this instead.
+
 ### Versions
 
 Both packages move to 0.5.1 in lockstep, and `@blobbi-kit/react`'s peer range
