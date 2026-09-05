@@ -22,6 +22,29 @@ git history and adapted to a package boundary. It depends on React alone and
 imports neither `@blobbi-kit/core` nor `@blobbi-kit/react`; it knows no
 Nostr, no inventory, no host. See `packages/blobbi-renderer/README.md`.
 
+#### Adult V2 artwork and the artwork registry
+
+- `BlobbiVisual.visualGeneration?: 'v1' | 'v2'` (absent means `'v1'`) and
+  `BlobbiFacing = 'front' | 'back' | 'left' | 'right'` (the two profiles are
+  new; V1 draws its front for both). Existing consumers need no change.
+- **Adult V2**: one canonical anatomy with semantic `data-part` selectors
+  (body, arms, feet, tuft, eyes with movable inner groups, eyebrows, cheeks,
+  mouth) and authored directional artwork: front, a right-facing side that is
+  mirrored for `left`, and a back derived from the front with the face removed
+  and limbs/tufts stacked behind the body. `baseColor`, `secondaryColor` and
+  `eyeColor` apply by color role; `pattern`, `specialMark` and `theme` are
+  carried but not yet drawn; there is no closed-eye V2 artwork yet.
+- An artwork REGISTRY (`artwork/registry.ts`) now decides every drawing from
+  `(stage, visualGeneration, adultType, facing, eyesClosed)`; the React
+  component and the string API contain no generation conditionals. V1 output
+  is pinned byte for byte by `artwork/v1-fingerprints.test.ts` (142 digests
+  recorded before the refactor).
+- New string API `renderBlobbiSvg(options)`; `loadBlobbiSvg` is unchanged and
+  V1-only. New exports `DEFAULT_VISUAL_GENERATION`, `ADULT_V2_PARTS`,
+  `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`; `applyGazeMarkup` accepts a
+  generation. `npm run preview` (after a build) writes a static visual
+  preview page under `preview/`.
+
 ---
 
 ## 0.5.1 — Branding tags no longer imply a legacy event (fix)
@@ -68,6 +91,19 @@ schema tags, so nothing that was correctly excluded before is admitted now.
   compatible with `@blobbi/renderer`'s `BlobbiVisual` by design; neither
   package imports the other. Also re-exported from the package barrel. Hosts
   that hand-copied `visualTraits.*` into renderer input can call this instead.
+
+- `BlobbiVisualGeneration` (`'v1' | 'v2'`), `VISUAL_GENERATION_TAG`
+  (`'visual_generation'`), `DEFAULT_VISUAL_GENERATION` (`'v1'`) and
+  `parseVisualGeneration(tags)` in `./blobbi`; `BlobbiCompanion.visualGeneration`
+  and `BlobbiVisualIdentity.visualGeneration`. Which family of artwork draws a
+  Blobbi is IDENTITY, carried in its kind 31124 event as
+  `["visual_generation", "v2"]`, never a renderer or application version.
+  **An event without the tag is `'v1'`**, so every pre-existing Blobbi is V1
+  with no migration; an unrecognized value also resolves to `'v1'`. The tag
+  is managed on republish and described by the tag schema for every stage
+  (`visual`, persistent, not seed-derived, never mirrored). Nothing creates
+  the tag on its own: `buildEggTags` stays V1, and a host that adopts a V2
+  Blobbi adds the tag itself.
 
 ### Versions
 

@@ -96,7 +96,8 @@ contract: whatever crosses the boundary can have come off a wire.
 ```ts
 interface BlobbiVisual {
   stage?: 'egg' | 'baby' | 'adult';
-  adultType?: string;         // 'bloomi' | 'breezy' | … (16 forms); adult only
+  visualGeneration?: 'v1' | 'v2';  // absent means 'v1'; see "Artwork generations"
+  adultType?: string;         // 'bloomi' | 'breezy' | … (16 V1 forms); V1 adult only
   baseColor?: string;
   secondaryColor?: string;
   eyeColor?: string;
@@ -112,6 +113,8 @@ is the single pure function that does it):
 
 | Input | Result |
 | --- | --- |
+| absent / unrecognized `visualGeneration` | `'v1'` |
+| absent / unrecognized `facing` | `'front'` |
 | absent / unrecognized `stage` | `'baby'` |
 | `stage: 'egg'` | accepted; draws the baby body (a dedicated egg drawing is a later milestone) |
 | `stage: 'adult'` with no `adultType` | `'bloomi'` |
@@ -146,14 +149,21 @@ should not render accessories, whose sizes are fractions of the box
 
 ## 6. Facing, sleeping, gaze
 
-- `facing: 'back'` derives the rear drawing from the front artwork by removing
-  its face blocks (`applyRearView`). Face-only accessory slots are hidden
-  (`REAR_VIEW_HIDDEN_SLOTS`).
+- `facing` is `'front' | 'back' | 'left' | 'right'`. For V1, `'back'` derives
+  the rear drawing from the front artwork by removing its face blocks
+  (`applyRearView`) and the two profiles draw the front (V1 has no side art).
+  For V2, every facing is authored artwork: `'back'` is the derived rear
+  anatomy, `'right'` the authored profile and `'left'` that profile mirrored.
+  Face-only accessory slots are hidden for `'back'` (`REAR_VIEW_HIDDEN_SLOTS`);
+  the profiles hide nothing yet.
 - `isSleeping` selects the closed-eye artwork. `eyesClosed` is a legacy alias
   that produces byte-identical markup.
 - `eyeOffset` (each axis −1…1) moves only the pupils, through two CSS
   variables on the body wrapper. The SVG string is generated once per visual
-  change, never per gaze change, which is what makes per-frame gaze cheap.
+  change, never per gaze change, which is what makes per-frame gaze cheap. On
+  V1 the marked elements are the pupil shapes; on V2 they are the semantic
+  `*-eye-inner` groups (iris, pupil, highlights), so the eye whites and body
+  never move. The V2 back view has no face and receives no gaze markup.
 
 ## 7. Accessories
 
@@ -182,14 +192,115 @@ is seeded by `instanceId:effectId`, so re-renders never move anything.
 Reduced motion is honored in CSS. `BLOBBI_EFFECT_STYLESHEET` lets a host mount
 the rules once instead of carrying a `<style>` per effect-bearing Blobbi.
 
+## 8b. Artwork generations
+
+A Blobbi's **visual generation** is which family of artwork draws it. It is a
+property of the Blobbi's identity, carried in its kind 31124 event by the
+domain kit as `["visual_generation", "v2"]` and projected into `BlobbiVisual`
+as `visualGeneration`. It is never a renderer or application version: the same
+Blobbi draws the same generation in every client, today and later.
+
+**Absence of the marker means V1.** Every Blobbi that existed before the marker
+did is V1, without migration, and every consumer that never sets the field gets
+exactly the drawings it always got.
+
+### V1: the original generation
+
+Sixteen independent adult forms (`bloomi`, `breezy`, `cacti`, `catti`, `cloudi`,
+`crysti`, `droppi`, `flammi`, `froggi`, `leafy`, `mushie`, `owli`, `pandi`,
+`rocky`, `rosey`, `starri`), one baby, a sleeping variant of each, per-form
+color customizers, and a rear view derived by removing the face comment blocks.
+Supported for compatibility for as long as V1 Blobbis exist; `loadBlobbiSvg` is
+its positional API and `artwork/v1-fingerprints.test.ts` pins its output byte
+for byte.
+
+### V2: the canonical anatomy
+
+One adult body with explicit, stable semantic parts and authored directional
+artwork. Every meaningful element carries a `data-part` attribute; code selects
+parts by `data-part`, never by `id` (ids are namespaced per instance) and never
+by an Inkscape group name.
+
+| view | source | notes |
+| --- | --- | --- |
+| `front` | authored diagonal view | two eyes with movable `*-eye-inner` groups, eyebrows, cheeks, mouth, tuft, side pattern, shine |
+| `side` | authored right-facing profile | one `eye`/`eye-inner`, `near-*`/`far-*` limbs; **`left` is this drawing mirrored** (`data-blobbi-mirrored="x"`) |
+| `back` | derived from the front | same body, feet, arms, tufts and shadows; arms and tufts stacked behind the body; no face parts at all |
+
+Parts (see `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`):
+`character`, `body-base`, `body-shadow`, `ground-shadow`, `body-shine`,
+`left-arm`/`right-arm` (front, back), `near-arm`/`far-arm` (side),
+`left-foot`/`right-foot` and their shadows (front, back), `near-foot`/`far-foot`
+(side), `tuft-main`, `tuft-secondary`, `tuft-detail-left`/`-right`,
+`left-eye`/`right-eye`/`eye` with `*-eye-white`, `*-eye-inner` (movable),
+`*-iris`, `*-pupil`, `*-eye-highlight-primary`/`-secondary`,
+`left-eyebrow`/`right-eyebrow`/`eyebrow`, `left-cheek`/`right-cheek`/`cheek`
+(with `-base`/`-highlight`), `mouth`, `side-pattern` with `side-pattern-mark`s.
+In the back view, screen-left limbs are the character's right limbs and are
+labeled `right-*`.
+
+Traits on V2: `baseColor` recolors the body, limb, foot and stroke color roles;
+`secondaryColor` recolors the side-pattern marks (visible on the profile; the
+authored front places its pattern group outside the viewBox, so the front and
+back show no marks until the artist moves it); `eyeColor` recolors the iris
+gradient (the pupil stays near-black). `pattern`, `specialMark` and `theme`
+are carried in identity but **not yet drawn** on V2, and there is **no
+closed-eye V2 artwork yet**: `isSleeping` renders the awake drawing (the
+component still reports the state). Baby V2 does not exist yet; a V2 baby draws
+the V1 baby.
+
+V2 is the foundation for future movement, clothing and expressions. Nothing
+moves yet: the renderer stays a pure function of its props, and the semantic
+part map is what makes animation possible later without another artwork
+rewrite.
+
+### Adding artwork
+
+Sources live under `src/artwork/` as typed SVG strings, one file per drawing,
+with a clear source-of-truth hierarchy:
+
+```
+artwork/
+  registry.ts          which drawing for (stage, generation, adultType, facing, eyesClosed)
+  types.ts             BlobbiVisualGeneration, BlobbiFacing, ArtworkRequest, ResolvedArtwork
+  mirror.ts            horizontal mirroring for the profile
+  baby/v1/             the V1 baby (data, resolver, customizer)
+  adult/v1/            the sixteen V1 forms (data, resolver, per-form customizers)
+  adult/v2/            front.ts, side.ts, back.ts, customize.ts, parts.ts
+```
+
+- **Another V2 view** (e.g. a three-quarter back): author it under `adult/v2/`
+  with the same `data-part` vocabulary (add new parts to `parts.ts`), register
+  it in `ADULT_V2_VIEWS`, and teach `viewForFacing` in the registry which
+  facing selects it. Add it to the parts-contract tests.
+- **Adult V2 artwork changes**: edit the source file; geometry only. The
+  customizer works by color role, so keep the authored palette or update the
+  role table in `customize.ts`.
+- **Baby V2**: add `baby/v2/` (views, parts, customizer) and a `stage ===
+  'baby'` branch in the registry's `'v2'` case, mirroring the adult one; remove
+  the "V2 baby draws V1 baby" fallback.
+- **A future generation** (`'v3'`): add it to `BlobbiVisualGeneration` in both
+  this package and `@blobbi-kit/core` (they are declared independently on
+  purpose), add a `v3/` folder with its own customizer and pipeline, and one
+  new `case` in each `switch` of the registry. Nothing outside `artwork/`
+  should need to change.
+
+Run `npm run build` then `npm run preview` in this package to write a static
+visual preview of V1 and every V2 view and palette to `preview/index.html`.
+
 ## 9. String API
 
 ```ts
-loadBlobbiSvg(stage, adultType, baseColor, secondaryColor, eyeColor, isSleeping, instanceId, view);
+renderBlobbiSvg({ stage, visualGeneration, adultType, baseColor, secondaryColor, eyeColor, facing, eyesClosed, instanceId, gaze });
+// -> { svg, artwork: { generation, view, mirrored, gazeable, ... } }
+
+loadBlobbiSvg(stage, adultType, baseColor, secondaryColor, eyeColor, isSleeping, instanceId, view); // V1 only
 ```
 
 The same synchronous pipeline the component uses, as a string: for canvas
-compositing, server thumbnails or a non-React card. `applyGazeMarkup`,
+compositing, server thumbnails or a non-React card. `renderBlobbiSvg` is the
+generation-aware API; `loadBlobbiSvg` is the historical V1 positional API and
+its output is byte-identical to what it always was. `applyGazeMarkup`,
 `applyRearView` and `uniquifySvgIds` are exported as **provisional**
 string-to-string transforms over the artwork's comment-block convention.
 
@@ -283,6 +394,9 @@ helpers, the SVG id internals, the effect presets, and any Tailwind class map.
   `@blobbi-kit/core` dependency (the two color conversions are local), inline
   geometry instead of Tailwind utilities, numeric and CSS-length sizes, image
   semantics, and the optional sanitizer hook.
+
+Adult V2 artwork (front and side) was authored for this package in September
+2026 and the back view derived from the front; see "Artwork generations".
 
 One behavioral note for hosts coming from `@blobbi/react`: the box is no
 longer overridable through Tailwind class merging; pass `size` (a token,

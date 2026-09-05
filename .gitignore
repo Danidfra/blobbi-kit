@@ -5,6 +5,9 @@ node_modules/
 packages/*/dist/
 dist/
 
+# Renderer visual preview (generated from dist by scripts/preview.mjs)
+packages/*/preview/
+
 # TypeScript incremental
 *.tsbuildinfo
 

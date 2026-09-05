@@ -27,7 +27,8 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rimraf dist *.tsbuildinfo"
+    "clean": "rimraf dist *.tsbuildinfo",
+    "preview": "node scripts/preview.mjs"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
