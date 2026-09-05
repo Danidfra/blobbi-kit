@@ -84,11 +84,27 @@ describe('V2 resolution', () => {
     expect(resolved.gazeable).toBe(facing !== 'back');
   });
 
-  it('has no closed-eye artwork yet, and says so', () => {
-    const resolved = resolveBlobbiArtwork({ stage: 'adult', visualGeneration: 'v2', facing: 'front', eyesClosed: true });
-    expect(resolved.eyesClosed).toBe(false);
-    const awake = resolveBlobbiArtwork({ stage: 'adult', visualGeneration: 'v2', facing: 'front', eyesClosed: false });
-    expect(resolved.markup).toBe(awake.markup);
+  it.each(['front', 'left', 'right'] as const)('closed eyes on %s derive from the awake drawing and are not gazeable', (facing) => {
+    const asleep = resolveBlobbiArtwork({ stage: 'adult', visualGeneration: 'v2', facing, eyesClosed: true });
+    const awake = resolveBlobbiArtwork({ stage: 'adult', visualGeneration: 'v2', facing, eyesClosed: false });
+    expect(asleep.eyesClosed).toBe(true);
+    expect(asleep.gazeable).toBe(false);
+    expect(awake.gazeable).toBe(true);
+    expect(asleep.markup).not.toBe(awake.markup);
+    expect(asleep.markup).toContain('-closed"');
+    expect(awake.markup).not.toContain('-closed"');
+    // Same view, same mirroring, same anchors: only the eyes differ.
+    expect(asleep.view).toBe(awake.view);
+    expect(asleep.mirrored).toBe(awake.mirrored);
+    expect(asleep.anchors).toEqual(awake.anchors);
+  });
+
+  it('closed eyes on the back view are the identity: no eyes to close', () => {
+    const asleep = resolveBlobbiArtwork({ stage: 'adult', visualGeneration: 'v2', facing: 'back', eyesClosed: true });
+    const awake = resolveBlobbiArtwork({ stage: 'adult', visualGeneration: 'v2', facing: 'back', eyesClosed: false });
+    expect(asleep.markup).toBe(awake.markup);
+    expect(asleep.eyesClosed).toBe(true);
+    expect(asleep.gazeable).toBe(false);
   });
 
   it('ignores adultType: V2 is one anatomy', () => {

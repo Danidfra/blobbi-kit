@@ -58,6 +58,7 @@ const PUBLIC_API = [
   'BLOBBI_EFFECT_STYLESHEET',
   'BLOBBI_RENDERER_STYLESHEET',
   // Artwork vocabulary
+  'ADULT_V2_CLOSED_EYE_PARTS',
   'ADULT_V2_FACE_PARTS',
   'ADULT_V2_GAZE_PARTS',
   'ADULT_V2_PARTS',
@@ -112,6 +113,8 @@ describe('the public API is exactly what it claims to be', () => {
       'ADULT_V2_SIDE_SVG',
       'ADULT_V2_BACK_SVG',
       'customizeAdultV2Svg',
+      'closeAdultV2Eyes',
+      'closedEyePartFor',
       'mirrorSvgHorizontally',
       'BLOBBI_VISUAL_EFFECT_PRESETS',
       'BlobbiEffectLayer',

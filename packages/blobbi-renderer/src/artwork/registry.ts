@@ -7,8 +7,8 @@
  *   adult
  *   ├── v1                      sixteen forms, awake + sleeping; rear derived
  *   │   └── forms 1..16
- *   └── v2                      one canonical anatomy, authored views
- *       ├── front
+ *   └── v2                      one canonical anatomy, authored views;
+ *       ├── front                 closed eyes DERIVED from any view
  *       ├── side                right-facing; left is a mirror
  *       └── back
  * ```
@@ -46,7 +46,7 @@ import {
   type AdultForm,
 } from './adult/v1';
 import { getBabyBaseSvg, getBabySleepingSvg, customizeBabySvg } from './baby/v1';
-import { getAdultV2Artwork, customizeAdultV2Svg } from './adult/v2';
+import { getAdultV2Artwork, customizeAdultV2Svg, closeAdultV2Eyes } from './adult/v2';
 import { applyRearView } from '../svg';
 import { mirrorSvgHorizontally } from './mirror';
 
@@ -107,17 +107,20 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
     case 'v2': {
       if (stage === 'adult') {
         const art = getAdultV2Artwork(view);
+        // Closed eyes are a transformation of the one drawing, resolved here
+        // exactly where V1 picks its separately drawn sleeping SVG. The back
+        // view has no eyes: the transform is the identity there.
+        const markup = request.eyesClosed ? closeAdultV2Eyes(art.markup) : art.markup;
         return {
           generation: 'v2',
           stage,
           view,
           mirrored,
-          // No closed-eye V2 artwork exists yet; the awake drawing is used.
-          eyesClosed: false,
-          gazeable: art.hasFace,
+          eyesClosed: request.eyesClosed,
+          gazeable: art.hasFace && !request.eyesClosed,
           viewBox: art.viewBox,
           anchors: view === 'front' ? V2_FRONT_ANCHORS : view === 'back' ? V2_BACK_ANCHORS : V2_SIDE_ANCHORS,
-          markup: art.markup,
+          markup,
         };
       }
       // Baby V2 is not designed yet: a V2 baby draws the V1 baby (documented).

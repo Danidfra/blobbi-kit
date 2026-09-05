@@ -156,8 +156,11 @@ should not render accessories, whose sizes are fractions of the box
   anatomy, `'right'` the authored profile and `'left'` that profile mirrored.
   Face-only accessory slots are hidden for `'back'` (`REAR_VIEW_HIDDEN_SLOTS`);
   the profiles hide nothing yet.
-- `isSleeping` selects the closed-eye artwork. `eyesClosed` is a legacy alias
-  that produces byte-identical markup.
+- `isSleeping` closes the eyes. `eyesClosed` is a legacy alias that produces
+  byte-identical markup. On V1 this selects the separately drawn sleeping
+  artwork; on V2 it is a deterministic transformation of the one drawing (see
+  "V2: the canonical anatomy"). Closed eyes receive no gaze on either
+  generation.
 - `eyeOffset` (each axis −1…1) moves only the pupils, through two CSS
   variables on the body wrapper. The SVG string is generated once per visual
   change, never per gaze change, which is what makes per-frame gaze cheap. On
@@ -226,8 +229,10 @@ by an Inkscape group name.
 | `front` | authored diagonal view | two eyes with movable `*-eye-inner` groups, eyebrows, cheeks, mouth, tuft, side pattern, shine |
 | `side` | authored right-facing profile | one `eye`/`eye-inner`, `near-*`/`far-*` limbs; **`left` is this drawing mirrored** (`data-blobbi-mirrored="x"`) |
 | `back` | derived from the front | same body, feet, arms, tufts and shadows; arms and tufts stacked behind the body; no face parts at all |
+| closed eyes | derived from any view | `isSleeping`/`eyesClosed`: each eye group keeps its transform and is marked `data-blobbi-eyes="closed"`; its white and `*-eye-inner` children are removed and one lid stroke (`left-eye-closed`, `right-eye-closed`, `eye-closed`) is drawn in the mouth's `#21102e`. Eyebrows, cheeks, mouth and body are byte-identical to the awake drawing; the back view is unchanged. No separate sleeping SVG exists. |
 
-Parts (see `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`):
+Parts (see `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`,
+`ADULT_V2_CLOSED_EYE_PARTS`):
 `character`, `body-base`, `body-shadow`, `ground-shadow`, `body-shine`,
 `left-arm`/`right-arm` (front, back), `near-arm`/`far-arm` (side),
 `left-foot`/`right-foot` and their shadows (front, back), `near-foot`/`far-foot`
@@ -235,7 +240,8 @@ Parts (see `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`):
 `left-eye`/`right-eye`/`eye` with `*-eye-white`, `*-eye-inner` (movable),
 `*-iris`, `*-pupil`, `*-eye-highlight-primary`/`-secondary`,
 `left-eyebrow`/`right-eyebrow`/`eyebrow`, `left-cheek`/`right-cheek`/`cheek`
-(with `-base`/`-highlight`), `mouth`, `side-pattern` with `side-pattern-mark`s.
+(with `-base`/`-highlight`), `mouth`, `side-pattern` with `side-pattern-mark`s,
+and, in closed-eye output only, `left-eye-closed`/`right-eye-closed`/`eye-closed`.
 In the back view, screen-left limbs are the character's right limbs and are
 labeled `right-*`.
 
@@ -244,10 +250,9 @@ Traits on V2: `baseColor` recolors the body, limb, foot and stroke color roles;
 authored front places its pattern group outside the viewBox, so the front and
 back show no marks until the artist moves it); `eyeColor` recolors the iris
 gradient (the pupil stays near-black). `pattern`, `specialMark` and `theme`
-are carried in identity but **not yet drawn** on V2, and there is **no
-closed-eye V2 artwork yet**: `isSleeping` renders the awake drawing (the
-component still reports the state). Baby V2 does not exist yet; a V2 baby draws
-the V1 baby.
+are carried in identity but **not yet drawn** on V2. Closed eyes are drawn (as
+a transformation, above). Baby V2 does not exist yet; a V2 baby draws the V1
+baby.
 
 V2 is the foundation for future movement, clothing and expressions. Nothing
 moves yet: the renderer stays a pure function of its props, and the semantic
@@ -266,7 +271,7 @@ artwork/
   mirror.ts            horizontal mirroring for the profile
   baby/v1/             the V1 baby (data, resolver, customizer)
   adult/v1/            the sixteen V1 forms (data, resolver, per-form customizers)
-  adult/v2/            front.ts, side.ts, back.ts, customize.ts, parts.ts
+  adult/v2/            front.ts, side.ts, back.ts, closed-eyes.ts, customize.ts, parts.ts
 ```
 
 - **Another V2 view** (e.g. a three-quarter back): author it under `adult/v2/`

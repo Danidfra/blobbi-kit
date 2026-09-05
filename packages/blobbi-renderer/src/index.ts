@@ -108,7 +108,12 @@ export { DEFAULT_VISUAL_GENERATION } from './artwork/types';
 export type { BlobbiVisualGeneration, BlobbiFacing, ArtworkAnchors } from './artwork/types';
 // The Adult V2 semantic part contract: what `data-part` values a V2 drawing
 // carries, so hosts and future systems select parts by name, never by id.
-export { ADULT_V2_PARTS, ADULT_V2_FACE_PARTS, ADULT_V2_GAZE_PARTS } from './artwork/adult/v2';
+export {
+  ADULT_V2_PARTS,
+  ADULT_V2_FACE_PARTS,
+  ADULT_V2_GAZE_PARTS,
+  ADULT_V2_CLOSED_EYE_PARTS,
+} from './artwork/adult/v2';
 export type { AdultV2Part } from './artwork/adult/v2';
 
 // ── Rendering without React ────────────────────────────────────────────────

@@ -8,8 +8,9 @@
  *  - `back`: derived from the front anatomy with the face removed and the
  *    limbs and tufts stacked behind the body (`back.ts`).
  *
- * No sleeping (closed-eye) artwork exists yet: `eyesClosed` renders the awake
- * drawing. The registry reports `eyesClosed: false` for V2 so hosts can tell.
+ * Closed eyes are not a fourth drawing: `closeAdultV2Eyes` (`closed-eyes.ts`)
+ * derives them from any view by replacing each eye group's contents with one
+ * lid stroke, so the sleeping Blobbi can never drift from the awake one.
  */
 import type { BlobbiArtworkView } from '../../types';
 import { ADULT_V2_FRONT_SVG, ADULT_V2_FRONT_VIEWBOX } from './front';
@@ -17,8 +18,10 @@ import { ADULT_V2_SIDE_SVG, ADULT_V2_SIDE_VIEWBOX } from './side';
 import { ADULT_V2_BACK_SVG, ADULT_V2_BACK_VIEWBOX } from './back';
 
 export { customizeAdultV2Svg, ADULT_V2_ROLE_COLORS } from './customize';
+export { closeAdultV2Eyes, closedEyePartFor } from './closed-eyes';
 export {
   ADULT_V2_PARTS,
+  ADULT_V2_CLOSED_EYE_PARTS,
   ADULT_V2_FRONT_PARTS,
   ADULT_V2_SIDE_PARTS,
   ADULT_V2_BACK_PARTS,

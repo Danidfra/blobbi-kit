@@ -6,6 +6,7 @@
  *   - Adult V1 (a handful of forms) for reference;
  *   - Adult V2 front, right, left, back;
  *   - the same V2 views in several trait palettes;
+ *   - awake | sleeping pairs for every V2 facing (closed eyes are derived);
  *   - a V2 gaze demo driven by the CSS variables.
  * Everything is inlined SVG generated at script time; the page needs no server,
  * no framework and no network. Open `preview/index.html` in a browser.
@@ -47,6 +48,17 @@ const v1Row = V1_FORMS.map((form) =>
   cell(`v1 · ${form}`, loadBlobbiSvg('adult', form, '#8749ef', '#c792ff', '#201538', false, `v1-${form}`)),
 ).join('');
 
+// Awake | sleeping, side by side, for every facing; the sleeping drawing is
+// the awake one with `closeAdultV2Eyes` applied (no second SVG exists).
+const sleepRows = [PALETTES[0], PALETTES[2]].map((p) => {
+  const cells = FACINGS.map((facing) => {
+    const awake = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing, ...p.colors, instanceId: `s${i++}` }).svg;
+    const asleep = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing, ...p.colors, eyesClosed: true, instanceId: `s${i++}` }).svg;
+    return `<div class="pair">${cell(`v2 · ${facing} · awake`, awake)}${cell(`v2 · ${facing} · sleeping`, asleep)}</div>`;
+  }).join('');
+  return `<section><h2>Adult V2 — awake | sleeping — ${p.name}</h2><div class="row">${cells}</div></section>`;
+}).join('');
+
 const gaze = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing: 'front', instanceId: 'gaze', gaze: true }).svg;
 const gazeSide = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing: 'right', instanceId: 'gaze-s', gaze: true }).svg;
 
@@ -61,6 +73,7 @@ const html = `<!doctype html>
   .box{width:240px;height:240px;background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center}
   .box svg{width:100%;height:100%}
   figcaption{margin-top:6px;color:#555}
+  .pair{display:flex;gap:4px;padding:6px;border-radius:14px;background:#ece6f7}
   .gaze{--blobbi-eye-x:0;--blobbi-eye-y:0}
   input[type=range]{width:200px}
 </style>
@@ -68,6 +81,7 @@ const html = `<!doctype html>
 <p>Generated from <code>dist/</code> by <code>scripts/preview.mjs</code>. Static markup; no framework.</p>
 <section><h2>Adult V1 (reference)</h2><div class="row">${v1Row}</div></section>
 ${v2Rows}
+${sleepRows}
 <section><h2>Adult V2 — gaze (CSS variables on the wrapper; no JS animation)</h2>
   <div class="row">
     ${cell('v2 · front · gaze', gaze, ' class="gaze" id="gaze-front"')}

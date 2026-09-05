@@ -128,12 +128,28 @@ export const ADULT_V2_FACE_PARTS = [
 /** Parts marked movable for gaze: the iris/pupil/highlight group inside each eye. */
 export const ADULT_V2_GAZE_PARTS = ['left-eye-inner', 'right-eye-inner', 'eye-inner'] as const;
 
-/** The union of every V2 part name across views. */
+/**
+ * The closed-lid strokes. Present ONLY in closed-eye output (`isSleeping` /
+ * `eyesClosed`), where they replace each eye group's white and `*-eye-inner`
+ * children; the awake drawing never carries them. One per eye group:
+ * `left-eye` → `left-eye-closed`, `right-eye` → `right-eye-closed` (front),
+ * `eye` → `eye-closed` (profile). The eye group itself stays, marked
+ * `data-blobbi-eyes="closed"`.
+ */
+export const ADULT_V2_CLOSED_EYE_PARTS = ['left-eye-closed', 'right-eye-closed', 'eye-closed'] as const;
+
+/** The union of every V2 part name across views and eye states. */
 export const ADULT_V2_PARTS = [
-  ...new Set<string>([...ADULT_V2_FRONT_PARTS, ...ADULT_V2_SIDE_PARTS, ...ADULT_V2_BACK_PARTS]),
+  ...new Set<string>([
+    ...ADULT_V2_FRONT_PARTS,
+    ...ADULT_V2_SIDE_PARTS,
+    ...ADULT_V2_BACK_PARTS,
+    ...ADULT_V2_CLOSED_EYE_PARTS,
+  ]),
 ] as readonly string[];
 
 export type AdultV2Part =
   | (typeof ADULT_V2_FRONT_PARTS)[number]
   | (typeof ADULT_V2_SIDE_PARTS)[number]
-  | (typeof ADULT_V2_BACK_PARTS)[number];
+  | (typeof ADULT_V2_BACK_PARTS)[number]
+  | (typeof ADULT_V2_CLOSED_EYE_PARTS)[number];

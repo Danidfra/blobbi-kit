@@ -33,7 +33,15 @@ Nostr, no inventory, no host. See `packages/blobbi-renderer/README.md`.
   mirrored for `left`, and a back derived from the front with the face removed
   and limbs/tufts stacked behind the body. `baseColor`, `secondaryColor` and
   `eyeColor` apply by color role; `pattern`, `specialMark` and `theme` are
-  carried but not yet drawn; there is no closed-eye V2 artwork yet.
+  carried but not yet drawn.
+- **Adult V2 closed eyes** (`isSleeping` / `eyesClosed`) are a deterministic
+  transformation of the canonical drawing, not a second SVG: each eye group
+  keeps its transform, loses its white and `*-eye-inner` children, and gains
+  one lid stroke (`left-eye-closed`, `right-eye-closed`, `eye-closed`) in the
+  mouth's stroke colour. Everything else is byte-identical to the awake
+  drawing; the back view is unchanged; closed eyes receive no gaze. New export
+  `ADULT_V2_CLOSED_EYE_PARTS`. The preview page shows awake | sleeping pairs
+  for every facing. V1 sleeping output is untouched (fingerprints unchanged).
 - An artwork REGISTRY (`artwork/registry.ts`) now decides every drawing from
   `(stage, visualGeneration, adultType, facing, eyesClosed)`; the React
   component and the string API contain no generation conditionals. V1 output

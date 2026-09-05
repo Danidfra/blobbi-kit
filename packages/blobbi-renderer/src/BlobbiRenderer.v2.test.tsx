@@ -127,11 +127,56 @@ describe('isolation and determinism through the component', () => {
     }
   });
 
-  it('renders identically twice, sleeping or not (V2 has no closed-eye art yet)', () => {
+  it('renders identically twice; sleeping is a different, equally deterministic drawing', () => {
     const a = render(<BlobbiRenderer visual={V2} instanceId="d" />);
     const b = render(<BlobbiRenderer visual={V2} instanceId="d" />);
     const asleep = render(<BlobbiRenderer visual={V2} instanceId="d" isSleeping />);
+    const asleepAgain = render(<BlobbiRenderer visual={V2} instanceId="d" eyesClosed />);
     expect(a.container.innerHTML).toBe(b.container.innerHTML);
-    expect(body(asleep.container).innerHTML).toBe(body(a.container).innerHTML);
+    expect(body(asleep.container).innerHTML).not.toBe(body(a.container).innerHTML);
+    expect(body(asleep.container).innerHTML).toBe(body(asleepAgain.container).innerHTML);
+  });
+});
+
+describe('closed eyes on V2 through the component', () => {
+  it('front: both eye groups stay, each holding one lid and nothing of the open eye', () => {
+    const { container } = render(<BlobbiRenderer visual={V2} instanceId="sl" isSleeping eyeOffset={{ x: 1, y: 0 }} />);
+    const s = svg(container);
+    expect(s.querySelectorAll('[data-part="left-eye"], [data-part="right-eye"]')).toHaveLength(2);
+    expect(s.querySelectorAll('[data-part="left-eye-closed"], [data-part="right-eye-closed"]')).toHaveLength(2);
+    expect(s.querySelectorAll('[data-part$="eye-inner"], [data-part$="eye-white"], [data-part$="iris"], [data-part$="pupil"], [data-part*="eye-highlight"]')).toHaveLength(0);
+    for (const g of s.querySelectorAll('[data-part$="-eye"]')) {
+      expect(g.getAttribute('data-blobbi-eyes')).toBe('closed');
+      expect(g.children).toHaveLength(1);
+    }
+    // Eyebrows, cheeks, mouth and body are all still there.
+    for (const part of ['left-eyebrow', 'right-eyebrow', 'left-cheek', 'right-cheek', 'mouth', 'body-base']) {
+      expect(s.querySelector(`[data-part="${part}"]`), part).not.toBeNull();
+    }
+    // No gaze on closed eyes: nothing is marked and no gaze stylesheet is
+    // emitted, so the wrapper's CSS variables (set as on a sleeping V1) are inert.
+    expect(s.querySelector('.blobbi-pupil')).toBeNull();
+    expect(s.querySelector('style[data-blobbi-gaze-style]')).toBeNull();
+  });
+
+  it.each(['right', 'left'] as const)('%s profile: one lid, mirrored with the rest of the drawing', (facing) => {
+    const { container } = render(<BlobbiRenderer visual={V2} instanceId={`sp-${facing}`} facing={facing} isSleeping />);
+    const s = svg(container);
+    expect(s.querySelectorAll('[data-part="eye-closed"]')).toHaveLength(1);
+    expect(s.querySelectorAll('[data-part="eye-inner"], [data-part="eye-white"]')).toHaveLength(0);
+    expect(s.querySelector('[data-blobbi-mirrored]') !== null).toBe(facing === 'left');
+    expect(s.querySelector('[data-part="eye-closed"]')!.closest('[data-blobbi-mirrored]') !== null).toBe(facing === 'left');
+  });
+
+  it('back: sleeping and awake are the same markup', () => {
+    const awake = render(<BlobbiRenderer visual={V2} instanceId="sb" facing="back" />);
+    const asleep = render(<BlobbiRenderer visual={V2} instanceId="sb" facing="back" isSleeping />);
+    expect(body(asleep.container).innerHTML).toBe(body(awake.container).innerHTML);
+  });
+
+  it('the lid id is namespaced per instance like every other id', () => {
+    const { container } = render(<BlobbiRenderer visual={V2} instanceId="ns" isSleeping />);
+    const lid = svg(container).querySelector('[data-part="left-eye-closed"]')!;
+    expect(lid.id).toBe('b_ns_left-eye-closed');
   });
 });
