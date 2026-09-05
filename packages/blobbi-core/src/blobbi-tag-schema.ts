@@ -579,6 +579,23 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // VISUAL GENERATION (Optional; absence means the original generation)
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    tag: 'visual_generation',
+    description: 'Which family of artwork draws this Blobbi',
+    category: 'visual',
+    required: false,
+    stages: ['egg', 'baby', 'adult'],
+    persistent: true,
+    source: 'system',
+    regenerable: false,
+    format: "'v1' | 'v2'",
+    defaultValue: 'v1',
+    notes: 'Identity, not application version: the same event draws the same generation everywhere. Missing tag means v1, so every pre-existing Blobbi is v1 without migration. Not derived from the seed; never mirrored or rewritten by the kit.',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // EXTENSION TAGS (Optional, for crossovers/themes)
   // ═══════════════════════════════════════════════════════════════════════════
   {

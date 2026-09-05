@@ -103,6 +103,43 @@ export type BlobbiStage = 'egg' | 'baby' | 'adult';
 export type BlobbiState = 'active' | 'sleeping' | 'hibernating';
 
 /**
+ * Visual generation: WHICH FAMILY OF ARTWORK a Blobbi is drawn with.
+ *
+ * - `'v1'`: the original generation, sixteen independent adult forms.
+ * - `'v2'`: the standardized canonical anatomy with directional artwork.
+ *
+ * This is a property of the Blobbi's IDENTITY, carried in its kind 31124
+ * event, never of the application or renderer version: the same event draws
+ * the same generation in every client, today and later. An event with no
+ * marker is `'v1'`; every Blobbi that existed before the marker did is V1
+ * without any migration.
+ */
+export type BlobbiVisualGeneration = 'v1' | 'v2';
+
+/** The kind 31124 tag that names a Blobbi's visual generation: `["visual_generation", "v2"]`. */
+export const VISUAL_GENERATION_TAG = 'visual_generation';
+
+/** The generation of every event that carries no {@link VISUAL_GENERATION_TAG}. */
+export const DEFAULT_VISUAL_GENERATION: BlobbiVisualGeneration = 'v1';
+
+const VISUAL_GENERATIONS: ReadonlySet<string> = new Set<BlobbiVisualGeneration>(['v1', 'v2']);
+
+/**
+ * Read the visual generation from a tag list.
+ *
+ * Absent tag -> `'v1'`. An unrecognized value also resolves to `'v1'` rather
+ * than throwing: a client that predates a future generation must still draw
+ * the Blobbi somehow, and V1 is the only generation every client has. Hosts
+ * that want to detect "newer than I understand" can read the raw tag.
+ */
+export function parseVisualGeneration(tags: string[][]): BlobbiVisualGeneration {
+  const value = getTagValue(tags, VISUAL_GENERATION_TAG);
+  return value !== undefined && VISUAL_GENERATIONS.has(value)
+    ? (value as BlobbiVisualGeneration)
+    : DEFAULT_VISUAL_GENERATION;
+}
+
+/**
  * Progression process state — orthogonal to BlobbiState.
  * 
  * 'none'       — no progression process active
@@ -309,6 +346,12 @@ export interface BlobbiCompanion {
   startIncubation: number | undefined;
   /** Adult evolution form type (adult only) */
   adultType: string | undefined;
+  /**
+   * Which artwork generation draws this Blobbi. `'v1'` when the event carries
+   * no `visual_generation` tag (every pre-existing Blobbi). See
+   * {@link BlobbiVisualGeneration}.
+   */
+  visualGeneration: BlobbiVisualGeneration;
   /** 
    * @deprecated Use progressionStartedAt instead.
    * Timestamp when current state (incubating/evolving) started (unix seconds).
@@ -1262,6 +1305,7 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
     adultType: stage === 'adult' && effectiveSeed && effectiveSeed.length === 64
       ? deriveAdultFormFromSeed(effectiveSeed)
       : getTagValue(tags, 'adult_type'),
+    visualGeneration: parseVisualGeneration(tags),
     stateStartedAt: parseNumericTag(tags, 'state_started_at'),
     progressionStartedAt: parseNumericTag(tags, 'progression_started_at') ?? parseNumericTag(tags, 'state_started_at'),
     tasks,
@@ -1409,6 +1453,8 @@ export const MANAGED_BLOBBI_STATE_TAG_NAMES = new Set([
   'state_started_at', 'task', 'task_completed',
   // Evolution tags (adult only)
   'adult_type',
+  // Visual generation (identity; never derived from the seed)
+  'visual_generation',
   // Extension tags (for themes/crossovers)
   'theme', 'crossover_app',
 ]);

@@ -23,8 +23,14 @@
  * d-tag, the seed) is not identity either; it is how the identity was
  * derived, which the renderer has no reason to know.
  */
-import type { BlobbiCompanion, BlobbiPattern, BlobbiSpecialMark, BlobbiStage } from './blobbi';
-import { getTagValue } from './blobbi';
+import type {
+  BlobbiCompanion,
+  BlobbiPattern,
+  BlobbiSpecialMark,
+  BlobbiStage,
+  BlobbiVisualGeneration,
+} from './blobbi';
+import { getTagValue, parseVisualGeneration } from './blobbi';
 
 /**
  * Plain, serializable visual identity of a Blobbi.
@@ -39,6 +45,12 @@ import { getTagValue } from './blobbi';
 export interface BlobbiVisualIdentity {
   /** Life stage: `'egg' | 'baby' | 'adult'`. */
   stage: BlobbiStage;
+  /**
+   * Artwork generation: `'v1'` (the original sixteen adult forms) or `'v2'`
+   * (the canonical anatomy). Always present in the projection; `'v1'` for
+   * every event without a `visual_generation` tag.
+   */
+  visualGeneration: BlobbiVisualGeneration;
   /** Adult form (`'bloomi'`, `'catti'`, ...), as the domain resolved it. */
   adultType?: string;
   /** Canonical CSS hex color. */
@@ -64,7 +76,7 @@ export interface BlobbiVisualIdentity {
  * been a Nostr event.
  */
 export type BlobbiVisualIdentitySource = Pick<BlobbiCompanion, 'stage' | 'visualTraits'> &
-  Partial<Pick<BlobbiCompanion, 'adultType' | 'name' | 'allTags'>>;
+  Partial<Pick<BlobbiCompanion, 'adultType' | 'name' | 'allTags' | 'visualGeneration'>>;
 
 /**
  * Project a Blobbi's domain state onto its visual identity.
@@ -78,10 +90,13 @@ export type BlobbiVisualIdentitySource = Pick<BlobbiCompanion, 'stage' | 'visual
  * this object can never disagree about what they were given.
  */
 export function getBlobbiVisualIdentity(blobbi: BlobbiVisualIdentitySource): BlobbiVisualIdentity {
-  const { stage, visualTraits, adultType, name, allTags } = blobbi;
+  const { stage, visualTraits, adultType, name, allTags, visualGeneration } = blobbi;
 
   const identity: BlobbiVisualIdentity = {
     stage,
+    // A parsed companion carries the generation already; a minimal source
+    // (adoption preview, fixture) may carry only tags, or nothing: then v1.
+    visualGeneration: visualGeneration ?? parseVisualGeneration(allTags ?? []),
     baseColor: visualTraits.baseColor,
     secondaryColor: visualTraits.secondaryColor,
     eyeColor: visualTraits.eyeColor,

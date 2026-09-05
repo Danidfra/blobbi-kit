@@ -45,6 +45,7 @@ function makeCompanion(
 
 const IDENTITY_KEYS = [
   'stage',
+  'visualGeneration',
   'adultType',
   'baseColor',
   'secondaryColor',
@@ -64,6 +65,7 @@ describe('getBlobbiVisualIdentity', () => {
 
     expect(identity).toEqual({
       stage: 'baby',
+      visualGeneration: 'v1',
       baseColor: baby.visualTraits.baseColor,
       secondaryColor: baby.visualTraits.secondaryColor,
       eyeColor: baby.visualTraits.eyeColor,
@@ -128,6 +130,7 @@ describe('getBlobbiVisualIdentity', () => {
     const identity = getBlobbiVisualIdentity({ stage: 'egg', visualTraits: traits });
     expect(identity).toEqual({
       stage: 'egg',
+      visualGeneration: 'v1',
       baseColor: traits.baseColor,
       secondaryColor: traits.secondaryColor,
       eyeColor: traits.eyeColor,
