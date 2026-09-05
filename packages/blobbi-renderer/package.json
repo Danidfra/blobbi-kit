@@ -1,7 +1,6 @@
 {
-  "name": "@blobbi/renderer",
+  "name": "@blobbi-kit/renderer",
   "version": "0.1.0",
-  "private": true,
   "description": "Portable, host-independent React renderer for Blobbi characters: plain visual data in, deterministic SVG out.",
   "type": "module",
   "license": "MIT",

@@ -10,7 +10,7 @@ Island, and future clients).
 | --- | --- | --- |
 | [`@blobbi-kit/core`](./packages/blobbi-core) | Framework-agnostic core domain logic (kinds, addressing, seed/identity, decay, missions, progression). | **DOM-free.** Runs in Node, React Native, or tests without a DOM. |
 | [`@blobbi-kit/react`](./packages/blobbi-react) | App-agnostic React hooks built on `@blobbi-kit/core`. | **Browser-only.** Many hooks rely on `window`, `localStorage`, and `document.visibilityState`. |
-| [`@blobbi/renderer`](./packages/blobbi-renderer) | Host-independent React renderer: plain visual data in, deterministic Blobbi SVG out. Depends on nothing but React; imports neither kit package. | **Private, unpublished** until the `@blobbi` npm scope is confirmed. |
+| [`@blobbi-kit/renderer`](./packages/blobbi-renderer) | Host-independent React renderer: plain visual data in, deterministic Blobbi SVG out. Depends on nothing but React; imports neither kit package. | **Public package.** |
 
 ## Status
 

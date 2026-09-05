@@ -1,5 +1,5 @@
 /**
- * PACKAGE-PURITY enforcement for `@blobbi/renderer`.
+ * PACKAGE-PURITY enforcement for `@blobbi-kit/renderer`.
  *
  * The package's whole value proposition is negative: it is useful to an outside
  * consumer precisely because of what it CANNOT do. It cannot open a relay, read
@@ -106,9 +106,9 @@ const SHIPPED_FILES = ALL_FILES.filter((file) => !/\.test\.tsx?$/.test(file));
 const FORBIDDEN: Array<{ pattern: RegExp; why: string }> = [
   // ── Host-application aliases and the Blobbi domain kit ──────────────────
   { pattern: /^@\//, why: 'a host-application `@/` path alias' },
-  { pattern: /^@blobbi-kit\//, why: 'the Blobbi domain kit (core or react hooks)' },
-  { pattern: /^@blobbi\/renderer/, why: 'itself by package name (a resolution cycle)' },
-  { pattern: /^@blobbi\/(ui|companion)/, why: 'a downstream Blobbi package (an inverted dependency)' },
+  { pattern: /^@blobbi-kit\/(core|react)(\/|$)/, why: 'the Blobbi domain kit (core or react hooks)' },
+  { pattern: /^@blobbi-kit\/renderer/, why: 'itself by package name (a resolution cycle)' },
+  { pattern: /^@blobbi(-kit)?\/(ui|companion)/, why: 'a downstream Blobbi package (an inverted dependency)' },
   // ── Protocol and data ───────────────────────────────────────────────────
   { pattern: /nostr/i, why: 'a Nostr library or module' },
   { pattern: /^@tanstack\//, why: 'a query client' },
@@ -159,7 +159,7 @@ describe('the package reaches nothing it must not', () => {
     // sweep every file on disk rather than only the reachable ones.
     const offenders = ALL_FILES.flatMap((file) =>
       importsOf(file)
-        .filter((specifier) => specifier.startsWith('@/') || specifier.startsWith('@blobbi-kit/'))
+        .filter((specifier) => specifier.startsWith('@/') || /^@blobbi-kit\/(core|react)(\/|$)/.test(specifier))
         .map((specifier) => `${relative(PACKAGE_ROOT, file)} -> ${specifier}`),
     );
     expect(offenders).toEqual([]);
@@ -178,14 +178,14 @@ describe('the package reaches nothing it must not', () => {
     expect(manifest.dependencies, 'the renderer has no runtime dependencies').toBeUndefined();
   });
 
-  it('stays private until the package identity is settled', () => {
-    // `@blobbi` is not a scope this project is known to own on npm. The name
-    // is the intended one, so the code is written against it, but the manifest
-    // must not be publishable until a maintainer confirms the scope (or picks
-    // another name). Flipping this flag is that decision, made in a diff.
+  it('has the intended public package identity', () => {
+    // The package publishes under the kit's own npm scope, alongside
+    // `@blobbi-kit/core` and `@blobbi-kit/react`. Nothing else in the package
+    // depends on the name, so a rename is one string here and one in the
+    // manifest; pinning it keeps that a decision made in a diff.
     const manifest = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
-    expect(manifest.private).toBe(true);
-    expect(manifest.name).toBe('@blobbi/renderer');
+    expect(manifest.private).toBeUndefined();
+    expect(manifest.name).toBe('@blobbi-kit/renderer');
   });
 
   it('contains exactly the React component files it means to', () => {

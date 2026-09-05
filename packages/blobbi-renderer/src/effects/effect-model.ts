@@ -1,5 +1,5 @@
 /**
- * The PUBLIC effect contract of `@blobbi/react`.
+ * The PUBLIC effect contract of `@blobbi-kit/renderer`.
  *
  * A visual effect is named by an ID and nothing else. The package knows a fixed
  * set of ids and how to draw them; it does not know what an id costs, who owns

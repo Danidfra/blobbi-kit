@@ -1,20 +1,20 @@
 # Changelog
 
-All notable changes to the `blobbi-kit` packages are recorded here. Both
-packages (`@blobbi-kit/core`, `@blobbi-kit/react`) are versioned and released in
-lockstep.
+All notable changes to the `blobbi-kit` packages are recorded here. The two
+domain packages (`@blobbi-kit/core`, `@blobbi-kit/react`) are versioned and
+released in lockstep; `@blobbi-kit/renderer` is versioned independently.
 
 The project is pre-1.0, so a **minor** bump is used for breaking changes
 (`0.MINOR.PATCH`), per the `0.x` convention.
 
 ---
 
-## Unreleased — `@blobbi/renderer` 0.1.0 (new package, private)
+## `@blobbi-kit/renderer` 0.1.0
 
-A third workspace package, `packages/blobbi-renderer`, versioned
-independently of the two kit packages and **not yet published**: the
-intended `@blobbi/renderer` name needs the `@blobbi` npm scope confirmed
-first, and the manifest stays `"private": true` until then.
+Initial public release of the canonical, host-independent Blobbi renderer.
+
+A third workspace package, `packages/blobbi-renderer`, published under the
+kit's npm scope and versioned independently of the two domain packages.
 
 It is the canonical Blobbi renderer: Blobbi Island's `@blobbi/react`
 extraction (itself built on the SVG engine Ditto wrote), imported with its
@@ -96,7 +96,7 @@ schema tags, so nothing that was correctly excluded before is admitted now.
   projection of a parsed companion's domain state (`stage`, `adultType`, the
   three colors, `pattern`, `specialMark`, the `theme` extension tag, `name`)
   onto the plain visual identity a renderer draws from. Structurally
-  compatible with `@blobbi/renderer`'s `BlobbiVisual` by design; neither
+  compatible with `@blobbi-kit/renderer`'s `BlobbiVisual` by design; neither
   package imports the other. Also re-exported from the package barrel. Hosts
   that hand-copied `visualTraits.*` into renderer input can call this instead.
 

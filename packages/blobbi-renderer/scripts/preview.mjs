@@ -13,7 +13,7 @@
  *
  * Development only. `preview/` is gitignored and `scripts/` is not published.
  *
- *   npm run build --workspace @blobbi/renderer && npm run preview --workspace @blobbi/renderer
+ *   npm run build --workspace @blobbi-kit/renderer && npm run preview --workspace @blobbi-kit/renderer
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

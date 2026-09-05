@@ -2,7 +2,7 @@
  * THE EXTERNAL CONSUMER TEST.
  *
  * This file is what an application that has never heard of Blobbi Island,
- * Ditto or blobbi-kit gets when it installs `@blobbi/renderer`. It imports the
+ * Ditto or blobbi-kit gets when it installs `@blobbi-kit/renderer`. It imports the
  * package by NAME, from outside the package's own source tree, and it renders
  * with:
  *
@@ -27,7 +27,7 @@ import {
   BLOBBI_RENDER_SIZE_PX,
   type BlobbiVisual,
   type BlobbiRenderSize,
-} from '@blobbi/renderer';
+} from '@blobbi-kit/renderer';
 import {
   FIXTURE_ACCESSORIES,
   FIXTURE_BROKEN_PRIMARY,

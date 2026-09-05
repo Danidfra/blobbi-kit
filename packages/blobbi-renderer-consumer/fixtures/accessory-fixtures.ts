@@ -24,7 +24,7 @@
  * | `goggles`    | `eyewear`  | front layer, rotation, rear-view HIDING    |
  * | `starBadge`  | `headwear` | front layer, scale, x/y placement          |
  */
-import type { AccessoryPlacementInput } from '@blobbi/renderer';
+import type { AccessoryPlacementInput } from '@blobbi-kit/renderer';
 
 /** Resolved against this module, so the URLs are real and bundler-agnostic. */
 const fixtureUrl = (file: string) => new URL(`./${file}`, import.meta.url).href;

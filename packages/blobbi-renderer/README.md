@@ -1,14 +1,7 @@
-# `@blobbi/renderer`
+# `@blobbi-kit/renderer`
 
 The canonical, host-independent Blobbi renderer: a React component (and a
 string function) that draws a Blobbi from plain, serializable visual data.
-
-> **Publication status: private, unpublished.** The intended name is
-> `@blobbi/renderer`. At the time of writing the `@blobbi` npm scope holds no
-> packages and its ownership could not be verified without logging in, so the
-> manifest is `"private": true` until a maintainer confirms the scope (or
-> chooses another name). Nothing else in the package depends on the name; a
-> rename is one string in `package.json` and one in this README.
 
 ---
 
@@ -19,7 +12,7 @@ string function) that draws a Blobbi from plain, serializable visual data.
                                   │
                                   ▼
              ┌─────────────────────────────────────────┐
-             │  @blobbi/renderer                       │
+             │  @blobbi-kit/renderer                   │
              │    body   ──►  inline SVG (synchronous) │
              │    accessories ──► positioned <img>s    │
              │    effects ──► deterministic CSS pieces │
@@ -48,11 +41,11 @@ Blobbi.** That is the whole contract.
 ## 2. Installation
 
 ```bash
-npm install @blobbi/renderer react        # once published
+npm install @blobbi-kit/renderer react
 ```
 
 Inside this repository the package is a workspace member: `npm install` at the
-root links it, and `@blobbi/renderer` resolves to `packages/blobbi-renderer`.
+root links it, and `@blobbi-kit/renderer` resolves to `packages/blobbi-renderer`.
 
 Peer dependency: `react ^18.0.0 || ^19.0.0`. There are no runtime
 dependencies.
@@ -60,7 +53,7 @@ dependencies.
 ## 3. Basic use
 
 ```tsx
-import { BlobbiRenderer, normalizeAccessoryPlacements, type BlobbiVisual } from '@blobbi/renderer';
+import { BlobbiRenderer, normalizeAccessoryPlacements, type BlobbiVisual } from '@blobbi-kit/renderer';
 
 const visual: BlobbiVisual = {
   stage: 'adult',

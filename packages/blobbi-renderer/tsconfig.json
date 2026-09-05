@@ -4,12 +4,12 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     /* The ONLY alias is the package's own name, so the tests that import
-       `@blobbi/renderer` by name typecheck before `dist/` exists. No host
+       `@blobbi-kit/renderer` by name typecheck before `dist/` exists. No host
        alias (`@/`) may ever appear here; `package-purity.test.ts` fails if one
        does. */
     "baseUrl": ".",
     "paths": {
-      "@blobbi/renderer": ["./src/index.ts"]
+      "@blobbi-kit/renderer": ["./src/index.ts"]
     }
   },
   "include": ["src"]

@@ -13,7 +13,7 @@
  * dependency a static scan could miss (a global read, a context consumed
  * through a re-export).
  *
- * Every case here is also a case a `@blobbi/renderer` consumer will hit on
+ * Every case here is also a case a `@blobbi-kit/renderer` consumer will hit on
  * day one: incomplete relay data, a stage nobody sent, an accessory whose
  * numbers are broken, several Blobbis on one page.
  */

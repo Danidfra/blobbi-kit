@@ -1,5 +1,5 @@
 /**
- * `@blobbi/renderer`: the canonical, host-independent Blobbi renderer.
+ * `@blobbi-kit/renderer`: the canonical, host-independent Blobbi renderer.
  *
  * Everything reachable from this file renders a Blobbi from PLAIN, SERIALIZABLE
  * DATA: no relay, no query client, no router, no current user, no world

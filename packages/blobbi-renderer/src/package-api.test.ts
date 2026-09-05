@@ -1,5 +1,5 @@
 /**
- * The PUBLIC API of `@blobbi/renderer`, asserted exactly.
+ * The PUBLIC API of `@blobbi-kit/renderer`, asserted exactly.
  *
  * An export list is a promise, and promises made by accident are the expensive
  * kind. This test exists so that widening the surface is a deliberate edit to a
@@ -160,7 +160,7 @@ describe('the public API is exactly what it claims to be', () => {
     // Proves the workspace wiring works the way a consumer would use it. If the
     // package name ever stops resolving, this fails here rather than in a
     // downstream application build.
-    const byName = await import('@blobbi/renderer');
+    const byName = await import('@blobbi-kit/renderer');
     expect(Object.keys(byName).sort()).toEqual(PUBLIC_API);
     expect(byName.BlobbiRenderer).toBe(api.BlobbiRenderer);
   });

@@ -8,7 +8,7 @@
        runtime artifact is exercised separately by `npm run smoke`. */
     "baseUrl": ".",
     "paths": {
-      "@blobbi/renderer": ["../blobbi-renderer/src/index.ts"]
+      "@blobbi-kit/renderer": ["../blobbi-renderer/src/index.ts"]
     }
   },
   "include": ["fixtures", "src"]

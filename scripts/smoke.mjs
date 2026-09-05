@@ -29,7 +29,7 @@ const runtimeEntries = [
   '@blobbi-kit/react/lib/blobbi-streak',
   '@blobbi-kit/react/lib/blobbi-actions',
   '@blobbi-kit/react/adapters/types',
-  '@blobbi/renderer',
+  '@blobbi-kit/renderer',
 ];
 
 // Type-only deep entries: assert they still load as ESM modules (types are
