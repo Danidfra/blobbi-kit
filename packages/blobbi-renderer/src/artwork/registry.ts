@@ -47,7 +47,8 @@ import {
 } from './adult/v1';
 import { getBabyBaseSvg, getBabySleepingSvg, customizeBabySvg } from './baby/v1';
 import { getAdultV2Artwork, customizeAdultV2Svg, closeAdultV2Eyes } from './adult/v2';
-import { applyRearView } from '../svg';
+import { applyRearView, sanitizeArtworkColor } from '../svg';
+import { DEFAULT_VISUAL_GENERATION } from './types';
 import { mirrorSvgHorizontally } from './mirror';
 
 // ─── Anchors ─────────────────────────────────────────────────────────────────
@@ -73,9 +74,6 @@ export function viewForFacing(
   facing: BlobbiFacing,
 ): { view: BlobbiArtworkView; mirrored: boolean } {
   switch (generation) {
-    case 'v1':
-      // V1 has no profile artwork: both profiles draw the front.
-      return { view: facing === 'back' ? 'back' : 'front', mirrored: false };
     case 'v2':
       switch (facing) {
         case 'back':
@@ -87,7 +85,23 @@ export function viewForFacing(
         default:
           return { view: 'front', mirrored: false };
       }
+    case 'v1':
+    default:
+      // V1 has no profile artwork: both profiles draw the front. A generation
+      // this package does not know (a string API caller passing external data
+      // straight through) draws as V1, the same fallback `BlobbiRenderer`
+      // applies, rather than failing to resolve a view at all.
+      return { view: facing === 'back' ? 'back' : 'front', mirrored: false };
   }
+}
+
+const KNOWN_GENERATIONS: ReadonlySet<string> = new Set(['v1', 'v2']);
+
+/** A generation the registry draws; anything else is the default generation. */
+function knownGeneration(value: unknown): BlobbiVisualGeneration {
+  return typeof value === 'string' && KNOWN_GENERATIONS.has(value)
+    ? (value as BlobbiVisualGeneration)
+    : DEFAULT_VISUAL_GENERATION;
 }
 
 // ─── Resolution ──────────────────────────────────────────────────────────────
@@ -99,11 +113,14 @@ export function viewForFacing(
  * V1 forms fall back to the default form, exactly as before).
  */
 export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
-  const { view, mirrored } = viewForFacing(request.visualGeneration, request.facing);
+  // The request is typed as already normalized, but the string API hands
+  // caller data straight here; resolution must stay total for any string.
+  const generation = knownGeneration(request.visualGeneration);
+  const { view, mirrored } = viewForFacing(generation, request.facing);
   // The egg stage has no artwork of its own and draws the baby, historically.
   const stage: 'baby' | 'adult' = request.stage === 'adult' ? 'adult' : 'baby';
 
-  switch (request.visualGeneration) {
+  switch (generation) {
     case 'v2': {
       if (stage === 'adult') {
         const art = getAdultV2Artwork(view);
@@ -172,9 +189,20 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
  */
 export function finishBlobbiArtwork(
   resolved: ResolvedArtwork,
-  colors: ArtworkColors,
+  rawColors: ArtworkColors,
   instanceId?: string,
 ): string {
+  // THE colour boundary. Everything below interpolates these into attribute
+  // values by string concatenation, so only a bare hex colour may pass; any
+  // other value is treated as absent (the artwork's own colour). Every entry
+  // point (`BlobbiRenderer`, `renderBlobbiSvg`, `loadBlobbiSvg`) reaches the
+  // customizers through here, which is what makes the package safe to hand
+  // relay data without a host-side gate.
+  const colors: ArtworkColors = {
+    baseColor: sanitizeArtworkColor(rawColors.baseColor),
+    secondaryColor: sanitizeArtworkColor(rawColors.secondaryColor),
+    eyeColor: sanitizeArtworkColor(rawColors.eyeColor),
+  };
   switch (resolved.generation) {
     case 'v2': {
       const customized = customizeAdultV2Svg(resolved.markup, colors, instanceId);

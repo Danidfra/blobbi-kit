@@ -10,7 +10,14 @@
  * - Rear ("facing away") view derivation
  */
 
-export { lightenColor, darkenColor, hexToHsl, hslToHex } from './colors';
+export {
+  lightenColor,
+  darkenColor,
+  hexToHsl,
+  hslToHex,
+  isArtworkHexColor,
+  sanitizeArtworkColor,
+} from './colors';
 export { uniquifySvgIds } from './ids';
 export { ensureSvgFillsContainer } from './container';
 export { applyGazeMarkup } from './gaze';

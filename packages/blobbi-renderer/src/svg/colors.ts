@@ -13,6 +13,37 @@
  */
 
 /**
+ * The colour gate: the ONLY shapes a caller colour may take before it is
+ * spliced into artwork.
+ *
+ * Every customizer in this package builds markup by string interpolation
+ * (`style="stop-color:${color}"`, `fill="${color}"`), and the finished string is
+ * mounted through `dangerouslySetInnerHTML`. A colour is therefore an
+ * attribute value written by hand, and anything that is not a bare hex colour
+ * could close the attribute and open an element. This gate runs once, at the
+ * artwork boundary (`finishBlobbiArtwork`) and in `normalizeBlobbiRenderModel`,
+ * so no host has to remember to validate before calling.
+ *
+ * `#rgb` and `#rrggbb` only, either case, exactly as `@blobbi-kit/core` writes
+ * them. The value is returned UNCHANGED when it passes (no case folding, no
+ * expansion), so every valid colour still produces byte-identical artwork.
+ */
+const ARTWORK_HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/** Whether a value is a colour the artwork customizers may interpolate as-is. */
+export function isArtworkHexColor(value: unknown): value is string {
+  return typeof value === 'string' && ARTWORK_HEX_COLOR.test(value);
+}
+
+/**
+ * The colour if it is a plain hex colour, else `undefined`, which every
+ * customizer already treats as "the artwork's own colour".
+ */
+export function sanitizeArtworkColor(value: unknown): string | undefined {
+  return isArtworkHexColor(value) ? value : undefined;
+}
+
+/**
  * Lighten a hex color by a percentage.
  *
  * @param color - Hex color string (e.g., "#ff0000")

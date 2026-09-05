@@ -19,6 +19,9 @@
  *    {@link DEFAULT_ADULT_TYPE}; an unrecognized value is corrected downstream
  *    by the adult SVG resolver;
  *  - absent colors are left undefined, which means "the artwork's own colors";
+ *    a color that is not a bare hex color (`#rgb` / `#rrggbb`) is treated as
+ *    absent too: colors are spliced into SVG attribute values as strings, so
+ *    this is the renderer's own guarantee, not something a host must remember;
  *  - a non-finite gaze axis becomes 0; finite axes clamp to -1..1;
  *  - rear facing has no pupils in its markup at all, so gaze is dropped
  *    outright rather than injected and left unused;
@@ -31,6 +34,7 @@
 import type { NormalizedAccessoryPlacement } from './accessory-normalize';
 import type { BlobbiFacing, BlobbiVisualGeneration } from './artwork/types';
 import { DEFAULT_VISUAL_GENERATION } from './artwork/types';
+import { sanitizeArtworkColor } from './svg/colors';
 
 /**
  * The visual identity of a Blobbi: the plain, serializable input the renderer
@@ -99,6 +103,7 @@ export interface BlobbiRenderModel {
   visualGeneration: BlobbiVisualGeneration;
   /** Present only when `stage === 'adult'`. */
   adultType?: string;
+  /** Validated hex colors (`#rgb` / `#rrggbb`), or undefined for the artwork's own. */
   baseColor?: string;
   secondaryColor?: string;
   eyeColor?: string;
@@ -182,9 +187,9 @@ export function normalizeBlobbiRenderModel(
     stage,
     visualGeneration,
     adultType: stage === 'adult' ? visual.adultType || DEFAULT_ADULT_TYPE : undefined,
-    baseColor: visual.baseColor,
-    secondaryColor: visual.secondaryColor,
-    eyeColor: visual.eyeColor,
+    baseColor: sanitizeArtworkColor(visual.baseColor),
+    secondaryColor: sanitizeArtworkColor(visual.secondaryColor),
+    eyeColor: sanitizeArtworkColor(visual.eyeColor),
     name: visual.name,
     facing,
     view: isRearFacing ? 'rear' : 'front',

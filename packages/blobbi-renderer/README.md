@@ -113,6 +113,7 @@ is the single pure function that does it):
 | `stage: 'adult'` with no `adultType` | `'bloomi'` |
 | unknown `adultType` | corrected to the default form by the artwork resolver |
 | absent colors | the artwork's own colors |
+| a color that is not `#rgb` / `#rrggbb` | treated as absent (colors are spliced into SVG attributes as strings; this is the renderer's own guarantee, not a host's job) |
 | non-finite gaze axis | `0`; finite axes clamp to ±1 |
 | gaze with `facing: 'back'` | dropped (that drawing has no pupils) |
 | blank / punctuation-only `instanceId` | `'blobbi'` |

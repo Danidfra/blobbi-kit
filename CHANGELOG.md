@@ -9,6 +9,26 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## Unreleased
+
+### `@blobbi-kit/renderer`
+
+- **Colours are validated inside the renderer.** Every entry point
+  (`BlobbiRenderer`, `renderBlobbiSvg`, `loadBlobbiSvg`) now accepts a colour
+  only if it is a bare `#rgb` / `#rrggbb` hex value; anything else is treated
+  as an absent colour and the artwork keeps its own. The V1 customizers splice
+  colours into SVG attribute values by string interpolation, so a host that
+  passed relay data straight through could have a stranger's `base_color` tag
+  end up as markup. Valid colours are returned unchanged (no case folding, no
+  expansion), so every existing drawing is byte-identical
+  (`v1-fingerprints.test.ts`). `normalizeBlobbiRenderModel` reports the
+  validated colours.
+- **The string API is total.** `renderBlobbiSvg` with an unrecognized
+  `visualGeneration` or `facing` now draws the V1 front, the same fallback
+  `BlobbiRenderer` always applied, instead of throwing.
+- New `input-hardening.test.tsx` pins both properties with inert probe payloads
+  against every entry point.
+
 ## 0.5.2 — One modern kind 31124 contract; configurable collection (fix + additions)
 
 Backwards-compatible for every current producer: Blobbi Island and Ditto
