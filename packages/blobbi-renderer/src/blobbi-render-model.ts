@@ -22,10 +22,15 @@
  *  - a non-finite gaze axis becomes 0; finite axes clamp to -1..1;
  *  - rear facing has no pupils in its markup at all, so gaze is dropped
  *    outright rather than injected and left unused;
+ *  - unknown/absent `visualGeneration` -> `'v1'`, unknown/absent `facing` ->
+ *    `'front'`, so pre-existing consumers and pre-existing Blobbis are
+ *    untouched;
  *  - an empty/blank `instanceId` falls back to {@link FALLBACK_INSTANCE_ID}
  *    rather than producing an SVG id prefix shared by every such renderer.
  */
 import type { NormalizedAccessoryPlacement } from './accessory-normalize';
+import type { BlobbiFacing, BlobbiVisualGeneration } from './artwork/types';
+import { DEFAULT_VISUAL_GENERATION } from './artwork/types';
 
 /**
  * The visual identity of a Blobbi: the plain, serializable input the renderer
@@ -39,6 +44,14 @@ export interface BlobbiVisual {
    * (the historical fallback); a dedicated egg drawing is a later milestone.
    */
   stage?: 'egg' | 'baby' | 'adult';
+  /**
+   * Artwork generation. `'v1'` is the original sixteen-form generation and
+   * the default when absent, so every existing consumer and every pre-existing
+   * Blobbi keeps drawing exactly as before; `'v2'` is the canonical anatomy.
+   * This is identity data (the domain kit reads it from the Blobbi's event),
+   * never a renderer-version switch.
+   */
+  visualGeneration?: BlobbiVisualGeneration;
   /** Adult form (`'bloomi'`, `'catti'`, ...). Ignored unless `stage` is `'adult'`. */
   adultType?: string;
   baseColor?: string;
@@ -69,7 +82,8 @@ export type BlobbiRenderView = 'front' | 'rear';
 export interface BlobbiRenderModelInput {
   visual: BlobbiVisual;
   instanceId: string;
-  facing?: 'front' | 'back';
+  /** `'front' | 'back' | 'left' | 'right'`; V1 draws its front for both profiles. */
+  facing?: BlobbiFacing;
   isSleeping?: boolean;
   /** Kept distinct from sleeping for the seated legacy prop; both close eyes. */
   eyesClosed?: boolean;
@@ -81,14 +95,20 @@ export interface BlobbiRenderModelInput {
 /** Fully resolved, renderable state. Every field is defined and valid. */
 export interface BlobbiRenderModel {
   stage: 'egg' | 'baby' | 'adult';
+  /** Resolved artwork generation; `'v1'` when the visual named none. */
+  visualGeneration: BlobbiVisualGeneration;
   /** Present only when `stage === 'adult'`. */
   adultType?: string;
   baseColor?: string;
   secondaryColor?: string;
   eyeColor?: string;
   name?: string;
-  facing: 'front' | 'back';
-  /** The SVG variant to build: `'rear'` iff `facing === 'back'`. */
+  facing: BlobbiFacing;
+  /**
+   * The V1 drawing family: `'rear'` iff `facing === 'back'`, `'front'`
+   * otherwise (including both profiles). Kept for V1 consumers; the artwork
+   * registry works from `facing` and `visualGeneration` directly.
+   */
   view: BlobbiRenderView;
   /**
    * Selects the closed-eye (sleeping) artwork. `isSleeping` and the legacy
@@ -113,6 +133,8 @@ export const DEFAULT_ADULT_TYPE = 'bloomi';
 export const FALLBACK_INSTANCE_ID = 'blobbi';
 
 const VALID_STAGES: ReadonlySet<string> = new Set(['egg', 'baby', 'adult']);
+const VALID_FACINGS: ReadonlySet<string> = new Set(['front', 'back', 'left', 'right']);
+const VALID_GENERATIONS: ReadonlySet<string> = new Set(['v1', 'v2']);
 
 function clampGazeAxis(value: number): number {
   if (!Number.isFinite(value)) return 0;
@@ -140,16 +162,25 @@ export function normalizeInstanceId(instanceId: string | undefined): string {
 export function normalizeBlobbiRenderModel(
   input: BlobbiRenderModelInput,
 ): BlobbiRenderModel {
-  const { visual, facing = 'front', isSleeping = false, eyesClosed = false } = input;
+  const { visual, isSleeping = false, eyesClosed = false } = input;
 
   const stage = VALID_STAGES.has(visual.stage ?? '')
     ? (visual.stage as 'egg' | 'baby' | 'adult')
     : DEFAULT_STAGE;
+  // Unknown facings and generations (external JSON) fall back like an unknown
+  // stage does: to the historical default, never to nothing.
+  const facing: BlobbiFacing = VALID_FACINGS.has(input.facing ?? '')
+    ? (input.facing as BlobbiFacing)
+    : 'front';
+  const visualGeneration: BlobbiVisualGeneration = VALID_GENERATIONS.has(visual.visualGeneration ?? '')
+    ? (visual.visualGeneration as BlobbiVisualGeneration)
+    : DEFAULT_VISUAL_GENERATION;
 
   const isRearFacing = facing === 'back';
 
   return {
     stage,
+    visualGeneration,
     adultType: stage === 'adult' ? visual.adultType || DEFAULT_ADULT_TYPE : undefined,
     baseColor: visual.baseColor,
     secondaryColor: visual.secondaryColor,

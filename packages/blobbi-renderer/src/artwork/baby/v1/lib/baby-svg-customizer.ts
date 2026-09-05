@@ -5,8 +5,8 @@
  * Uses shared utilities from blobbi/ui/lib/svg for common operations.
  */
 
-import { Blobbi } from '../../core/blobbi-domain-types';
-import { lightenColor, uniquifySvgIds, ensureSvgFillsContainer } from '../../../svg';
+import { Blobbi } from '../../../core/blobbi-domain-types';
+import { lightenColor, uniquifySvgIds, ensureSvgFillsContainer } from '../../../../svg';
 import { BabySvgCustomization } from '../types/baby.types';
 
 /**

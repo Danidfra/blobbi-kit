@@ -4,7 +4,7 @@
  * Handles loading and resolving baby stage SVG assets
  */
 
-import { Blobbi } from '../../core/blobbi-domain-types';
+import { Blobbi } from '../../../core/blobbi-domain-types';
 import { BabyVariant, BabySvgResolverOptions } from '../types/baby.types';
 import { BABY_BASE_SVG, BABY_SLEEPING_SVG } from './baby-svg-data';
 

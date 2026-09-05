@@ -108,7 +108,12 @@ function positiveScaleOr(value: number, fallback: number): number {
 }
 
 export interface NormalizeAccessoryOptions {
-  facing?: 'front' | 'back';
+  /**
+   * `'back'` hides the face-only slots ({@link REAR_VIEW_HIDDEN_SLOTS}). The
+   * two profiles currently hide nothing: no per-slot side rule exists yet, so
+   * a host that wants one applies it before normalizing.
+   */
+  facing?: 'front' | 'back' | 'left' | 'right';
   /**
    * How an accessory maps to image URLs. Defaults to
    * {@link DEFAULT_ACCESSORY_SOURCES}, "use the URL you gave me", because a

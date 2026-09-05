@@ -18,8 +18,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { loadBlobbiSvg } from './artwork/load-blobbi-svg';
-import { getAdultBaseSvg, customizeAdultSvg } from './artwork/adult-blobbi';
-import { ADULT_FORMS, type AdultForm } from './artwork/adult-blobbi/types/adult.types';
+import { getAdultBaseSvg, customizeAdultSvg } from './artwork/adult/v1';
+import { ADULT_FORMS, type AdultForm } from './artwork/adult/v1/types/adult.types';
 
 /** Distinctive, lower-case, and used nowhere in any shipped artwork. */
 const EYE = '#12abef';

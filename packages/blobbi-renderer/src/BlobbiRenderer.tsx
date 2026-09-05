@@ -34,7 +34,8 @@
  * host passes in `className`.
  */
 import { useMemo, type CSSProperties } from 'react';
-import { loadBlobbiSvg } from './artwork/load-blobbi-svg';
+import { buildBlobbiMarkup } from './artwork/registry';
+import type { BlobbiFacing } from './artwork/types';
 import { applyGazeMarkup } from './svg';
 import {
   ACCESSORY_BASE_PERCENT,
@@ -74,7 +75,12 @@ export interface BlobbiRendererProps {
   isSleeping?: boolean;
   /** Kept distinct from sleeping for the seated legacy prop; both close eyes. */
   eyesClosed?: boolean;
-  facing?: 'front' | 'back';
+  /**
+   * `'front' | 'back' | 'left' | 'right'`. V1 artwork has no profile and draws
+   * the front for both `left` and `right`; V2 draws its authored side view,
+   * mirrored for `left`.
+   */
+  facing?: BlobbiFacing;
   /** Normalized gaze direction (-1..1 per axis); undefined renders statically. */
   eyeOffset?: { x: number; y: number };
   /** Pre-normalized accessory placements (already sorted; see accessory-normalize). */
@@ -277,20 +283,28 @@ export function BlobbiRenderer({
 
   const svgContent = useMemo(() => {
     try {
-      const customizedSvg = loadBlobbiSvg(
-        model.stage,
-        model.adultType,
-        model.baseColor,
-        model.secondaryColor,
-        model.eyeColor,
-        model.eyesClosed,
+      // The registry decides WHICH drawing (generation, form, view, mirroring)
+      // and runs that generation's pipeline; nothing here knows what V1 or V2 is.
+      const { svg, artwork } = buildBlobbiMarkup(
+        {
+          stage: model.stage,
+          visualGeneration: model.visualGeneration,
+          adultType: model.adultType,
+          facing: model.facing,
+          eyesClosed: model.eyesClosed,
+        },
+        {
+          baseColor: model.baseColor,
+          secondaryColor: model.secondaryColor,
+          eyeColor: model.eyeColor,
+        },
         model.instanceId,
-        model.view,
       );
-      // When gaze is enabled, mark the pupils/highlights once so they can be
+      // When gaze is enabled, mark the movable eye parts once so they can be
       // moved via CSS variables. Static contexts (no eyeOffset) keep the SVG
       // untouched, so previews/modals/cards render exactly as before.
-      const withGaze = gazeEnabled ? applyGazeMarkup(customizedSvg) : customizedSvg;
+      const withGaze =
+        gazeEnabled && artwork.gazeable ? applyGazeMarkup(svg, artwork.generation) : svg;
       return sanitize ? sanitize(withGaze) : withGaze;
     } catch (err) {
       console.error('Failed to load Blobbi SVG:', err);
@@ -298,13 +312,14 @@ export function BlobbiRenderer({
     }
   }, [
     model.stage,
+    model.visualGeneration,
     model.adultType,
     model.baseColor,
     model.secondaryColor,
     model.eyeColor,
     model.eyesClosed,
     model.instanceId,
-    model.view,
+    model.facing,
     gazeEnabled,
     sanitize,
   ]);
@@ -352,6 +367,8 @@ export function BlobbiRenderer({
       aria-hidden={decorative ? true : undefined}
       data-blobbi-renderer=""
       data-blobbi-size={box.label}
+      data-blobbi-generation={model.visualGeneration}
+      data-blobbi-facing={model.facing}
       title={title}
       onClick={onClick}
     >

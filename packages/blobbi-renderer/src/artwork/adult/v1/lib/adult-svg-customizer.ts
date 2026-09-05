@@ -10,7 +10,7 @@
  * Uses shared utilities from blobbi/ui/lib/svg for common operations.
  */
 
-import type { Blobbi } from '../../core/blobbi-domain-types';
+import type { Blobbi } from '../../../core/blobbi-domain-types';
 import {
   lightenColor,
   darkenColor,
@@ -18,7 +18,7 @@ import {
   hslToHex,
   uniquifySvgIds,
   ensureSvgFillsContainer,
-} from '../../../svg';
+} from '../../../../svg';
 import type { AdultForm, AdultSvgCustomization } from '../types/adult.types';
 
 // ─── Gradient Builders ────────────────────────────────────────────────────────

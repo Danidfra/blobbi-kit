@@ -4,7 +4,7 @@
  * Type definitions for baby stage visuals and customization
  */
 
-import { Blobbi } from '../../core/blobbi-domain-types';
+import { Blobbi } from '../../../core/blobbi-domain-types';
 
 /**
  * Baby visual variant types

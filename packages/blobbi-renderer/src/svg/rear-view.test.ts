@@ -16,9 +16,9 @@ import {
   REAR_VIEW_REMOVED_BLOCKS,
 } from './rear-view';
 import { applyGazeMarkup } from './gaze';
-import { ADULT_FORMS, type AdultForm } from '../artwork/adult-blobbi';
-import { getAdultBaseSvg, getAdultSleepingSvg } from '../artwork/adult-blobbi';
-import { getBabyBaseSvg, getBabySleepingSvg } from '../artwork/baby-blobbi';
+import { ADULT_FORMS, type AdultForm } from '../artwork/adult/v1';
+import { getAdultBaseSvg, getAdultSleepingSvg } from '../artwork/adult/v1';
+import { getBabyBaseSvg, getBabySleepingSvg } from '../artwork/baby/v1';
 import { loadBlobbiSvg } from '../artwork/load-blobbi-svg';
 
 interface Drawing {

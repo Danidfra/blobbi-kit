@@ -57,8 +57,14 @@ const PUBLIC_API = [
   // Optional stylesheets
   'BLOBBI_EFFECT_STYLESHEET',
   'BLOBBI_RENDERER_STYLESHEET',
+  // Artwork vocabulary
+  'ADULT_V2_FACE_PARTS',
+  'ADULT_V2_GAZE_PARTS',
+  'ADULT_V2_PARTS',
+  'DEFAULT_VISUAL_GENERATION',
   // Rendering without React
   'loadBlobbiSvg',
+  'renderBlobbiSvg',
   // SVG post-processing (provisional)
   'applyGazeMarkup',
   'applyRearView',
@@ -95,6 +101,18 @@ describe('the public API is exactly what it claims to be', () => {
       'BLOBBI_RENDER_SIZE_CLASSES',
       // Effect INTERNALS. The presets are particle geometry, timings and
       // palettes: the implementation of an effect, not its interface.
+      // Artwork registry internals: a host names a generation and a facing,
+      // never a file, a view table or a pipeline step.
+      'resolveBlobbiArtwork',
+      'buildBlobbiMarkup',
+      'finishBlobbiArtwork',
+      'viewForFacing',
+      'ADULT_V2_VIEWS',
+      'ADULT_V2_FRONT_SVG',
+      'ADULT_V2_SIDE_SVG',
+      'ADULT_V2_BACK_SVG',
+      'customizeAdultV2Svg',
+      'mirrorSvgHorizontally',
       'BLOBBI_VISUAL_EFFECT_PRESETS',
       'BlobbiEffectLayer',
       'BlobbiEffectStyles',
@@ -127,6 +145,8 @@ describe('the public API is exactly what it claims to be', () => {
     expect(typeof api.normalizeBlobbiRenderModel).toBe('function');
     expect(typeof api.normalizeAccessoryPlacements).toBe('function');
     expect(typeof api.loadBlobbiSvg).toBe('function');
+    expect(typeof api.renderBlobbiSvg).toBe('function');
+    expect(api.DEFAULT_VISUAL_GENERATION).toBe('v1');
     expect(typeof api.BLOBBI_RENDERER_STYLESHEET).toBe('string');
     expect(api.BLOBBI_RENDER_SIZE_PX).toEqual({
       sm: 32, md: 56, lg: 96, xl: 128, '2xl': 224, '3xl': 288,

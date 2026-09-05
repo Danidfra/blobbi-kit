@@ -101,10 +101,23 @@ export type { BlobbiVisualEffectInfo } from './effects/effect-catalog';
 export { BLOBBI_RENDERER_STYLESHEET } from './styles';
 export { BLOBBI_EFFECT_STYLESHEET } from './effects/effect-styles';
 
+// ── Artwork vocabulary ─────────────────────────────────────────────────────
+// Generation and facing are plain strings a host puts on the wire. Declared
+// here independently of the domain kit's identical unions.
+export { DEFAULT_VISUAL_GENERATION } from './artwork/types';
+export type { BlobbiVisualGeneration, BlobbiFacing, ArtworkAnchors } from './artwork/types';
+// The Adult V2 semantic part contract: what `data-part` values a V2 drawing
+// carries, so hosts and future systems select parts by name, never by id.
+export { ADULT_V2_PARTS, ADULT_V2_FACE_PARTS, ADULT_V2_GAZE_PARTS } from './artwork/adult/v2';
+export type { AdultV2Part } from './artwork/adult/v2';
+
 // ── Rendering without React ────────────────────────────────────────────────
 // The same SVG pipeline the component uses, for consumers that want a string:
 // server-side thumbnails, canvas compositing, a non-React card.
-export { loadBlobbiSvg } from './artwork/load-blobbi-svg';
+// `renderBlobbiSvg` is generation-aware; `loadBlobbiSvg` is the historical V1
+// positional API and stays byte-identical.
+export { loadBlobbiSvg, renderBlobbiSvg } from './artwork/load-blobbi-svg';
+export type { RenderBlobbiSvgOptions, RenderedBlobbiSvg } from './artwork/load-blobbi-svg';
 export type { BlobbiView } from './svg';
 
 // ── SVG post-processing (provisional) ──────────────────────────────────────
