@@ -6,14 +6,67 @@ import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 import {
   KIND_BLOBBI_STATE,
   BLOBBI_ECOSYSTEM_NAMESPACE,
-  isValidBlobbiEvent,
-  isLegacyBlobbiEvent,
-  parseBlobbiEvent,
+  isModernBlobbiEvent,
+  parseModernBlobbiEvent,
   type BlobbiCompanion,
+  type BlobbiStage,
 } from '@blobbi-kit/core/blobbi';
 
 /** Maximum number of d-tags per query chunk to avoid relay issues */
 const CHUNK_SIZE = 20;
+
+/**
+ * Consumer-side shaping of the collection. Options never change WHAT is
+ * fetched or cached (every caller shares one query per owner), only which of
+ * the modern companions the caller sees, so two hooks with different options
+ * stay in sync through the same cache and the same optimistic updates.
+ */
+export interface UseBlobbisCollectionOptions {
+  /**
+   * Keep only these lifecycle stages. Omit for every stage. A product that
+   * shows eggs in a hatchery and only hatched Blobbis in the world passes
+   * `['baby', 'adult']` to the latter.
+   */
+  stages?: readonly BlobbiStage[];
+  /** Arbitrary extra predicate over modern companions, applied after `stages`. */
+  filter?: (companion: BlobbiCompanion) => boolean;
+}
+
+/**
+ * Where the collection stands, as one word a consumer can switch on.
+ *
+ * - `'idle'`: the read has not been asked for (no owner pubkey, or an empty
+ *   d-list). Nothing is known; do NOT treat the empty `companions` as "owns
+ *   none".
+ * - `'loading'`: the first read is in flight and nothing is known yet.
+ * - `'empty'`: a read COMPLETED and yielded no modern companion matching the
+ *   options. This is the confirmed-empty state: the relay adapter resolved its
+ *   query (end of stored events, or the requested limit) rather than timing
+ *   out or failing; a timeout or failure ends in `'error'`, never here.
+ *   Confirmation is exactly as strong as the adapter's own resolution; the
+ *   kit does not re-read to double-check, a host that wants that adds it.
+ * - `'ready'`: a read completed with at least one matching companion.
+ * - `'error'`: the read failed after retries. `companions` is empty and
+ *   `error` is set; do not treat it as "owns none".
+ */
+export type BlobbiCollectionStatus = 'idle' | 'loading' | 'empty' | 'ready' | 'error';
+
+/**
+ * Pure mapping from the query's state to {@link BlobbiCollectionStatus}.
+ * Exported so the mapping can be pinned independently of relay timing.
+ */
+export function resolveBlobbiCollectionStatus(input: {
+  enabled: boolean;
+  status: 'pending' | 'error' | 'success';
+  count: number;
+}): BlobbiCollectionStatus {
+  if (input.status === 'error') return 'error';
+  if (input.status === 'pending') return input.enabled ? 'loading' : 'idle';
+  return input.count > 0 ? 'ready' : 'empty';
+}
+
+/** The legacy policy at the collection layer: modern events only, no exceptions. */
+export const BLOBBI_COLLECTION_KEEPS = isModernBlobbiEvent;
 
 /**
  * Stable, deterministic owned-Blobbi ordering, by d-tag.
@@ -55,13 +108,25 @@ function chunkArray<T>(array: T[], size: number): T[][] {
  * - Returns both a lookup record and array of companions
  * - Provides invalidation and optimistic update helpers
  *
- * @param dList  - Optional list of d-tags to fetch. Omit to fetch all.
- * @param pubkey - The owner's hex pubkey. When absent (logged out), the query
- *                 stays disabled and returns an empty collection.
+ * Legacy policy: only modern events (`isModernBlobbiEvent`: schema-valid and
+ * not historical) ever enter the collection. Legacy events are identified and
+ * dropped here, at the single source of truth; nothing downstream sees them
+ * and nothing migrates them. There is no option to admit them.
+ *
+ * @param dList   - Optional list of d-tags to fetch. Omit to fetch all.
+ * @param pubkey  - The owner's hex pubkey. When absent (logged out), the query
+ *                  stays disabled (`status: 'idle'`) and returns an empty collection.
+ * @param options - Consumer-side shaping, see {@link UseBlobbisCollectionOptions}.
  */
-export function useBlobbisCollection(dList?: string[] | undefined, pubkey?: string) {
+export function useBlobbisCollection(
+  dList?: string[] | undefined,
+  pubkey?: string,
+  options?: UseBlobbisCollectionOptions,
+) {
   const { nostr } = useNostr();
   const queryClient = useQueryClient();
+  const stages = options?.stages;
+  const filter = options?.filter;
   
   // Determine the mode: 'all' fetches everything, 'dlist' fetches by specific d-tags
   const mode = dList === undefined ? 'all' : 'dlist';
@@ -75,6 +140,8 @@ export function useBlobbisCollection(dList?: string[] | undefined, pubkey?: stri
   // Query key segment: 'all' for fetch-all mode, comma-joined d-tags for dlist mode
   const queryKeySegment = mode === 'all' ? 'all' : (sortedDList?.join(',') ?? '');
   
+  const enabled = !!pubkey && (mode === 'all' || (!!sortedDList && sortedDList.length > 0));
+
   // Main query to fetch companions from relays
   const query = useQuery({
     queryKey: ['blobbi-collection', pubkey, queryKeySegment],
@@ -131,18 +198,14 @@ export function useBlobbisCollection(dList?: string[] | undefined, pubkey?: stri
       
       console.log('[useBlobbisCollection] Total events received:', allEvents.length);
       
-      // Filter to valid events.
-      //
-      // Old-app legacy Blobbis are unsupported: they must never reach the UI,
-      // be selected, or be republished. Automatic migration into the canonical
-      // format was removed, so we exclude legacy-format events here at the
-      // single source of truth. A user with only legacy Blobbis is treated as
-      // having no current Blobbi (normal empty / new-user flow).
-      const validEvents = allEvents.filter(
-        (event) => isValidBlobbiEvent(event) && !isLegacyBlobbiEvent(event),
-      );
+      // Modern events only (schema-valid and not historical), decided by the
+      // core predicate so every consumer of the kit agrees on what a Blobbi is.
+      // Legacy Blobbis are unsupported: they never reach the UI, are never
+      // selected or republished, and are never migrated. A user with only
+      // legacy events is a user with no current Blobbi (confirmed empty).
+      const validEvents = allEvents.filter(BLOBBI_COLLECTION_KEEPS);
 
-      console.log('[useBlobbisCollection] Valid (canonical, non-legacy) events:', validEvents.length);
+      console.log('[useBlobbisCollection] Modern events:', validEvents.length);
       
       // Group events by d-tag and keep only the newest per d
       const eventsByD = new Map<string, NostrEvent>();
@@ -162,12 +225,10 @@ export function useBlobbisCollection(dList?: string[] | undefined, pubkey?: stri
       const companions: BlobbiCompanion[] = [];
       
       for (const [dTag, event] of eventsByD) {
-        const parsed = parseBlobbiEvent(event);
-        // Ignore old-format / unsupported Blobbi events entirely. They must not
-        // render, be selectable, or trigger migration. isValidBlobbiEvent above
-        // is schema-level validation; this drops legacy companions at the parsed
-        // layer so nothing downstream (page, widget, floating companion) sees them.
-        if (parsed && !parsed.isLegacy) {
+        // parseModernBlobbiEvent returns undefined for legacy or invalid input,
+        // so the filter above and this parse can never disagree.
+        const parsed = parseModernBlobbiEvent(event);
+        if (parsed) {
           companionsByD[dTag] = parsed;
           companions.push(parsed);
         }
@@ -185,7 +246,7 @@ export function useBlobbisCollection(dList?: string[] | undefined, pubkey?: stri
 
       return { companionsByD, companions: sortedCompanions };
     },
-    enabled: !!pubkey && (mode === 'all' || (!!sortedDList && sortedDList.length > 0)),
+    enabled,
     staleTime: 30_000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
@@ -211,11 +272,10 @@ export function useBlobbisCollection(dList?: string[] | undefined, pubkey?: stri
   // one matching the current queryKeySegment. This ensures the BlobbiPage cache
   // and companion layer cache stay in sync (they use different query modes).
   const updateCompanionEvent = useCallback((event: NostrEvent) => {
-    const parsed = parseBlobbiEvent(event);
-    // Mirror the collection parse-loop guard: never let an old-format /
-    // unsupported Blobbi enter companionsByD via the optimistic cache path,
-    // even if a future caller accidentally passes one.
-    if (!parsed || parsed.isLegacy || !pubkey) return;
+    // Same gate as the query: a legacy or invalid event never enters the cache,
+    // even through the optimistic path.
+    const parsed = parseModernBlobbiEvent(event);
+    if (!parsed || !pubkey) return;
     
     type CollectionData = { companionsByD: Record<string, BlobbiCompanion>; companions: BlobbiCompanion[] };
     const matchingQueries = queryClient.getQueriesData<CollectionData>({
@@ -243,15 +303,31 @@ export function useBlobbisCollection(dList?: string[] | undefined, pubkey?: stri
     }
   }, [queryClient, pubkey, queryKeySegment]);
   
-  // Memoize return values for stability
-  const companionsByD = query.data?.companionsByD ?? {};
-  const companions = query.data?.companions ?? [];
-  
+  // Consumer-side shaping. Applied on top of the shared cache so callers with
+  // different options share one read and one optimistic-update path.
+  const { companions, companionsByD } = useMemo(() => {
+    const all = query.data?.companions ?? [];
+    const kept = all.filter((c) => (!stages || stages.includes(c.stage)) && (!filter || filter(c)));
+    const byD: Record<string, BlobbiCompanion> = {};
+    for (const c of kept) byD[c.d] = c;
+    return { companions: kept, companionsByD: byD };
+  }, [query.data, stages, filter]);
+
+  const status = resolveBlobbiCollectionStatus({ enabled, status: query.status, count: companions.length });
+
   return {
-    /** Record of companions keyed by d-tag */
+    /** Record of companions keyed by d-tag (after `options`) */
     companionsByD,
-    /** Array of all companions (newest per d-tag) */
+    /** Array of all companions (newest per d-tag, after `options`) */
     companions,
+    /**
+     * One-word standing of the collection: idle | loading | empty | ready |
+     * error. `'empty'` is the confirmed-empty state; `'idle'`, `'loading'` and
+     * `'error'` also come with an empty `companions` but mean "unknown".
+     */
+    status,
+    /** True once a read has completed successfully (status is `empty` or `ready`) */
+    isResolved: status === 'empty' || status === 'ready',
     /** True only when query is loading and no data available */
     isLoading: query.isLoading,
     /** True when actively fetching */

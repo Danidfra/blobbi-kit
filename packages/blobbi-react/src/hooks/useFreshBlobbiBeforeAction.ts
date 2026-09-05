@@ -4,8 +4,7 @@ import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 
 import {
   KIND_BLOBBI_STATE,
-  isLegacyBlobbiEvent,
-  isValidBlobbiEvent,
+  isModernBlobbiEvent,
   parseBlobbiEvent,
   type BlobbiCompanion,
   type BlobbonautProfile,
@@ -80,7 +79,7 @@ export function useFreshBlobbiBeforeAction(pubkey?: string) {
     }]);
 
     const validEvents = events
-      .filter((event) => isValidBlobbiEvent(event) && !isLegacyBlobbiEvent(event))
+      .filter(isModernBlobbiEvent)
       .sort((a, b) => b.created_at - a.created_at);
 
     if (validEvents.length === 0) return null;

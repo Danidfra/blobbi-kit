@@ -9,6 +9,79 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## 0.5.2 — One modern kind 31124 contract; configurable collection (fix + additions)
+
+Backwards-compatible for every current producer: Blobbi Island and Ditto
+events published today classify as modern exactly as before. The only event
+acceptance change concerns the historical progression-in-`state` schema (see
+below), which no client has written since 2026-04-18.
+
+### `@blobbi-kit/core`
+
+- **The modern contract is now written down on `isValidBlobbiEvent`** and
+  pinned by `blobbi-modern-contract.test.ts` against fixtures modeled on a
+  current Island egg, the same `d` after hatch (`baby`, `evolving`, evolution
+  JSON in `content`) and a Ditto adult with `visual_generation = v2`. Required:
+  kind 31124, `d`, `b = blobbi:ecosystem:v1`, `stage` in `egg|baby|adult`,
+  `state` in `active|sleeping|hibernating`, `last_interaction`. Everything else
+  (stats, `experience`, `care_streak*`, `generation`, `breeding_ready`,
+  `progression_state`/`progression_started_at`, `last_decay_at`, visual trait
+  tags, `visual_generation`, `published_at`, `content`) is optional and
+  defaulted; `client`/`t` and host extension tags are never required.
+- **`state` is strict.** `incubating`/`evolving` in `state` was the schema
+  that preceded `progression_state` (split on 2026-04-18); the validator
+  accepted it and `parseBlobbiEvent` silently rewrote it into
+  `progressionState`. That read-time compatibility layer is gone: such an
+  event is now `isUnsupportedLegacyBlobbiEvent`, `isLegacyBlobbiEvent`,
+  invalid and unparsed. Legacy events are identified and ignored, never
+  reinterpreted. New constant `BLOBBI_ACTIVITY_STATES`.
+- `progression_state` is read from its own tag only; an unknown value yields
+  `progressionState: 'none'` instead of leaking an arbitrary string through
+  the union type.
+- **Added** `classifyBlobbiEvent(event): 'modern' | 'legacy' | 'invalid'`,
+  `isModernBlobbiEvent(event)` and `parseModernBlobbiEvent(event)`: the one
+  path a consumer needs. `parseModernBlobbiEvent` returns `undefined` for
+  legacy AND invalid input, so nobody has to check `isLegacy` by hand.
+  `parseBlobbiEvent` is unchanged for callers that want the flagged companion.
+- **Added** `BlobbiCompanion.publishedAt?: number` from the `published_at`
+  tag (optional; not every producer writes it). No other field changed.
+- Legacy policy tests made explicit: each known marker → unsupported; every
+  current modern tag name → not a marker; `client`/`t` branding (Island and
+  NIP-89 Ditto forms) → not legacy; `visual_generation` with any value → not
+  legacy; malformed modern events → `'invalid'`, not `'legacy'`.
+
+### `@blobbi-kit/react`
+
+- **`useBlobbisCollection(dList?, pubkey?, options?)`** gains a third,
+  optional argument (`UseBlobbisCollectionOptions`): `stages` keeps only the
+  given lifecycle stages (a hatched-only world view passes
+  `['baby', 'adult']`; eggs are included by default) and `filter` is an extra
+  predicate. Options shape the result only: every caller shares one read, one
+  cache entry per owner and the same optimistic updates.
+- **Added** `status: BlobbiCollectionStatus` (`idle | loading | empty | ready
+  | error`) and `isResolved` on the result. `'empty'` is the confirmed-empty
+  state: a read the relay adapter resolved with no matching modern companion.
+  `'idle'` (no pubkey / empty d-list), `'loading'` and `'error'` also come
+  with an empty `companions` but mean "unknown", which the old shape could not
+  express (a disabled query and a confirmed-empty one both read as
+  `isLoading: false, companions: []`). Confirmation is exactly as strong as the
+  adapter's own query resolution; the kit does not re-read to double-check.
+  `resolveBlobbiCollectionStatus` (pure) and `BLOBBI_COLLECTION_KEEPS` (the
+  legacy policy predicate, `isModernBlobbiEvent`) are exported.
+- The collection and `updateCompanionEvent` now gate on
+  `isModernBlobbiEvent`/`parseModernBlobbiEvent` from core instead of
+  combining `isValidBlobbiEvent && !isLegacyBlobbiEvent` locally. Same set of
+  events, one definition.
+- Tests: `useBlobbisCollection.test.tsx` (loading → ready, confirmed empty,
+  legacy-only owner is empty, mixed legacy/modern, idle without pubkey and
+  with an empty d-list, error after retries, stage exclusion, default egg
+  inclusion, filter composition, optimistic-update gating).
+
+Versions: `@blobbi-kit/core` and `@blobbi-kit/react` 0.5.2 in lockstep; the
+react peer on core moves to `^0.5.2`. `@blobbi-kit/renderer` is untouched.
+
+---
+
 ## `@blobbi-kit/renderer` 0.1.0
 
 Initial public release of the canonical, host-independent Blobbi renderer.
