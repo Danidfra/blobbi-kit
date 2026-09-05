@@ -103,6 +103,14 @@ export type BlobbiStage = 'egg' | 'baby' | 'adult';
 export type BlobbiState = 'active' | 'sleeping' | 'hibernating';
 
 /**
+ * The only values the `state` tag may carry in a modern event. Progression
+ * (`incubating`, `evolving`) lives in `progression_state` since 2026-04; an
+ * event that still stores it in `state` follows the schema that preceded that
+ * split and is unsupported (see {@link isUnsupportedLegacyBlobbiEvent}).
+ */
+export const BLOBBI_ACTIVITY_STATES: readonly BlobbiState[] = ['active', 'sleeping', 'hibernating'];
+
+/**
  * Visual generation: WHICH FAMILY OF ARTWORK a Blobbi is drawn with.
  *
  * - `'v1'`: the original generation, sixteen independent adult forms.
@@ -352,6 +360,14 @@ export interface BlobbiCompanion {
    * {@link BlobbiVisualGeneration}.
    */
   visualGeneration: BlobbiVisualGeneration;
+  /**
+   * NIP-23 style `published_at` (unix seconds): when this Blobbi was first
+   * published, preserved across republishes by hosts that carry it. Optional;
+   * not every producer writes it. Never used for decay or ordering by the kit.
+   * Optional (not `| undefined`) so hosts that build companions by hand, as
+   * Ditto's egg preview does, keep compiling.
+   */
+  publishedAt?: number;
   /** 
    * @deprecated Use progressionStartedAt instead.
    * Timestamp when current state (incubating/evolving) started (unix seconds).
@@ -945,6 +961,15 @@ const OLD_APP_SCHEMA_TAG_NAMES = new Set<string>([
 ]);
 
 /**
+ * `state` values of the schema that stored progression in the activity state.
+ * The current model (`state` = activity, `progression_state` = process) has
+ * been the only one written by any client since 2026-04-18; an event that still
+ * carries one of these in `state` was last published before that split and is
+ * historical. It is identified and ignored, never reinterpreted.
+ */
+const LEGACY_PROGRESSION_STATE_VALUES = new Set<string>(['incubating', 'evolving']);
+
+/**
  * Detect a Blobbi event that originated from the old app / old schema, even
  * when its d-tag is in the current canonical format and it carries a valid
  * seed.
@@ -963,8 +988,9 @@ const OLD_APP_SCHEMA_TAG_NAMES = new Set<string>([
  * The mere presence of a `seed` is NOT a marker either.
  */
 export function isUnsupportedLegacyBlobbiEvent(event: NostrEvent): boolean {
-  for (const [name] of event.tags) {
+  for (const [name, value] of event.tags) {
     if (OLD_APP_SCHEMA_TAG_NAMES.has(name)) return true;
+    if (name === 'state' && value !== undefined && LEGACY_PROGRESSION_STATE_VALUES.has(value)) return true;
   }
   return false;
 }
@@ -1049,8 +1075,32 @@ export function companionNeedsMigration(companion: BlobbiCompanion): boolean {
 // ─── Event Validation ─────────────────────────────────────────────────────────
 
 /**
- * Validate that an event has the required tags for a valid Blobbi state (Kind 31124).
- * Required: d, b (blobbi:ecosystem:v1), stage, state, last_interaction
+ * Schema-level validity of a kind 31124 Blobbi state event.
+ *
+ * This is the modern contract. It is deliberately the SMALLEST set of
+ * requirements every current producer (Ditto, Blobbi Island, this kit's own
+ * `buildEggTags`) satisfies, so a standalone consumer can rely on exactly these
+ * fields and nothing more:
+ *
+ * - `kind` 31124;
+ * - `d`: the replaceable identity (its canonical shape is a legacy question,
+ *   see {@link isLegacyBlobbiEvent}, not a validity one);
+ * - `b` = `blobbi:ecosystem:v1`: the ecosystem marker. It is protocol-level
+ *   (collections are queried by it) and every current producer writes it;
+ * - `stage` in `egg | baby | adult`;
+ * - `state` in `active | sleeping | hibernating`. Progression is NOT a state:
+ *   an event carrying `incubating`/`evolving` here follows the historical
+ *   schema and is rejected (also flagged by {@link isUnsupportedLegacyBlobbiEvent});
+ * - `last_interaction`: the one timestamp every stat and decay computation
+ *   anchors on; written by every producer, `BlobbiCompanion.lastInteraction`
+ *   is typed non-optional because of it.
+ *
+ * Everything else is optional, because real current events differ in it:
+ * the five care stats, `experience`, `care_streak*`, `generation`,
+ * `breeding_ready`, `progression_state`/`progression_started_at`,
+ * `last_decay_at`, the visual trait tags, `visual_generation`, `published_at`
+ * and the JSON `content`. A parser must default them, not reject them.
+ * Product-specific tags (`client`, `t`, host extensions) are never required.
  */
 export function isValidBlobbiEvent(event: NostrEvent): boolean {
   if (event.kind !== KIND_BLOBBI_STATE) return false;
@@ -1064,12 +1114,57 @@ export function isValidBlobbiEvent(event: NostrEvent): boolean {
   if (!d) return false;
   if (b !== BLOBBI_ECOSYSTEM_NAMESPACE) return false;
   if (!stage || !['egg', 'baby', 'adult'].includes(stage)) return false;
-  // Accept both new states (active/sleeping/hibernating) and legacy states (incubating/evolving)
-  // for backwards compatibility during migration
-  if (!state || !['active', 'sleeping', 'hibernating', 'incubating', 'evolving'].includes(state)) return false;
+  if (!state || !(BLOBBI_ACTIVITY_STATES as readonly string[]).includes(state)) return false;
   if (!lastInteraction) return false;
   
   return true;
+}
+
+// ─── Modern classification (the one path a consumer needs) ───────────────────
+
+/**
+ * How a kind 31124 event relates to the modern contract.
+ *
+ * - `'modern'`: schema-valid and not legacy. Parse and use it.
+ * - `'legacy'`: schema-valid but historical (old-app markers, progression in
+ *   `state`, non-canonical `d`, missing seed or name). Identify and ignore; it
+ *   is never migrated, normalized or republished.
+ * - `'invalid'`: fails the schema contract (wrong kind, missing `d`, wrong or
+ *   missing `b`, unknown `stage`/`state`, no `last_interaction`).
+ *
+ * Legacy takes precedence over invalid only where the two overlap through
+ * `state` (an old progression value fails validity too); the result is still
+ * `'legacy'` so callers can tell "old" from "malformed".
+ */
+export type BlobbiEventClass = 'modern' | 'legacy' | 'invalid';
+
+/** Classify a kind 31124 event against the modern contract. */
+export function classifyBlobbiEvent(event: NostrEvent): BlobbiEventClass {
+  if (event.kind !== KIND_BLOBBI_STATE) return 'invalid';
+  if (isUnsupportedLegacyBlobbiEvent(event)) return 'legacy';
+  if (!isValidBlobbiEvent(event)) return 'invalid';
+  return isLegacyBlobbiEvent(event) ? 'legacy' : 'modern';
+}
+
+/**
+ * True for exactly the events a consumer should show, select, care for and
+ * republish: schema-valid ({@link isValidBlobbiEvent}) and not historical
+ * ({@link isLegacyBlobbiEvent}). This is the predicate `useBlobbisCollection`
+ * keeps events with.
+ */
+export function isModernBlobbiEvent(event: NostrEvent): boolean {
+  return classifyBlobbiEvent(event) === 'modern';
+}
+
+/**
+ * Parse a kind 31124 event only if it is modern. Unlike {@link parseBlobbiEvent},
+ * which still returns a companion flagged `isLegacy` for historical events,
+ * this returns `undefined` for both legacy and invalid input, so a consumer
+ * never has to check `isLegacy` itself.
+ */
+export function parseModernBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined {
+  if (!isModernBlobbiEvent(event)) return undefined;
+  return parseBlobbiEvent(event);
 }
 
 /**
@@ -1188,29 +1283,16 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
   const rawState = getTagValue(tags, 'state')!;
   const seed = getTagValue(tags, 'seed');
   
-  // ─── Progression state resolution (migration-aware) ───
-  // New model: progression lives in progression_state tag.
-  // Old model: progression lived in the state tag ('incubating', 'evolving').
-  // On read we normalise both into the new model.
-  const progressionStateTag = getTagValue(tags, 'progression_state') as BlobbiProgressionState | undefined;
-  
-  let state: BlobbiState;
-  let progressionState: BlobbiProgressionState;
-  
-  if (progressionStateTag) {
-    // New-format event: progression_state tag is authoritative
-    state = rawState as BlobbiState;
-    progressionState = progressionStateTag;
-  } else if (rawState === 'incubating' || rawState === 'evolving') {
-    // Legacy event: progression was stored in state tag.
-    // Normalise: move it to progressionState, set activity state to 'active'.
-    state = 'active';
-    progressionState = rawState as BlobbiProgressionState;
-  } else {
-    // No progression
-    state = rawState as BlobbiState;
-    progressionState = 'none';
-  }
+  // `state` is an activity state (isValidBlobbiEvent guarantees the value) and
+  // progression lives only in `progression_state`. There is no read-time
+  // normalisation of the historical progression-in-state schema: such events
+  // are unsupported and never reach this point (see classifyBlobbiEvent).
+  // An unknown `progression_state` value means "no known process", not a
+  // rejected event: a future process name must not hide a Blobbi.
+  const state = rawState as BlobbiState;
+  const progressionStateTag = getTagValue(tags, 'progression_state');
+  const progressionState: BlobbiProgressionState =
+    progressionStateTag === 'incubating' || progressionStateTag === 'evolving' ? progressionStateTag : 'none';
   
   // Resolve name: tag > legacy d-tag derivation > fallback
   const name = nameTag ?? deriveNameFromLegacyD(d);
@@ -1306,6 +1388,7 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
       ? deriveAdultFormFromSeed(effectiveSeed)
       : getTagValue(tags, 'adult_type'),
     visualGeneration: parseVisualGeneration(tags),
+    publishedAt: parseNumericTag(tags, 'published_at'),
     stateStartedAt: parseNumericTag(tags, 'state_started_at'),
     progressionStartedAt: parseNumericTag(tags, 'progression_started_at') ?? parseNumericTag(tags, 'state_started_at'),
     tasks,

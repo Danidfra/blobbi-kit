@@ -175,14 +175,28 @@ describe('parseBlobbiEvent (current canonical events)', () => {
     expect(companion.stats.energy).toBe(100);
   });
 
-  it('normalises a legacy "incubating" state into progressionState (read compatibility)', () => {
+  it('does not reinterpret the historical progression-in-state schema: such an event is unsupported', () => {
+    // Before 2026-04 progression lived in `state`. That schema is legacy now:
+    // identified and ignored, never normalised into progressionState.
     const event = makeCanonicalEggEvent();
     event.tags = event.tags
       .filter(([name]) => name !== 'progression_state')
       .map((t) => (t[0] === 'state' ? ['state', 'incubating'] : t));
-    const companion = parseBlobbiEvent(event)!;
-    expect(companion.state).toBe('active');
-    expect(companion.progressionState).toBe('incubating');
+    expect(isValidBlobbiEvent(event)).toBe(false);
+    expect(isUnsupportedLegacyBlobbiEvent(event)).toBe(true);
+    expect(isLegacyBlobbiEvent(event)).toBe(true);
+    expect(parseBlobbiEvent(event)).toBeUndefined();
+  });
+
+  it('reads progression from progression_state only, defaulting unknown values to none', () => {
+    const withProcess = makeCanonicalEggEvent();
+    withProcess.tags = withProcess.tags.map((t) => (t[0] === 'progression_state' ? ['progression_state', 'incubating'] : t));
+    expect(parseBlobbiEvent(withProcess)!.progressionState).toBe('incubating');
+    expect(parseBlobbiEvent(withProcess)!.state).toBe('active');
+
+    const unknown = makeCanonicalEggEvent();
+    unknown.tags = unknown.tags.map((t) => (t[0] === 'progression_state' ? ['progression_state', 'moulting'] : t));
+    expect(parseBlobbiEvent(unknown)!.progressionState).toBe('none');
   });
 
   it('returns undefined for an invalid event', () => {
