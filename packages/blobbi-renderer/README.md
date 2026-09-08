@@ -1,7 +1,9 @@
 # `@blobbi-kit/renderer`
 
-The canonical, host-independent Blobbi renderer: a React component (and a
-string function) that draws a Blobbi from plain, serializable visual data.
+A host-independent Blobbi renderer: a React component (and a string
+function) that draws a Blobbi from plain, serializable visual data. It
+imports neither `@blobbi-kit/core` nor `@blobbi-kit/react`; see the
+[repository README](../../README.md) for how the packages fit together.
 
 ---
 
@@ -72,7 +74,7 @@ const accessories = normalizeAccessoryPlacements([
   visual={visual}
   instanceId="rosa"           // required: namespaces every SVG id
   size={240}                  // or a token: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl', or '100%'
-  facing="front"              // or 'back'
+  facing="front"              // 'front' | 'back' | 'left' | 'right'
   isSleeping={false}
   eyeOffset={{ x: 0.4, y: -0.2 }}
   accessories={accessories}
@@ -109,7 +111,7 @@ is the single pure function that does it):
 | absent / unrecognized `visualGeneration` | `'v1'` |
 | absent / unrecognized `facing` | `'front'` |
 | absent / unrecognized `stage` | `'baby'` |
-| `stage: 'egg'` | accepted; draws the baby body (a dedicated egg drawing is a later milestone) |
+| `stage: 'egg'` | accepted; draws the baby body (there is no dedicated egg drawing) |
 | `stage: 'adult'` with no `adultType` | `'bloomi'` |
 | unknown `adultType` | corrected to the default form by the artwork resolver |
 | absent colors | the artwork's own colors |
@@ -248,10 +250,8 @@ are carried in identity but **not yet drawn** on V2. Closed eyes are drawn (as
 a transformation, above). Baby V2 does not exist yet; a V2 baby draws the V1
 baby.
 
-V2 is the foundation for future movement, clothing and expressions. Nothing
-moves yet: the renderer stays a pure function of its props, and the semantic
-part map is what makes animation possible later without another artwork
-rewrite.
+Nothing moves: the renderer stays a pure function of its props. The semantic
+part map exists so that parts can be selected by name rather than by id.
 
 ### Adding artwork
 
@@ -346,7 +346,8 @@ document. `instanceId` is required: every `id`, `url(#…)` and `href="#…"` is
 prefixed `b_<instanceId>_`. Sanitization (`[^a-zA-Z0-9_-]` → `_`) is part of
 the contract via `normalizeInstanceId`. Two renderers given the same id share a
 namespace, which is the caller getting what they asked for. With no meaningful
-id, React's `useId()` is the right fallback.
+id, a host can fall back to React's `useId()`; the package itself never calls
+it.
 
 ## 14. Public API
 
@@ -361,7 +362,8 @@ Everything is exported from the package root; there are no deep imports and no
 | Accessories | `normalizeAccessoryPlacements`, `ACCESSORY_SLOT_RANK`, `REAR_VIEW_HIDDEN_SLOTS`, `DEFAULT_ACCESSORY_SOURCES`, and their types |
 | Effects | `BLOBBI_VISUAL_EFFECT_IDS`, `EFFECT_SLOTS`, `EFFECT_SLOT_ORDER`, `normalizeBlobbiVisualEffects`, `isBlobbiVisualEffectId`, `getBlobbiVisualEffectInfo`, intensity and piece-cap constants, and their types |
 | Stylesheets | `BLOBBI_RENDERER_STYLESHEET`, `BLOBBI_EFFECT_STYLESHEET` |
-| String API | `loadBlobbiSvg`, `applyGazeMarkup`, `applyRearView`, `uniquifySvgIds`, `BlobbiView` |
+| Artwork | `DEFAULT_VISUAL_GENERATION`, `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`, `ADULT_V2_CLOSED_EYE_PARTS`; types `BlobbiVisualGeneration`, `BlobbiFacing`, `ArtworkAnchors`, `AdultV2Part` |
+| String API | `renderBlobbiSvg`, `loadBlobbiSvg`, `applyGazeMarkup`, `applyRearView`, `uniquifySvgIds`; types `RenderBlobbiSvgOptions`, `RenderedBlobbiSvg`, `BlobbiView` |
 
 Deliberately **not** exported: the artwork modules and customizers, the color
 helpers, the SVG id internals, the effect presets, and any Tailwind class map.
@@ -372,10 +374,10 @@ helpers, the SVG id internals, the effect presets, and any Tailwind class map.
   and source maps, built with tsup. `sideEffects: false`.
 - React 18 and 19 are both declared. The package uses `useMemo` and plain
   JSX only: no `use`, no ref-as-prop, no React 19-only API. The repository
-  typechecks and tests against React 19; React 18 is validated by the
-  consuming hosts (Blobbi Island) until a CI matrix exists.
+  typechecks and tests against React 19 only; React 18 is declared but not
+  exercised by this repository's tests.
 - Bundle: all 16 adult forms and their sleeping variants are inlined
-  (`artwork/adult-blobbi/lib/adult-svg-data.ts`, ~138 kB of source) behind
+  (`src/artwork/adult/v1/lib/adult-svg-data.ts`, ~138 kB of source) behind
   one lookup table, so a subset of forms is not currently tree-shakeable.
 
 ## 16. Lineage
