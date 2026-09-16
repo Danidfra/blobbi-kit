@@ -7,7 +7,7 @@ import {
   parseBlobbiEvent,
   type BlobbiCompanion,
 } from './blobbi';
-import { deriveAdultFormFromSeed } from './types/adult';
+import { ADULT_FORMS, deriveAdultFormFromSeed } from './types/adult';
 import {
   getBlobbiVisualIdentity,
   type BlobbiVisualIdentity,
@@ -52,6 +52,7 @@ const IDENTITY_KEYS = [
   'eyeColor',
   'pattern',
   'specialMark',
+  'size',
   'theme',
   'name',
 ] as const;
@@ -71,6 +72,7 @@ describe('getBlobbiVisualIdentity', () => {
       eyeColor: baby.visualTraits.eyeColor,
       pattern: baby.visualTraits.pattern,
       specialMark: baby.visualTraits.specialMark,
+      size: baby.visualTraits.size,
       name: 'Sparky',
     });
     // No adult form on a baby: the domain resolved none, so none is emitted.
@@ -85,8 +87,37 @@ describe('getBlobbiVisualIdentity', () => {
     expect(identity.stage).toBe('adult');
     expect(identity.adultType).toBe(adult.adultType);
     expect(identity.adultType).toBe(deriveAdultFormFromSeed(adult.seed!));
+    expect(ADULT_FORMS).toContain(identity.adultType);
     expect(identity.baseColor).toBe(adult.visualTraits.baseColor);
     expect(identity.eyeColor).toBe(adult.visualTraits.eyeColor);
+  });
+
+  it('carries the seed-derived size category, from the same vocabulary the domain resolves', () => {
+    for (const stage of ['egg', 'baby', 'adult'] as const) {
+      const companion = makeCompanion(stage);
+      const identity = getBlobbiVisualIdentity(companion);
+      expect(identity.size).toBe(companion.visualTraits.size);
+      expect(['small', 'medium', 'large']).toContain(identity.size);
+    }
+  });
+
+  it('admits only canonical adult forms: a valid legacy form survives, a raw value is dropped', () => {
+    const traits = deriveVisualTraits([], 'd'.repeat(64));
+    // A seedless (legacy) adult carries its raw `adult_type` tag on the companion.
+    const valid = getBlobbiVisualIdentity({ stage: 'adult', visualTraits: traits, adultType: 'catti' });
+    expect(valid.adultType).toBe('catti');
+
+    for (const raw of ['dragon', 'Catti', 'catti ', '<svg>', 'bloomi;', '0']) {
+      const identity = getBlobbiVisualIdentity({ stage: 'adult', visualTraits: traits, adultType: raw });
+      expect('adultType' in identity, `${JSON.stringify(raw)} entered the identity`).toBe(false);
+    }
+  });
+
+  it('every canonical adult form round-trips through the projection', () => {
+    const traits = deriveVisualTraits([], 'e'.repeat(64));
+    for (const form of ADULT_FORMS) {
+      expect(getBlobbiVisualIdentity({ stage: 'adult', visualTraits: traits, adultType: form }).adultType).toBe(form);
+    }
   });
 
   it('carries the egg stage through unchanged', () => {
@@ -136,22 +167,25 @@ describe('getBlobbiVisualIdentity', () => {
       eyeColor: traits.eyeColor,
       pattern: traits.pattern,
       specialMark: traits.specialMark,
+      size: traits.size,
     });
   });
 
-  it('emits only the visual identity fields: no stats, transport, size or render state', () => {
+  it('emits only the visual identity fields: no stats, transport or render state', () => {
     const companion = makeCompanion('adult', [['theme', 'divine']]);
     const identity = getBlobbiVisualIdentity(companion);
     const keys = Object.keys(identity).sort();
     expect(keys.every((k) => (IDENTITY_KEYS as readonly string[]).includes(k))).toBe(true);
     for (const forbidden of [
-      'event', 'd', 'seed', 'stats', 'state', 'allTags', 'size',
+      'event', 'd', 'seed', 'stats', 'state', 'allTags', 'visualTraits',
       'isSleeping', 'facing', 'eyeOffset', 'accessories', 'effects', 'isLegacy',
     ]) {
       expect(identity, `${forbidden} leaked into the identity`).not.toHaveProperty(forbidden);
     }
-    // visualTraits.size is a domain trait, not part of the renderer identity.
-    expect(identity).not.toHaveProperty('size');
+    // Every seed-derived trait is present: the identity is complete.
+    for (const trait of ['baseColor', 'secondaryColor', 'eyeColor', 'pattern', 'specialMark', 'size']) {
+      expect(identity).toHaveProperty(trait);
+    }
   });
 
   it('is deterministic and never mutates its input', () => {
@@ -173,5 +207,7 @@ describe('getBlobbiVisualIdentity', () => {
     const identity = getBlobbiVisualIdentity(makeCompanion('adult'));
     const roundTripped: BlobbiVisualIdentity = JSON.parse(JSON.stringify(identity));
     expect(roundTripped).toEqual(identity);
+    expect(roundTripped.size).toBe(identity.size);
+    expect(roundTripped.adultType).toBe(identity.adultType);
   });
 });

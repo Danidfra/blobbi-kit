@@ -26,7 +26,10 @@ the [CHANGELOG](../../CHANGELOG.md).
 - `fetchFreshEvent` and `fetchFreshBlobbonautProfile`, async helpers that
   query a relay pool or store you pass in.
 - A parallel type system under `./types/*`, re-exported from the root barrel
-  under the `BlobbiTypes`, `AdultTypes` and `ShopTypes` namespaces.
+  under the `BlobbiTypes`, `AdultTypes` and `ShopTypes` namespaces. Ditto's
+  egg renderer and shop consume it directly (`Blobbi`, `BlobbiStats`,
+  `ShopItem`, `ItemEffect`), so it is public API, distinct from the parsed
+  `BlobbiCompanion` model.
 - A no-op logger you can replace with `setBlobbiLogger`.
 
 ## Install
@@ -84,6 +87,45 @@ import { blobbiLogger } from '@blobbi-kit/core/logger';
 import { validateAndRepairBlobbiTags } from '@blobbi-kit/core/blobbi-tag-schema';
 import type { Blobbi } from '@blobbi-kit/core/types/blobbi';
 ```
+
+## Visual identity
+
+`getBlobbiVisualIdentity(companion)` is the canonical projection of a Blobbi
+onto the plain data a renderer draws from. It is the one place hosts should
+read a Blobbi's appearance; `@blobbi-kit/renderer`'s `BlobbiVisual` accepts
+the result as-is.
+
+```ts
+interface BlobbiVisualIdentity {
+  stage: 'egg' | 'baby' | 'adult';
+  visualGeneration: 'v1' | 'v2';   // absent tag means 'v1'
+  adultType?: AdultForm;           // one of ADULT_FORMS; seed-derived for adults
+  baseColor: string;               // '#RRGGBB'
+  secondaryColor: string;
+  eyeColor: string;
+  pattern: 'solid' | 'spotted' | 'striped' | 'gradient';
+  specialMark: 'none' | 'star' | 'heart' | 'sparkle' | 'blush';
+  size: 'small' | 'medium' | 'large';
+  theme?: string;                  // the `theme` extension tag, opaque
+  name?: string;
+}
+```
+
+- Every seed-derived trait is present: the six values `deriveVisualTraits`
+  resolves (three colours, pattern, mark, size) plus the adult form.
+- `adultType` is typed over the canonical vocabulary. `ADULT_FORMS`,
+  `AdultForm`, `isValidAdultForm` and `deriveAdultFormFromSeed` are exported
+  from the root barrel. A value outside the vocabulary (a raw legacy
+  `adult_type` tag) is omitted rather than passed through.
+- `theme` is a property of the creature, written on its kind 31124 event by
+  whichever feature themed it. The protocol defines no vocabulary for it, so
+  it is carried as the opaque tag value. It is not an application UI theme,
+  and the kit draws nothing from it.
+- Not included: render state (facing, sleeping, gaze, box size), host inputs
+  (accessories, effects) and transport (the event, `d`, the seed).
+
+The projection is pure and deterministic, and the result survives
+`JSON.parse(JSON.stringify(...))`.
 
 ## Tags and compatibility
 

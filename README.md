@@ -89,7 +89,8 @@ map.
   lookup and page layout are the host's.
 - It does not import core. Core's `getBlobbiVisualIdentity(companion)` returns
   an object shaped to fit the renderer's `BlobbiVisual`, so a host can pass it
-  through.
+  through. That identity carries every seed-derived trait (colours, pattern,
+  mark, size) and an adult form typed over core's `ADULT_FORMS`.
 
 ## What the host application owns
 

@@ -40,6 +40,17 @@ export * from './missions';
 export * from './progression';
 export * from './color-guardrails';
 
+// The canonical adult-form vocabulary, flat on the root barrel because the
+// visual identity is typed over it. `./types/adult` remains the deep-import
+// home and `AdultTypes` below still namespaces the whole module.
+export {
+  ADULT_FORMS,
+  isValidAdultForm,
+  getDefaultAdultForm,
+  deriveAdultFormFromSeed,
+  type AdultForm,
+} from './types/adult';
+
 // Pure domain -> renderer visual identity projection (no renderer import).
 export * from './blobbi-visual-identity';
 

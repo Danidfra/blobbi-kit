@@ -753,30 +753,15 @@ export function deriveSizeFromSeed(seed: string): BlobbiSize {
   return BLOBBI_SIZES[index];
 }
 
-// ─── Temporary Adult-Type Compatibility ───────────────────────────────────────
-//
-// TEMPORARY: Seed adjustment for existing adult Blobbies whose stored adult_type
-// does not match the seed-derived adult_type. During the compatibility window,
-// we mutate the seed so it produces the stored adult_type, then recompute the
-// full visual identity from the adjusted seed.
-//
-// After the cutoff date this code becomes a no-op and can be removed entirely.
-//
-// Cutoff: 2026-05-01 00:00:00 UTC
-//
-
-/** UTC timestamp when the compatibility window closes. */
-const ADULT_TYPE_COMPAT_CUTOFF = Date.UTC(2026, 4, 1) / 1000; // 2026-05-01 00:00:00 UTC
-
-/**
- * Check whether the temporary adult-type compatibility window is still active.
- */
-export function isAdultTypeCompatActive(): boolean {
-  return Math.floor(Date.now() / 1000) < ADULT_TYPE_COMPAT_CUTOFF;
-}
+// ─── Seed Authoring ───────────────────────────────────────────────────────────
 
 /**
  * Adjust a seed so that deriveAdultFormFromSeed(adjusted) === targetForm.
+ *
+ * A seed AUTHORING utility, not a read path: the kit never calls it while
+ * parsing an event. Hosts use it when they deliberately rewrite a Blobbi's
+ * seed to select an adult form (Ditto's development editor does), after
+ * which the mirror tags follow the new seed on republish.
  *
  * Directly computes the seed bytes at offset [40..48] (the adult_type
  * region) that produce the target form index. All other seed regions
@@ -1297,28 +1282,10 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
   // Resolve name: tag > legacy d-tag derivation > fallback
   const name = nameTag ?? deriveNameFromLegacyD(d);
   
-  // ─── TEMPORARY: Adult-type compatibility seed adjustment ───
-  // During the compatibility window, if an existing adult has an explicit
-  // adult_type tag that doesn't match the seed-derived form, adjust the
-  // seed so it produces that form. This prevents existing adults from
-  // suddenly changing form. After the cutoff this block is a no-op.
-  let effectiveSeed = seed;
-  if (
-    seed && seed.length === 64 &&
-    stage === 'adult' &&
-    isAdultTypeCompatActive()
-  ) {
-    const storedAdultType = getTagValue(tags, 'adult_type');
-    if (storedAdultType && ADULT_FORMS.includes(storedAdultType as AdultForm)) {
-      const seedDerivedForm = deriveAdultFormFromSeed(seed);
-      if (storedAdultType !== seedDerivedForm) {
-        effectiveSeed = adjustSeedForAdultType(seed, storedAdultType as AdultForm);
-      }
-    }
-  }
-  
-  // Derive visual traits (single source of truth)
-  const visualTraits = deriveVisualTraits(tags, effectiveSeed);
+  // Derive visual traits (single source of truth). The seed alone decides
+  // the identity, adult form included: a stored `adult_type` tag is a mirror
+  // of the seed and is only consulted when there is no seed (legacy).
+  const visualTraits = deriveVisualTraits(tags, seed);
   
   // Flag legacy / unsupported format (non-canonical d-tag, missing seed/name,
   // OR old-app schema markers even when the d-tag looks canonical). Never
@@ -1363,7 +1330,7 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
     stage,
     state,
     progressionState,
-    seed: effectiveSeed,
+    seed,
     visualTraits,
     isLegacy,
     lastInteraction: parseNumericTag(tags, 'last_interaction')!,
@@ -1384,8 +1351,8 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
     careStreakLastDay: getTagValue(tags, 'care_streak_last_day'),
     incubationTime: parseNumericTag(tags, 'incubation_time'),
     startIncubation: parseNumericTag(tags, 'start_incubation'),
-    adultType: stage === 'adult' && effectiveSeed && effectiveSeed.length === 64
-      ? deriveAdultFormFromSeed(effectiveSeed)
+    adultType: stage === 'adult' && seed && seed.length === 64
+      ? deriveAdultFormFromSeed(seed)
       : getTagValue(tags, 'adult_type'),
     visualGeneration: parseVisualGeneration(tags),
     publishedAt: parseNumericTag(tags, 'published_at'),

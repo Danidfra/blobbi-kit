@@ -16,21 +16,32 @@
  * adapter object and no shared type package, and either side can evolve
  * without the other compiling against it.
  *
- * WHAT IS NOT HERE, deliberately. Render STATE (size, facing, sleeping, gaze)
- * and HOST inputs (accessories, effects, inventory) are not identity: the
- * same Blobbi is the same Blobbi asleep, seen from behind, wearing a hat.
+ * WHAT IS HERE. Every PERSISTENT visual trait the domain resolves for a
+ * Blobbi: the stage, the artwork generation, the three colours, the pattern,
+ * the special mark, the size category, the adult form, the theme tag and the
+ * name. The seed-derived traits are exactly the six `deriveVisualTraits`
+ * returns; nothing the seed decides is left out, so a host never has to reach
+ * back into `visualTraits` for a trait the identity forgot.
+ *
+ * WHAT IS NOT HERE, deliberately. Render STATE (box size, facing, sleeping,
+ * gaze) and HOST inputs (accessories, effects, inventory) are not identity:
+ * the same Blobbi is the same Blobbi asleep, seen from behind, wearing a hat.
  * Those stay with the host and the renderer. Transport data (the event, the
  * d-tag, the seed) is not identity either; it is how the identity was
- * derived, which the renderer has no reason to know.
+ * derived, which the renderer has no reason to know. Application UI themes
+ * (light/dark, host styling) are not identity: they describe the app, not the
+ * creature.
  */
 import type {
   BlobbiCompanion,
   BlobbiPattern,
+  BlobbiSize,
   BlobbiSpecialMark,
   BlobbiStage,
   BlobbiVisualGeneration,
 } from './blobbi';
 import { getTagValue, parseVisualGeneration } from './blobbi';
+import { isValidAdultForm, type AdultForm } from './types/adult';
 
 /**
  * Plain, serializable visual identity of a Blobbi.
@@ -39,8 +50,8 @@ import { getTagValue, parseVisualGeneration } from './blobbi';
  * the domain: `parseBlobbiEvent` always resolves a stage and a full set of
  * visual traits (seed-derived, with legacy-tag fallbacks and defaults), so
  * those are required; an adult form exists only when the event carries or
- * derives one; a theme exists only when the extension tag is present; a name
- * is emitted only when non-empty.
+ * derives a form from the canonical vocabulary; a theme exists only when the
+ * extension tag is present; a name is emitted only when non-empty.
  */
 export interface BlobbiVisualIdentity {
   /** Life stage: `'egg' | 'baby' | 'adult'`. */
@@ -51,8 +62,13 @@ export interface BlobbiVisualIdentity {
    * every event without a `visual_generation` tag.
    */
   visualGeneration: BlobbiVisualGeneration;
-  /** Adult form (`'bloomi'`, `'catti'`, ...), as the domain resolved it. */
-  adultType?: string;
+  /**
+   * Adult form, always one of {@link ADULT_FORMS} (`'bloomi'`, `'catti'`, ...).
+   * Seed-derived for every adult with a seed. A value outside the vocabulary
+   * (a malformed legacy `adult_type` tag) never enters the identity; it is
+   * omitted, and the renderer's own default applies.
+   */
+  adultType?: AdultForm;
   /** Canonical CSS hex color. */
   baseColor: string;
   /** Canonical CSS hex color. */
@@ -63,7 +79,20 @@ export interface BlobbiVisualIdentity {
   pattern: BlobbiPattern;
   /** Seed-derived special mark: `'none' | 'star' | 'heart' | 'sparkle' | 'blush'`. */
   specialMark: BlobbiSpecialMark;
-  /** Theme variant from the `theme` extension tag (e.g. `'divine'`), when present. */
+  /**
+   * Seed-derived size category: `'small' | 'medium' | 'large'`. Persistent
+   * identity like the pattern and the mark; the current body drawings do not
+   * scale by it, so it is carried for hosts and future artwork.
+   */
+  size: BlobbiSize;
+  /**
+   * Blobbi theme variant from the `theme` extension tag (e.g. `'divine'`),
+   * when present. This is a property of the CREATURE, written on its kind
+   * 31124 event by the feature that themed it (Ditto's divine eggs read it
+   * this way); it is not an application UI theme. The protocol defines no
+   * closed vocabulary for it, so it is carried as the opaque string the tag
+   * holds, exactly as `crossover_app` would be. Nothing in the kit draws it.
+   */
   theme?: string;
   /** Display name, when the Blobbi has one. */
   name?: string;
@@ -88,6 +117,9 @@ export type BlobbiVisualIdentitySource = Pick<BlobbiCompanion, 'stage' | 'visual
  * non-adult, clamping a color) is applied here. Those decisions belong to the
  * renderer's normalization, so a renderer and a host card that both start from
  * this object can never disagree about what they were given.
+ *
+ * The one rule applied here is VOCABULARY: `adultType` is emitted only when it
+ * is a canonical adult form. That is not policy, it is the type of the field.
  */
 export function getBlobbiVisualIdentity(blobbi: BlobbiVisualIdentitySource): BlobbiVisualIdentity {
   const { stage, visualTraits, adultType, name, allTags, visualGeneration } = blobbi;
@@ -102,9 +134,10 @@ export function getBlobbiVisualIdentity(blobbi: BlobbiVisualIdentitySource): Blo
     eyeColor: visualTraits.eyeColor,
     pattern: visualTraits.pattern,
     specialMark: visualTraits.specialMark,
+    size: visualTraits.size,
   };
 
-  if (adultType !== undefined && adultType !== '') {
+  if (adultType !== undefined && isValidAdultForm(adultType)) {
     identity.adultType = adultType;
   }
 

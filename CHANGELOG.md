@@ -11,7 +11,47 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ## Unreleased
 
-### `@blobbi-kit/renderer`
+Nothing below is published yet. The target versions are named so the release
+notes can be checked against the manifests before `npm publish`.
+
+### `@blobbi-kit/core` and `@blobbi-kit/react` 0.6.0 (breaking)
+
+The canonical visual identity contract is closed: one validated, complete,
+serializable description of how a Blobbi looks, for every host.
+
+- **`BlobbiVisualIdentity.size`** is new and required. `size` is seed-derived
+  identity like the pattern and the mark (`deriveVisualTraits` has always
+  resolved it), but the projection dropped it and hosts reached back into
+  `visualTraits` for it. The identity now carries all six seed-derived traits.
+- **`BlobbiVisualIdentity.adultType` is typed `AdultForm`**, the sixteen-form
+  vocabulary in `ADULT_FORMS`, instead of `string`. `getBlobbiVisualIdentity`
+  emits it only when the value is a canonical form; a raw legacy `adult_type`
+  tag outside the vocabulary is omitted, and the renderer's own default form
+  applies. Seed-derived forms are unaffected (they are always canonical).
+  Breaking only for code that constructs a `BlobbiVisualIdentity` literal with
+  an arbitrary string; reading the field is unchanged.
+- **`ADULT_FORMS`, `AdultForm`, `isValidAdultForm`, `getDefaultAdultForm` and
+  `deriveAdultFormFromSeed` are exported from the root barrel.** They were
+  reachable only through `@blobbi-kit/core/types/adult` and the `AdultTypes`
+  namespace; both still work.
+- **`theme` stays an opaque string.** The `theme` tag is creature identity (a
+  themed Blobbi's kind 31124 event carries it; Ditto's divine eggs read it),
+  not an application UI theme, and the protocol defines no vocabulary for it.
+  Documented on the field; no type change.
+- **Removed: the adult-type compatibility window.** `parseBlobbiEvent` used to
+  rewrite the seed of an adult whose stored `adult_type` tag disagreed with
+  the seed-derived form, until 2026-05-01. That date passed, the predicate
+  `isAdultTypeCompatActive()` has returned `false` ever since, and the code
+  path was dead. It is deleted along with the predicate export. Parsing of
+  every persisted event is unchanged: the seed decides the adult form, the
+  stored tag is a mirror and is rewritten on republish, and a seedless legacy
+  adult still reads its raw tag (`blobbi-adult-form.test.ts` pins all three
+  with fixed seed vectors). `adjustSeedForAdultType` remains, re-documented
+  as a seed authoring utility (Ditto's dev editor uses it).
+- `@blobbi-kit/react` has no code change; it moves to 0.6.0 in lockstep and
+  its core peer to `^0.6.0`.
+
+### `@blobbi-kit/renderer` 0.1.1 (fix)
 
 - **Colours are validated inside the renderer.** Every entry point
   (`BlobbiRenderer`, `renderBlobbiSvg`, `loadBlobbiSvg`) now accepts a colour
@@ -28,7 +68,6 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
   `BlobbiRenderer` always applied, instead of throwing.
 - New `input-hardening.test.tsx` pins both properties with inert probe payloads
   against every entry point.
-
 ## 0.5.2 — One modern kind 31124 contract; configurable collection (fix + additions)
 
 Backwards-compatible for every current producer: Blobbi Island and Ditto
