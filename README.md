@@ -13,9 +13,9 @@ npm under the `@blobbi-kit` scope.
 
 | Package | Version | What it is | Runtime dependencies |
 | --- | --- | --- | --- |
-| [`@blobbi-kit/core`](./packages/blobbi-core) | 0.5.2 | Event kinds, parsing, domain rules, decay, seed identity. No React, no DOM, no Nostr library. | `@noble/hashes` |
-| [`@blobbi-kit/react`](./packages/blobbi-react) | 0.5.2 | React hooks over core: reading a user's Blobbis, projecting state, syncing and publishing through host-supplied functions. Browser only. | peers: core, `react`, `@tanstack/react-query`, `@nostrify/react` |
-| [`@blobbi-kit/renderer`](./packages/blobbi-renderer) | 0.1.0 | React component and string API that draws a Blobbi as SVG from plain visual data. Imports neither kit package. | peer: `react` |
+| [`@blobbi-kit/core`](./packages/blobbi-core) | 0.6.0 | Event kinds, parsing, domain rules, decay, seed identity. No React, no DOM, no Nostr library. | `@noble/hashes` |
+| [`@blobbi-kit/react`](./packages/blobbi-react) | 0.6.0 | React hooks over core: reading a user's Blobbis, projecting state, syncing and publishing through host-supplied functions. Browser only. | peers: core, `react`, `@tanstack/react-query`, `@nostrify/react` |
+| [`@blobbi-kit/renderer`](./packages/blobbi-renderer) | 0.1.1 | React component and string API that draws a Blobbi as SVG from plain visual data. Imports neither kit package. | peer: `react` |
 | [`renderer-consumer-fixture`](./packages/blobbi-renderer-consumer) | private | Test-only consumer of the renderer. Proves it renders with no provider, no host CSS and no kit package around it. | |
 
 `core` and `react` are versioned and released together. `renderer` is versioned
@@ -269,7 +269,7 @@ in the [CHANGELOG](./CHANGELOG.md).
 
 What is verified in this repository:
 
-- `npm run typecheck`, `npm run test` (46 files, 1400 tests), `npm run build`
+- `npm run typecheck`, `npm run test` (47 files, 1417 tests), `npm run build`
   and `npm run smoke` all pass.
 - Manifest tests assert the exact peer sets, the core/react version lockstep,
   and that no `@nostrify/nostrify` dependency exists. The smoke script scans
