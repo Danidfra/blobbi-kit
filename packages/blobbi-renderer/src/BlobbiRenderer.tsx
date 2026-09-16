@@ -27,6 +27,16 @@
  * `pointer-events: none`, so nothing an effect does can change a measurement,
  * move an anchor or intercept a click. See `effects/`.
  *
+ * Expressive state splits in two, deliberately:
+ *  - EXPRESSION is SVG render state. It changes the body markup (mouth, brows,
+ *    lids) through the artwork registry, and so is part of the memoized SVG;
+ *  - MOTION is wrapper/CSS render state. The body box and the two accessory
+ *    layers (so a hat bobs with the head) carry `data-blobbi-motion*`
+ *    attributes and a package-owned `<style>` animates them; the SVG string
+ *    is untouched, and `'still'` emits neither attribute nor style.
+ * The component represents the state; when and why a Blobbi is walking or
+ * happy is the host's decision.
+ *
  * Styling boundary: everything that affects geometry is an inline style.
  * The only class names emitted are `blobbi-renderer` plus the two optional
  * decoration modifiers (`--interactive`, `--framed`) that
@@ -43,6 +53,8 @@ import {
   type BlobbiRendererSize,
 } from './blobbi-render-size';
 import { normalizeBlobbiRenderModel, type BlobbiVisual } from './blobbi-render-model';
+import type { BlobbiExpression } from './expression-model';
+import { BLOBBI_MOTION_STYLESHEET, blobbiMotionAttributes, type BlobbiMotion } from './motion-model';
 import type { NormalizedAccessoryPlacement } from './accessory-normalize';
 import { BlobbiEffectLayer, BlobbiEffectStyles } from './effects/BlobbiEffectLayers';
 import {
@@ -95,6 +107,19 @@ export interface BlobbiRendererProps {
    * pre-normalized) because effect resolution contains no host policy at all.
    */
   effects?: readonly BlobbiVisualEffect[];
+  /**
+   * Facial expression: a preset (`'happy'`, `'sad'`, ...) or explicit parts
+   * (`{ eyes, mouth, brows, blush }`), every value from a closed vocabulary.
+   * Drawn on V2 front and side; V1 and the V2 back ignore it. `isSleeping`
+   * always closes the eyes. Default: neutral, the authored face.
+   */
+  expression?: BlobbiExpression;
+  /**
+   * Body motion: `'still'` (default, no markup change), `'idle'` (a slow
+   * breath) or `'walking'` (a bob with sway and squash). The host moves the
+   * box through its world; this only makes the body look the part.
+   */
+  motion?: BlobbiMotion;
   /** Optional pure post-processor for the body SVG string. */
   sanitize?: BlobbiSvgSanitizer;
   /**
@@ -211,10 +236,13 @@ export function AccessoryLayerView({
   placements,
   layer,
   className,
+  motion,
 }: {
   placements: readonly NormalizedAccessoryPlacement[];
   layer: 'behind' | 'front';
   className?: string;
+  /** The body's motion attributes, so worn accessories move with the body. */
+  motion?: ReturnType<typeof blobbiMotionAttributes>;
 }) {
   const layerPlacements = placements.filter((p) => p.layer === layer);
   if (layerPlacements.length === 0) return null;
@@ -224,6 +252,7 @@ export function AccessoryLayerView({
       className={className}
       style={ACCESSORY_LAYER_STYLE}
       data-accessory-layer-group={layer}
+      {...motion}
     >
       {layerPlacements.map((placement) => (
         <AccessoryPlacementView key={placement.id} placement={placement} />
@@ -242,6 +271,8 @@ export function BlobbiRenderer({
   eyeOffset,
   accessories = [],
   effects,
+  expression,
+  motion,
   sanitize,
   label,
   title,
@@ -268,6 +299,8 @@ export function BlobbiRenderer({
     eyesClosed,
     eyeOffset,
     accessories,
+    expression,
+    motion,
   });
 
   // Effect resolution: pure, total and cheap, and it returns a shared frozen
@@ -281,7 +314,7 @@ export function BlobbiRenderer({
   // the CSS variables below move.
   const gazeEnabled = model.gaze !== null;
 
-  const svgContent = useMemo(() => {
+  const rendered = useMemo(() => {
     try {
       // The registry decides WHICH drawing (generation, form, view, mirroring)
       // and runs that generation's pipeline; nothing here knows what V1 or V2 is.
@@ -292,6 +325,7 @@ export function BlobbiRenderer({
           adultType: model.adultType,
           facing: model.facing,
           eyesClosed: model.eyesClosed,
+          expression: model.expression,
         },
         {
           baseColor: model.baseColor,
@@ -304,11 +338,13 @@ export function BlobbiRenderer({
       // moved via CSS variables. Static contexts (no eyeOffset) keep the SVG
       // untouched, so previews/modals/cards render exactly as before.
       const withGaze =
-        gazeEnabled && artwork.gazeable ? applyGazeMarkup(svg, artwork.generation) : svg;
-      return sanitize ? sanitize(withGaze) : withGaze;
+        gazeEnabled && artwork.gazeable
+          ? applyGazeMarkup(svg, artwork.generation, { mirrored: artwork.mirrored })
+          : svg;
+      return { svg: sanitize ? sanitize(withGaze) : withGaze, supports: artwork.supports };
     } catch (err) {
       console.error('Failed to load Blobbi SVG:', err);
-      return '';
+      return { svg: '', supports: { expression: false, gaze: false, motion: false } };
     }
   }, [
     model.stage,
@@ -320,13 +356,25 @@ export function BlobbiRenderer({
     model.eyesClosed,
     model.instanceId,
     model.facing,
+    // The resolved expression is a frozen value object; its fields are the
+    // memo inputs, so a fresh but equal `expression` prop never rebuilds.
+    model.expression.eyes,
+    model.expression.mouth,
+    model.expression.brows,
+    model.expression.blush,
     gazeEnabled,
     sanitize,
   ]);
 
+  const svgContent = rendered.svg;
+  const artworkSupports = rendered.supports;
   if (!svgContent) return null;
 
   const box = resolveBlobbiRenderSize(size);
+
+  // Motion attributes: null for `'still'`, so nothing is spread and the DOM
+  // is exactly the motionless DOM.
+  const motionAttrs = blobbiMotionAttributes(model.motion, model.instanceId);
 
   // Gaze CSS variables on the body wrapper: only the pupils/highlights move
   // (via the injected `.blobbi-pupil` style), never the whole SVG.
@@ -369,12 +417,14 @@ export function BlobbiRenderer({
       data-blobbi-size={box.label}
       data-blobbi-generation={model.visualGeneration}
       data-blobbi-facing={model.facing}
+      data-blobbi-expression-support={artworkSupports.expression ? '' : undefined}
       title={title}
       onClick={onClick}
     >
       <BlobbiEffectStyles effects={resolvedEffects} />
+      {motionAttrs ? <style data-blobbi-motion-styles="">{BLOBBI_MOTION_STYLESHEET}</style> : null}
       <BlobbiEffectLayer effects={resolvedEffects} layer="behind" instanceId={model.instanceId} />
-      <AccessoryLayerView placements={model.accessories} layer="behind" />
+      <AccessoryLayerView placements={model.accessories} layer="behind" motion={motionAttrs} />
       {/* The body fills the renderer box exactly: the wrapper is absolutely
           positioned over the whole box and the SVG carries width/height="100%"
           with its square viewBox (xMidYMid meet), so it neither distorts nor
@@ -382,13 +432,14 @@ export function BlobbiRenderer({
       <div
         data-blobbi-body-box=""
         style={bodyStyle}
+        {...motionAttrs}
         dangerouslySetInnerHTML={{ __html: svgContent }}
       />
       {/* Between the body and the front accessories: where a body-overlay
           effect (Pixel Glitch, Electric Charge) belongs. It paints ON the
           Blobbi without ever painting over its hat. */}
       <BlobbiEffectLayer effects={resolvedEffects} layer="mid" instanceId={model.instanceId} />
-      <AccessoryLayerView placements={model.accessories} layer="front" />
+      <AccessoryLayerView placements={model.accessories} layer="front" motion={motionAttrs} />
       <BlobbiEffectLayer effects={resolvedEffects} layer="front" instanceId={model.instanceId} />
     </div>
   );

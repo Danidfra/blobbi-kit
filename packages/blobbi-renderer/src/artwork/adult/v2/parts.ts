@@ -138,13 +138,28 @@ export const ADULT_V2_GAZE_PARTS = ['left-eye-inner', 'right-eye-inner', 'eye-in
  */
 export const ADULT_V2_CLOSED_EYE_PARTS = ['left-eye-closed', 'right-eye-closed', 'eye-closed'] as const;
 
-/** The union of every V2 part name across views and eye states. */
+/**
+ * Parts that exist ONLY in expression output (`expression.ts`):
+ *  - `*-eye-lid` / `*-eye-lid-edge`: the half-closed lid fill and its edge,
+ *    drawn on top of each eye group for `eyes: 'half'`;
+ *  - `*-eye-scale`: the wrapper around the inner eye for `eyes: 'wide'`,
+ *    nested inside the movable `*-eye-inner` group so gaze still applies.
+ * The neutral drawing never carries them.
+ */
+export const ADULT_V2_EXPRESSION_PARTS = [
+  'left-eye-lid', 'right-eye-lid', 'eye-lid',
+  'left-eye-lid-edge', 'right-eye-lid-edge', 'eye-lid-edge',
+  'left-eye-scale', 'right-eye-scale', 'eye-scale',
+] as const;
+
+/** The union of every V2 part name across views, eye states and expressions. */
 export const ADULT_V2_PARTS = [
   ...new Set<string>([
     ...ADULT_V2_FRONT_PARTS,
     ...ADULT_V2_SIDE_PARTS,
     ...ADULT_V2_BACK_PARTS,
     ...ADULT_V2_CLOSED_EYE_PARTS,
+    ...ADULT_V2_EXPRESSION_PARTS,
   ]),
 ] as readonly string[];
 
@@ -152,4 +167,5 @@ export type AdultV2Part =
   | (typeof ADULT_V2_FRONT_PARTS)[number]
   | (typeof ADULT_V2_SIDE_PARTS)[number]
   | (typeof ADULT_V2_BACK_PARTS)[number]
-  | (typeof ADULT_V2_CLOSED_EYE_PARTS)[number];
+  | (typeof ADULT_V2_CLOSED_EYE_PARTS)[number]
+  | (typeof ADULT_V2_EXPRESSION_PARTS)[number];

@@ -7,7 +7,9 @@
  *   - Adult V2 front, right, left, back;
  *   - the same V2 views in several trait palettes;
  *   - awake | sleeping pairs for every V2 facing (closed eyes are derived);
- *   - a V2 gaze demo driven by the CSS variables.
+ *   - a V2 gaze demo driven by the CSS variables;
+ *   - every expression preset on the V2 front, right and left profile;
+ *   - the three motion states (still, idle, walking) on V2 and V1.
  * Everything is inlined SVG generated at script time; the page needs no server,
  * no framework and no network. Open `preview/index.html` in a browser.
  *
@@ -20,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const { renderBlobbiSvg, loadBlobbiSvg } = await import('../dist/index.js');
+const { renderBlobbiSvg, loadBlobbiSvg, BLOBBI_EMOTIONS, BLOBBI_MOTIONS } = await import('../dist/index.js');
 
 const PALETTES = [
   { name: 'authored (no colors)', colors: {} },
@@ -61,6 +63,30 @@ const sleepRows = [PALETTES[0], PALETTES[2]].map((p) => {
 
 const gaze = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing: 'front', instanceId: 'gaze', gaze: true }).svg;
 const gazeSide = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing: 'right', instanceId: 'gaze-s', gaze: true }).svg;
+const gazeLeft = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing: 'left', instanceId: 'gaze-l', gaze: true }).svg;
+
+// Every expression preset, front / right / left (the left profile is the
+// mirrored right one, so a preset that reads correctly there proves the
+// transforms survive the mirror). The expression is IN the SVG string.
+const expressionRows = ['front', 'right', 'left'].map((facing) => {
+  const cells = BLOBBI_EMOTIONS.map((emotion) => {
+    const { svg } = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing, expression: emotion, ...PALETTES[2].colors, instanceId: `x-${facing}-${emotion}` });
+    return cell(`${emotion}`, svg);
+  }).join('');
+  return `<section><h2>Adult V2 — expressions — ${facing}</h2><div class="row">${cells}</div></section>`;
+}).join('');
+
+// Sleeping wins over the expression's eyes: happy + eyesClosed smiles in its sleep.
+const sleepingHappy = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing: 'front', expression: 'happy', eyesClosed: true, ...PALETTES[2].colors, instanceId: 'x-sleep-happy' }).svg;
+const backUpset = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing: 'back', expression: 'upset', ...PALETTES[2].colors, instanceId: 'x-back-upset' }).svg;
+
+// Motion is wrapper/CSS state: the string API puts the attributes on the root
+// <svg> and injects the package stylesheet, so each cell animates on its own.
+const motionCells = BLOBBI_MOTIONS.map((motion) => {
+  const v2 = renderBlobbiSvg({ stage: 'adult', visualGeneration: 'v2', facing: 'right', motion, expression: motion === 'walking' ? 'happy' : 'neutral', ...PALETTES[2].colors, instanceId: `m-${motion}` }).svg;
+  const v1 = renderBlobbiSvg({ stage: 'adult', adultType: 'catti', motion, baseColor: '#8749ef', secondaryColor: '#c792ff', eyeColor: '#201538', instanceId: `m1-${motion}` }).svg;
+  return cell(`v2 · right · ${motion}`, v2) + cell(`v1 · catti · ${motion}`, v1);
+}).join('');
 
 const html = `<!doctype html>
 <meta charset="utf-8">
@@ -86,9 +112,20 @@ ${sleepRows}
   <div class="row">
     ${cell('v2 · front · gaze', gaze, ' class="gaze" id="gaze-front"')}
     ${cell('v2 · right · gaze', gazeSide, ' class="gaze" id="gaze-side"')}
+    ${cell('v2 · left · gaze (mirrored; same screen direction)', gazeLeft, ' class="gaze" id="gaze-left"')}
     <div><label>x <input id="gx" type="range" min="-1" max="1" step="0.05" value="0"></label><br>
          <label>y <input id="gy" type="range" min="-1" max="1" step="0.05" value="0"></label></div>
   </div>
+</section>
+${expressionRows}
+<section><h2>Adult V2 — precedence and faceless views</h2>
+  <div class="row">
+    ${cell('happy + eyesClosed (sleeping wins the eyes)', sleepingHappy)}
+    ${cell('back + upset (unchanged: no face)', backUpset)}
+  </div>
+</section>
+<section><h2>Motion — still | idle | walking (CSS on the root svg; reduced-motion disables)</h2>
+  <div class="row">${motionCells}</div>
 </section>
 <script>
   const set = () => { for (const el of document.querySelectorAll('.gaze')) {

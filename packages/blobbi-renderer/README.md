@@ -77,6 +77,8 @@ const accessories = normalizeAccessoryPlacements([
   facing="front"              // 'front' | 'back' | 'left' | 'right'
   isSleeping={false}
   eyeOffset={{ x: 0.4, y: -0.2 }}
+  expression="happy"          // a preset, or { eyes, mouth, brows, blush }; V2 faces only
+  motion="idle"               // 'still' | 'idle' | 'walking'; the body's in-place motion
   accessories={accessories}
   effects={[{ id: 'celestial-aura' }, { id: 'golden-sparkles', intensity: 0.8 }]}
   label="Rosa, an adult Bloomi"
@@ -122,6 +124,8 @@ is the single pure function that does it):
 | non-finite accessory `x`/`y`/`scale`/`rot` | `50` / `50` / `1` / `0` |
 | unknown effect id | ignored |
 | non-finite / out-of-range `intensity` | `1` / clamped to 0…1.5 |
+| unknown `expression` preset or part value | neutral (per part) |
+| unknown `motion` | `'still'` |
 
 `BlobbiRenderVisual` is a deprecated alias of `BlobbiVisual`, kept for one
 migration cycle.
@@ -162,7 +166,67 @@ should not render accessories, whose sizes are fractions of the box
   change, never per gaze change, which is what makes per-frame gaze cheap. On
   V1 the marked elements are the pupil shapes; on V2 they are the semantic
   `*-eye-inner` groups (iris, pupil, highlights), so the eye whites and body
-  never move. The V2 back view has no face and receives no gaze markup.
+  never move. The V2 back view has no face and receives no gaze markup. Gaze
+  is **screen-relative** on every facing: `x = 1` looks to the viewer's right
+  on the front, the right profile and the mirrored left profile alike (the
+  injected gaze style negates the horizontal travel under the mirror).
+
+## 6b. Expression and motion
+
+The renderer represents **visual state**. The application owns **behavioural
+policy**: it decides that a zap makes its Blobbi happy, that a click sends it
+walking, or that it should glance sideways now, and hands the renderer the
+resulting words. Nothing in this package decides when or why.
+
+```tsx
+<BlobbiRenderer visual={identity} instanceId={d} facing="left" expression="happy" motion="walking" />
+```
+
+**Expression** is *SVG render state*: it changes the body markup, on artwork
+with a semantic face (V2 front and side). A preset name or explicit parts,
+every value from a closed vocabulary; no path data or CSS is ever accepted.
+
+| preset | eyes | mouth | brows | blush |
+| --- | --- | --- | --- | --- |
+| `neutral` | open | neutral | neutral | soft |
+| `happy` | open | smile | raised | soft |
+| `excited` | wide | grin | raised | strong |
+| `sad` | half | frown | inner-up | none |
+| `sleepy` | half | flat | lowered | soft |
+| `surprised` | wide | open | raised | soft |
+| `upset` | open | flat | lowered | none |
+
+Parts: `eyes` (`open | half | closed | wide`), `mouth` (`neutral | smile |
+grin | frown | open | flat`), `brows` (`neutral | raised | lowered |
+inner-up`), `blush` (`none | soft | strong`). Every shape is a package
+constant applied relative to the authored geometry, so the front and the
+profile share one vocabulary and the mirrored left profile needs nothing
+extra. `isSleeping` always wins the eyes (a sleeping happy Blobbi smiles with
+closed eyes). The V2 back view and every V1 form draw exactly the same
+markup for every expression; `BLOBBI_EMOTION_PRESETS` and
+`normalizeBlobbiExpression` are exported for hosts that compose their own.
+
+**Motion** is *wrapper/CSS render state*: the drawing is untouched. The body
+box and both accessory layers (a hat bobs with the head) carry
+`data-blobbi-motion="idle | walking"` and `data-blobbi-motion-phase="0…7"`,
+and a package-owned stylesheet animates them (`BLOBBI_MOTION_STYLESHEET`,
+namespaced `blobbi-motion-*`, `prefers-reduced-motion` disables it). The
+component emits the rules next to each moving Blobbi; a host may mount the
+stylesheet once instead. `'still'` (the default) emits nothing at all, so a
+motionless Blobbi has exactly the DOM it always had. The phase is a hash of
+`instanceId`, so a crowd does not bob in lockstep, deterministically; there
+is no timer and no randomness anywhere. Idle is a four-second breath of about
+one percent; walking is a half-second bob with a degree of sway and a hint of
+squash. The host moves the box through its world; the renderer only makes the
+body look the part.
+
+`renderBlobbiSvg(...).artwork.supports` reports `{ expression, gaze, motion }`
+per drawing: V2 front and side support all three, the V2 back supports motion
+only, V1 supports gaze (as before) and motion. The component mirrors
+`expression` support as `data-blobbi-expression-support` on its root.
+Blinking, looking around and any other timed behaviour are not in this
+package: they are policy, and belong to a host hook that sets `eyes` or
+`eyeOffset` over time.
 
 ## 7. Accessories
 
@@ -241,6 +305,12 @@ and, in closed-eye output only, `left-eye-closed`/`right-eye-closed`/`eye-closed
 In the back view, screen-left limbs are the character's right limbs and are
 labeled `right-*`.
 
+Expressions on V2 (see "Expression and motion") are further rules over the
+same parts: the mouth and brow paths are rewritten, `half` eyes gain a
+`*-eye-lid` and `*-eye-lid-edge` on top of the eye group, `wide` eyes gain a
+`*-eye-scale` wrapper inside the movable inner group, and blush sets the
+cheek opacities (`ADULT_V2_EXPRESSION_PARTS`).
+
 Traits on V2: `baseColor` recolors the body, limb, foot and stroke color roles;
 `secondaryColor` recolors the side-pattern marks (visible on the profile; the
 authored front places its pattern group outside the viewBox, so the front and
@@ -285,13 +355,15 @@ artwork/
   should need to change.
 
 Run `npm run build` then `npm run preview` in this package to write a static
-visual preview of V1 and every V2 view and palette to `preview/index.html`.
+visual preview of V1, every V2 view and palette, every expression preset on
+the front and both profiles, and the three motion states to
+`preview/index.html`.
 
 ## 9. String API
 
 ```ts
-renderBlobbiSvg({ stage, visualGeneration, adultType, baseColor, secondaryColor, eyeColor, facing, eyesClosed, instanceId, gaze });
-// -> { svg, artwork: { generation, view, mirrored, gazeable, ... } }
+renderBlobbiSvg({ stage, visualGeneration, adultType, baseColor, secondaryColor, eyeColor, facing, eyesClosed, expression, motion, instanceId, gaze });
+// -> { svg, artwork: { generation, view, mirrored, gazeable, supports, ... } }
 
 loadBlobbiSvg(stage, adultType, baseColor, secondaryColor, eyeColor, isSleeping, instanceId, view); // V1 only
 ```
@@ -299,7 +371,11 @@ loadBlobbiSvg(stage, adultType, baseColor, secondaryColor, eyeColor, isSleeping,
 The same synchronous pipeline the component uses, as a string: for canvas
 compositing, server thumbnails or a non-React card. `renderBlobbiSvg` is the
 generation-aware API; `loadBlobbiSvg` is the historical V1 positional API and
-its output is byte-identical to what it always was. `applyGazeMarkup`,
+its output is byte-identical to what it always was. `expression` is drawn
+into the string exactly as in the component. `motion` puts the two
+`data-blobbi-motion*` attributes on the root `<svg>` and injects the motion
+stylesheet after it, so the string animates on its own when mounted inline;
+`'still'` leaves the string untouched. `applyGazeMarkup`,
 `applyRearView` and `uniquifySvgIds` are exported as **provisional**
 string-to-string transforms over the artwork's comment-block convention.
 
@@ -330,8 +406,10 @@ input that reaches it is a validated color, a clamped number or a sanitized id
 (`normalizeInstanceId`), so the renderer ships no sanitizer and takes no
 dependency on one.
 
-Hosts that want defense in depth, or that post-process the markup, pass a pure
-`sanitize?: (svg: string) => string`. It runs once per structural change on
+Expression and motion widen nothing: an expression is a name from a closed
+vocabulary resolved to package constants, and motion is two data attributes
+plus package text. Hosts that want defense in depth, or that post-process the
+markup, pass a pure `sanitize?: (svg: string) => string`. It runs once per structural change on
 the finished body SVG (after gaze markup) and its output is what reaches the
 DOM; pass a stable function reference, since its identity is a memo
 dependency. A host that renders SVG it did **not** get from this package
@@ -361,9 +439,11 @@ Everything is exported from the package root; there are no deep imports and no
 | Box | `BLOBBI_RENDER_SIZE_PX`, `resolveBlobbiRenderSize`, `blobbiRenderSizePx`, `accessoryBasePx`, `ACCESSORY_BASE_RATIO`, `ACCESSORY_BASE_PERCENT`, `BlobbiRenderSize`, `BlobbiRendererSize` |
 | Accessories | `normalizeAccessoryPlacements`, `ACCESSORY_SLOT_RANK`, `REAR_VIEW_HIDDEN_SLOTS`, `DEFAULT_ACCESSORY_SOURCES`, and their types |
 | Effects | `BLOBBI_VISUAL_EFFECT_IDS`, `EFFECT_SLOTS`, `EFFECT_SLOT_ORDER`, `normalizeBlobbiVisualEffects`, `isBlobbiVisualEffectId`, `getBlobbiVisualEffectInfo`, intensity and piece-cap constants, and their types |
+| Expression | `BLOBBI_EMOTIONS`, `BLOBBI_EMOTION_PRESETS`, `NEUTRAL_EXPRESSION`, `BLOBBI_EYE_STATES`, `BLOBBI_MOUTH_STATES`, `BLOBBI_BROW_STATES`, `BLOBBI_BLUSH_STATES`, `isBlobbiEmotion`, `normalizeBlobbiExpression`; types `BlobbiExpression`, `BlobbiEmotion`, `BlobbiExpressionParts`, `BlobbiEyeState`, `BlobbiMouthState`, `BlobbiBrowState`, `BlobbiBlushState`, `ResolvedBlobbiExpression` |
+| Motion | `BLOBBI_MOTIONS`, `BLOBBI_MOTION_PHASES`, `BLOBBI_MOTION_STYLESHEET`, `normalizeBlobbiMotion`, `blobbiMotionPhase`, `blobbiMotionAttributes`; type `BlobbiMotion` |
 | Stylesheets | `BLOBBI_RENDERER_STYLESHEET`, `BLOBBI_EFFECT_STYLESHEET` |
-| Artwork | `DEFAULT_VISUAL_GENERATION`, `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`, `ADULT_V2_CLOSED_EYE_PARTS`; types `BlobbiVisualGeneration`, `BlobbiFacing`, `ArtworkAnchors`, `AdultV2Part` |
-| String API | `renderBlobbiSvg`, `loadBlobbiSvg`, `applyGazeMarkup`, `applyRearView`, `uniquifySvgIds`; types `RenderBlobbiSvgOptions`, `RenderedBlobbiSvg`, `BlobbiView` |
+| Artwork | `DEFAULT_VISUAL_GENERATION`, `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`, `ADULT_V2_CLOSED_EYE_PARTS`, `ADULT_V2_EXPRESSION_PARTS`; types `BlobbiVisualGeneration`, `BlobbiFacing`, `ArtworkAnchors`, `BlobbiArtworkSupport`, `AdultV2Part` |
+| String API | `renderBlobbiSvg`, `loadBlobbiSvg`, `applyGazeMarkup`, `applyRearView`, `uniquifySvgIds`; types `RenderBlobbiSvgOptions`, `RenderedBlobbiSvg`, `BlobbiView`, `GazeMarkupOptions` |
 
 Deliberately **not** exported: the artwork modules and customizers, the color
 helpers, the SVG id internals, the effect presets, and any Tailwind class map.

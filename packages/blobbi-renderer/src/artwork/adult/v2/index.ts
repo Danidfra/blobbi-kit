@@ -19,9 +19,11 @@ import { ADULT_V2_BACK_SVG, ADULT_V2_BACK_VIEWBOX } from './back';
 
 export { customizeAdultV2Svg, ADULT_V2_ROLE_COLORS } from './customize';
 export { closeAdultV2Eyes, closedEyePartFor } from './closed-eyes';
+export { applyAdultV2Expression } from './expression';
 export {
   ADULT_V2_PARTS,
   ADULT_V2_CLOSED_EYE_PARTS,
+  ADULT_V2_EXPRESSION_PARTS,
   ADULT_V2_FRONT_PARTS,
   ADULT_V2_SIDE_PARTS,
   ADULT_V2_BACK_PARTS,

@@ -20,7 +20,7 @@ export {
 } from './colors';
 export { uniquifySvgIds } from './ids';
 export { ensureSvgFillsContainer } from './container';
-export { applyGazeMarkup } from './gaze';
+export { applyGazeMarkup, type GazeMarkupOptions } from './gaze';
 export {
   applyRearView,
   findRearViewRemovals,

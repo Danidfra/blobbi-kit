@@ -94,6 +94,41 @@ export {
 } from './effects/effect-catalog';
 export type { BlobbiVisualEffectInfo } from './effects/effect-catalog';
 
+// ── Expressive state ───────────────────────────────────────────────────────
+// Expression is SVG render state (it changes the body markup on V2 faces);
+// motion is wrapper/CSS render state (attributes plus a package stylesheet).
+// Both are closed vocabularies: a host names a state, never a shape or a rule.
+export {
+  BLOBBI_EMOTIONS,
+  BLOBBI_EMOTION_PRESETS,
+  BLOBBI_EYE_STATES,
+  BLOBBI_MOUTH_STATES,
+  BLOBBI_BROW_STATES,
+  BLOBBI_BLUSH_STATES,
+  NEUTRAL_EXPRESSION,
+  isBlobbiEmotion,
+  normalizeBlobbiExpression,
+} from './expression-model';
+export type {
+  BlobbiEmotion,
+  BlobbiExpression,
+  BlobbiExpressionParts,
+  BlobbiEyeState,
+  BlobbiMouthState,
+  BlobbiBrowState,
+  BlobbiBlushState,
+  ResolvedBlobbiExpression,
+} from './expression-model';
+export {
+  BLOBBI_MOTIONS,
+  BLOBBI_MOTION_PHASES,
+  BLOBBI_MOTION_STYLESHEET,
+  blobbiMotionAttributes,
+  blobbiMotionPhase,
+  normalizeBlobbiMotion,
+} from './motion-model';
+export type { BlobbiMotion } from './motion-model';
+
 // ── Stylesheets (optional, package-owned text) ─────────────────────────────
 // The renderer needs NO CSS for its geometry. These are for hosts that want
 // the decoration modifiers styled, or that would rather mount the effect rules
@@ -105,7 +140,12 @@ export { BLOBBI_EFFECT_STYLESHEET } from './effects/effect-styles';
 // Generation and facing are plain strings a host puts on the wire. Declared
 // here independently of the domain kit's identical unions.
 export { DEFAULT_VISUAL_GENERATION } from './artwork/types';
-export type { BlobbiVisualGeneration, BlobbiFacing, ArtworkAnchors } from './artwork/types';
+export type {
+  BlobbiVisualGeneration,
+  BlobbiFacing,
+  ArtworkAnchors,
+  BlobbiArtworkSupport,
+} from './artwork/types';
 // The Adult V2 semantic part contract: what `data-part` values a V2 drawing
 // carries, so hosts and future systems select parts by name, never by id.
 export {
@@ -113,6 +153,7 @@ export {
   ADULT_V2_FACE_PARTS,
   ADULT_V2_GAZE_PARTS,
   ADULT_V2_CLOSED_EYE_PARTS,
+  ADULT_V2_EXPRESSION_PARTS,
 } from './artwork/adult/v2';
 export type { AdultV2Part } from './artwork/adult/v2';
 
@@ -123,7 +164,7 @@ export type { AdultV2Part } from './artwork/adult/v2';
 // positional API and stays byte-identical.
 export { loadBlobbiSvg, renderBlobbiSvg } from './artwork/load-blobbi-svg';
 export type { RenderBlobbiSvgOptions, RenderedBlobbiSvg } from './artwork/load-blobbi-svg';
-export type { BlobbiView } from './svg';
+export type { BlobbiView, GazeMarkupOptions } from './svg';
 
 // ── SVG post-processing (provisional) ──────────────────────────────────────
 // Exported for consumers composing their own pipeline around `loadBlobbiSvg`.

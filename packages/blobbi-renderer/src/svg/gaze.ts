@@ -78,7 +78,22 @@ function markV2MovableGroups(svgText: string): { markup: string; marked: boolean
   return { markup, marked };
 }
 
-export function applyGazeMarkup(svgText: string, generation: 'v1' | 'v2' | number = 'v1'): string {
+export interface GazeMarkupOptions {
+  /**
+   * The drawing is reflected horizontally (the V2 left profile). Gaze is a
+   * SCREEN-relative request: `x = 1` means "look to the viewer's right" on
+   * every facing. A CSS translate on a marked group happens in the group's
+   * own coordinates, which the reflection flips, so the horizontal travel is
+   * negated here to keep the screen meaning. V1 never mirrors.
+   */
+  mirrored?: boolean;
+}
+
+export function applyGazeMarkup(
+  svgText: string,
+  generation: 'v1' | 'v2' | number = 'v1',
+  options: GazeMarkupOptions = {},
+): string {
   // Already processed: avoid double-injecting the style.
   if (svgText.includes('data-blobbi-gaze-style')) {
     return svgText;
@@ -110,9 +125,10 @@ export function applyGazeMarkup(svgText: string, generation: 'v1' | 'v2' | numbe
   // The CSS vars are unitless and multiplied by `px`; they default to 0 so an
   // undefined gaze leaves pupils perfectly static.
   const px = Number.isFinite(maxPx) ? maxPx : 2;
+  const xPx = options.mirrored ? -px : px;
   const style =
     `<style data-blobbi-gaze-style>.${PUPIL_CLASS}{` +
-    `transform:translate(calc(var(--blobbi-eye-x,0) * ${px}px),calc(var(--blobbi-eye-y,0) * ${px}px));` +
+    `transform:translate(calc(var(--blobbi-eye-x,0) * ${xPx}px),calc(var(--blobbi-eye-y,0) * ${px}px));` +
     `transition:transform 250ms ease-out;}</style>`;
 
   modified = modified.replace(/(<svg\b[^>]*>)/i, `$1${style}`);

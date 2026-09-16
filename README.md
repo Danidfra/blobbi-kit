@@ -15,7 +15,7 @@ npm under the `@blobbi-kit` scope.
 | --- | --- | --- | --- |
 | [`@blobbi-kit/core`](./packages/blobbi-core) | 0.6.0 | Event kinds, parsing, domain rules, decay, seed identity. No React, no DOM, no Nostr library. | `@noble/hashes` |
 | [`@blobbi-kit/react`](./packages/blobbi-react) | 0.6.0 | React hooks over core: reading a user's Blobbis, projecting state, syncing and publishing through host-supplied functions. Browser only. | peers: core, `react`, `@tanstack/react-query`, `@nostrify/react` |
-| [`@blobbi-kit/renderer`](./packages/blobbi-renderer) | 0.1.1 | React component and string API that draws a Blobbi as SVG from plain visual data. Imports neither kit package. | peer: `react` |
+| [`@blobbi-kit/renderer`](./packages/blobbi-renderer) | 0.2.0 | React component and string API that draws a Blobbi as SVG from plain visual data. Imports neither kit package. | peer: `react` |
 | [`renderer-consumer-fixture`](./packages/blobbi-renderer-consumer) | private | Test-only consumer of the renderer. Proves it renders with no provider, no host CSS and no kit package around it. | |
 
 `core` and `react` are versioned and released together. `renderer` is versioned
@@ -72,10 +72,14 @@ map.
 
 - `BlobbiRenderer` (React) and `renderBlobbiSvg` / `loadBlobbiSvg` (strings).
 - Input is plain, JSON-serializable visual data: stage, artwork generation,
-  adult form, three colours, plus facing, sleeping, gaze, accessory placements
-  and named effects. Incomplete or invalid input falls back to defaults rather
-  than throwing. Colours must be `#rgb` or `#rrggbb`; anything else is treated
-  as absent.
+  adult form, three colours, plus facing, sleeping, gaze, an expression
+  preset or parts, a motion state, accessory placements and named effects.
+  Incomplete or invalid input falls back to defaults rather than throwing.
+  Colours must be `#rgb` or `#rrggbb`; anything else is treated as absent.
+- Expressive state is representation, not policy: the renderer knows how
+  `expression: 'happy'` or `motion: 'walking'` looks; the host decides when
+  and why. Expression is drawn into the V2 SVG (front and side); motion is a
+  package stylesheet on the body wrapper, `'still'` by default.
 - Output is one `role="img"` element containing inline SVG. Same props give
   byte-identical markup, effects included. Particle placement is seeded from
   `instanceId` and the effect id, not `Math.random`.
@@ -269,7 +273,7 @@ in the [CHANGELOG](./CHANGELOG.md).
 
 What is verified in this repository:
 
-- `npm run typecheck`, `npm run test` (47 files, 1417 tests), `npm run build`
+- `npm run typecheck`, `npm run test` (51 files, 1557 tests), `npm run build`
   and `npm run smoke` all pass.
 - Manifest tests assert the exact peer sets, the core/react version lockstep,
   and that no `@nostrify/nostrify` dependency exists. The smoke script scans
@@ -291,6 +295,8 @@ Limitations worth knowing:
   hook exists.
 - V2 artwork does not yet draw `pattern`, `specialMark` or `theme`, and there
   is no V2 baby. Those fall back to V1 behaviour.
+- Expressions are drawn on V2 only; V1's sixteen hand-drawn faces ignore
+  them. Blinking and looking around are host behaviour, not renderer state.
 - The evolution task definitions in `@blobbi-kit/react` reference a few
   host-ecosystem event kinds and URLs, so that package is less host-neutral
   than core.

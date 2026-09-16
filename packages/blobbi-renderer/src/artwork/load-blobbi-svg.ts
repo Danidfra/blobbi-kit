@@ -16,6 +16,13 @@ import { applyGazeMarkup } from '../svg';
 import { buildBlobbiMarkup } from './registry';
 import type { BlobbiFacing, BlobbiVisualGeneration, ResolvedArtwork } from './types';
 import { DEFAULT_VISUAL_GENERATION } from './types';
+import { normalizeBlobbiExpression, type BlobbiExpression } from '../expression-model';
+import {
+  BLOBBI_MOTION_STYLE_ELEMENT,
+  blobbiMotionAttributes,
+  normalizeBlobbiMotion,
+  type BlobbiMotion,
+} from '../motion-model';
 
 export type { BlobbiView };
 
@@ -29,6 +36,20 @@ export interface RenderBlobbiSvgOptions {
   eyeColor?: string;
   facing?: BlobbiFacing;
   eyesClosed?: boolean;
+  /**
+   * Facial expression: a preset name or explicit parts. Drawn into the SVG
+   * markup on artwork with a semantic face (V2 front and side); a no-op on
+   * V1 and on the V2 back. `eyesClosed` wins over the expression's eyes.
+   */
+  expression?: BlobbiExpression;
+  /**
+   * Body motion state. Unlike expression this is WRAPPER render state: the
+   * drawing is unchanged, the root `<svg>` gains `data-blobbi-motion` and
+   * `data-blobbi-motion-phase`, and the package's motion stylesheet is
+   * injected so the string is self-contained. `'still'` (the default) emits
+   * nothing.
+   */
+  motion?: BlobbiMotion;
   /** SVG id namespace; strongly recommended when several Blobbis share a page. */
   instanceId?: string;
   /**
@@ -60,6 +81,7 @@ export function renderBlobbiSvg(options: RenderBlobbiSvgOptions): RenderedBlobbi
       adultType: options.adultType,
       facing: options.facing ?? 'front',
       eyesClosed: options.eyesClosed ?? false,
+      expression: normalizeBlobbiExpression(options.expression),
     },
     {
       baseColor: options.baseColor,
@@ -68,10 +90,28 @@ export function renderBlobbiSvg(options: RenderBlobbiSvgOptions): RenderedBlobbi
     },
     options.instanceId,
   );
+  const withGaze =
+    options.gaze && artwork.gazeable
+      ? applyGazeMarkup(svg, artwork.generation, { mirrored: artwork.mirrored })
+      : svg;
   return {
-    svg: options.gaze && artwork.gazeable ? applyGazeMarkup(svg, artwork.generation) : svg,
+    svg: applyMotionMarkup(withGaze, normalizeBlobbiMotion(options.motion), options.instanceId ?? ''),
     artwork,
   };
+}
+
+/**
+ * Put the motion attributes on the root `<svg>` and inject the motion
+ * stylesheet right after it, the same place gaze puts its style. `'still'`
+ * returns the input string itself.
+ */
+function applyMotionMarkup(svgText: string, motion: BlobbiMotion, instanceId: string): string {
+  const attrs = blobbiMotionAttributes(motion, instanceId);
+  if (!attrs) return svgText;
+  const attrText = Object.entries(attrs)
+    .map(([k, v]) => ` ${k}="${v}"`)
+    .join('');
+  return svgText.replace(/<svg\b([^>]*)>/i, (_m, rest: string) => `<svg${rest}${attrText}>${BLOBBI_MOTION_STYLE_ELEMENT}`);
 }
 
 /**

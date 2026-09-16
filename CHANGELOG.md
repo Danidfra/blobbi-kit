@@ -51,8 +51,51 @@ serializable description of how a Blobbi looks, for every host.
 - `@blobbi-kit/react` has no code change; it moves to 0.6.0 in lockstep and
   its core peer to `^0.6.0`.
 
-### `@blobbi-kit/renderer` 0.1.1 (fix)
+### `@blobbi-kit/renderer` 0.2.0 (expressive state; includes the unreleased 0.1.1 fixes)
 
+The renderer represents visual STATE; the host owns behavioural POLICY. Every
+addition below is a closed vocabulary the host names, never a shape or a rule
+it supplies, and every default reproduces the previous output exactly.
+
+- **Expression.** `expression?: BlobbiExpression` on `BlobbiRenderer` and
+  `renderBlobbiSvg`: a preset (`neutral`, `happy`, `excited`, `sad`, `sleepy`,
+  `surprised`, `upset`) or explicit parts (`eyes: open | half | closed | wide`,
+  `mouth: neutral | smile | grin | frown | open | flat`, `brows: neutral |
+  raised | lowered | inner-up`, `blush: none | soft | strong`). Drawn INTO the
+  SVG on Adult V2 front and side as pure transforms of the authored face
+  (mouth and brow paths rewritten relative to their authored geometry, a lid
+  pair for half eyes, a scale wrapper inside the movable inner eye for wide
+  eyes, cheek opacities for blush); the mirrored left profile needs nothing
+  extra. `isSleeping` wins the eyes. The V2 back and every V1 drawing produce
+  byte-identical markup for any expression. Normalization is total: unknown
+  or hostile input is neutral, per part. New exports: `BLOBBI_EMOTIONS`,
+  `BLOBBI_EMOTION_PRESETS`, `NEUTRAL_EXPRESSION`, the four state lists,
+  `isBlobbiEmotion`, `normalizeBlobbiExpression`, `ADULT_V2_EXPRESSION_PARTS`
+  and the types.
+- **Motion.** `motion?: 'still' | 'idle' | 'walking'` (default `'still'`).
+  Wrapper/CSS render state: the body box and both accessory layers (React) or
+  the root `<svg>` (string API) carry `data-blobbi-motion` and
+  `data-blobbi-motion-phase`, and `BLOBBI_MOTION_STYLESHEET` (namespaced
+  `blobbi-motion-*`, `prefers-reduced-motion` aware) animates them: a
+  four-second breath for idle, a half-second bob with sway and squash for
+  walking, origin at the ground line. The phase is a hash of `instanceId`;
+  no timer, no randomness. `'still'` emits no attribute and no style. Where
+  the Blobbi is and why it walks stay with the host. New exports:
+  `BLOBBI_MOTIONS`, `BLOBBI_MOTION_PHASES`, `BLOBBI_MOTION_STYLESHEET`,
+  `normalizeBlobbiMotion`, `blobbiMotionPhase`, `blobbiMotionAttributes`.
+- **Capabilities.** `artwork.supports: { expression, gaze, motion }` on every
+  resolved drawing (`renderBlobbiSvg(...).artwork`), and
+  `data-blobbi-expression-support` on the component root, so a host can ask
+  what a drawing will honour instead of guessing. Type `BlobbiArtworkSupport`.
+- **Fix: gaze on the mirrored left profile.** `eyeOffset.x` is screen-relative
+  on every facing. The injected gaze style negates the horizontal travel when
+  the drawing is mirrored; before, `x = 1` on `facing: 'left'` moved the
+  pupils toward the viewer's left. `applyGazeMarkup` gains an optional
+  `{ mirrored }` argument (`GazeMarkupOptions`). V1 never mirrors and is
+  unchanged.
+- The preview page (`npm run preview`) shows every preset on the front and
+  both profiles, the sleeping-wins case, the unchanged back, and the three
+  motion states on V2 and V1.
 - **Colours are validated inside the renderer.** Every entry point
   (`BlobbiRenderer`, `renderBlobbiSvg`, `loadBlobbiSvg`) now accepts a colour
   only if it is a bare `#rgb` / `#rrggbb` hex value; anything else is treated

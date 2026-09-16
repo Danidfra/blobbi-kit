@@ -5,6 +5,8 @@
  * and which way it FACES. Both are plain strings a host can put on the wire.
  */
 
+import type { ResolvedBlobbiExpression } from '../expression-model';
+
 /**
  * Artwork generation. A property of the Blobbi's identity (carried in its
  * event by the domain kit), never of the renderer version: the same Blobbi
@@ -55,6 +57,29 @@ export interface ArtworkRequest {
   facing: BlobbiFacing;
   /** Draw the closed-eye variant when the generation has one. */
   eyesClosed: boolean;
+  /**
+   * Resolved facial expression. Drawn by generations with a semantic face
+   * (V2 front and side); ignored by V1 and by faceless views. Absent means
+   * neutral. `eyesClosed` wins over the expression's eye state.
+   */
+  expression?: ResolvedBlobbiExpression;
+}
+
+/**
+ * What a drawing can do, so a host can ask instead of guess.
+ *
+ *  - `expression`: the view has a semantic face the expression transforms
+ *    apply to (V2 front and side). V1 and the V2 back draw the neutral face,
+ *    or no face, whatever expression is requested.
+ *  - `gaze`: the drawing has pupils gaze markup can move (the historical
+ *    `gazeable`: a face, and eyes not closed).
+ *  - `motion`: the body can carry a motion state. Always true: motion is a
+ *    wrapper/CSS transform that never touches the artwork.
+ */
+export interface BlobbiArtworkSupport {
+  expression: boolean;
+  gaze: boolean;
+  motion: boolean;
 }
 
 /**
@@ -88,6 +113,8 @@ export interface ResolvedArtwork {
   eyesClosed: boolean;
   /** Whether the drawing has pupils that gaze markup can move. */
   gazeable: boolean;
+  /** What this drawing supports; see {@link BlobbiArtworkSupport}. */
+  supports: BlobbiArtworkSupport;
   /** V1 adult form that was resolved, when applicable. */
   form?: string;
   /** The `viewBox` width and height of the raw markup. */

@@ -46,7 +46,8 @@ import {
   type AdultForm,
 } from './adult/v1';
 import { getBabyBaseSvg, getBabySleepingSvg, customizeBabySvg } from './baby/v1';
-import { getAdultV2Artwork, customizeAdultV2Svg, closeAdultV2Eyes } from './adult/v2';
+import { getAdultV2Artwork, customizeAdultV2Svg, applyAdultV2Expression } from './adult/v2';
+import { NEUTRAL_EXPRESSION } from '../expression-model';
 import { applyRearView, sanitizeArtworkColor } from '../svg';
 import { DEFAULT_VISUAL_GENERATION } from './types';
 import { mirrorSvgHorizontally } from './mirror';
@@ -124,17 +125,23 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
     case 'v2': {
       if (stage === 'adult') {
         const art = getAdultV2Artwork(view);
-        // Closed eyes are a transformation of the one drawing, resolved here
-        // exactly where V1 picks its separately drawn sleeping SVG. The back
-        // view has no eyes: the transform is the identity there.
-        const markup = request.eyesClosed ? closeAdultV2Eyes(art.markup) : art.markup;
+        // The face is a transformation of the one drawing: the expression's
+        // mouth, brows, blush and eye state, with closed eyes (sleeping)
+        // winning over the eye state. Resolved here exactly where V1 picks its
+        // separately drawn sleeping SVG. The back view has no face: every
+        // expression is the identity there.
+        const expression = request.expression ?? NEUTRAL_EXPRESSION;
+        const eyesClosed = request.eyesClosed || expression.eyes === 'closed';
+        const markup = art.hasFace ? applyAdultV2Expression(art.markup, expression, request.eyesClosed) : art.markup;
+        const gazeable = art.hasFace && !eyesClosed;
         return {
           generation: 'v2',
           stage,
           view,
           mirrored,
-          eyesClosed: request.eyesClosed,
-          gazeable: art.hasFace && !request.eyesClosed,
+          eyesClosed,
+          gazeable,
+          supports: { expression: art.hasFace, gaze: gazeable, motion: true },
           viewBox: art.viewBox,
           anchors: view === 'front' ? V2_FRONT_ANCHORS : view === 'back' ? V2_BACK_ANCHORS : V2_SIDE_ANCHORS,
           markup,
@@ -150,26 +157,32 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
           request.adultType && isValidAdultForm(request.adultType)
             ? (request.adultType as AdultForm)
             : getDefaultAdultForm();
+        const gazeable = !request.eyesClosed && view !== 'back';
         return {
           generation: 'v1',
           stage,
           view: view === 'back' ? 'back' : 'front',
           mirrored: false,
           eyesClosed: request.eyesClosed,
-          gazeable: !request.eyesClosed && view !== 'back',
+          gazeable,
+          // V1 is compatibility artwork: sixteen hand-drawn faces with no
+          // shared geometry, so rich expression is not drawn on it.
+          supports: { expression: false, gaze: gazeable, motion: true },
           form,
           viewBox: { width: 200, height: 200 },
           anchors: V1_ANCHORS,
           markup: request.eyesClosed ? getAdultSleepingSvg(form) : getAdultBaseSvg(form),
         };
       }
+      const babyGazeable = !request.eyesClosed && view !== 'back';
       return {
         generation: 'v1',
         stage,
         view: view === 'back' ? 'back' : 'front',
         mirrored: false,
         eyesClosed: request.eyesClosed,
-        gazeable: !request.eyesClosed && view !== 'back',
+        gazeable: babyGazeable,
+        supports: { expression: false, gaze: babyGazeable, motion: true },
         viewBox: { width: 100, height: 100 },
         anchors: V1_ANCHORS,
         markup: request.eyesClosed ? getBabySleepingSvg() : getBabyBaseSvg(),

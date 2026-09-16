@@ -29,12 +29,21 @@
  *    `'front'`, so pre-existing consumers and pre-existing Blobbis are
  *    untouched;
  *  - an empty/blank `instanceId` falls back to {@link FALLBACK_INSTANCE_ID}
- *    rather than producing an SVG id prefix shared by every such renderer.
+ *    rather than producing an SVG id prefix shared by every such renderer;
+ *  - unknown/absent `expression` -> neutral (per part), unknown/absent
+ *    `motion` -> `'still'`: the two expressive-state inputs default to
+ *    exactly what the renderer drew before they existed.
  */
 import type { NormalizedAccessoryPlacement } from './accessory-normalize';
 import type { BlobbiFacing, BlobbiVisualGeneration } from './artwork/types';
 import { DEFAULT_VISUAL_GENERATION } from './artwork/types';
 import { sanitizeArtworkColor } from './svg/colors';
+import {
+  normalizeBlobbiExpression,
+  type BlobbiExpression,
+  type ResolvedBlobbiExpression,
+} from './expression-model';
+import { normalizeBlobbiMotion, type BlobbiMotion } from './motion-model';
 
 /**
  * The visual identity of a Blobbi: the plain, serializable input the renderer
@@ -97,6 +106,10 @@ export interface BlobbiRenderModelInput {
   /** Normalized gaze direction (-1..1 per axis); undefined renders statically. */
   eyeOffset?: { x: number; y: number };
   accessories?: readonly NormalizedAccessoryPlacement[];
+  /** Facial expression: a preset name or explicit parts. See `expression-model.ts`. */
+  expression?: BlobbiExpression;
+  /** Body motion state. See `motion-model.ts`. */
+  motion?: BlobbiMotion;
 }
 
 /** Fully resolved, renderable state. Every field is defined and valid. */
@@ -129,6 +142,10 @@ export interface BlobbiRenderModel {
   accessories: readonly NormalizedAccessoryPlacement[];
   /** Sanitized SVG id namespace; safe to embed in an `id` attribute. */
   instanceId: string;
+  /** Resolved expression; the shared neutral instance when none was asked for. */
+  expression: ResolvedBlobbiExpression;
+  /** Resolved motion state; `'still'` when none was asked for. */
+  motion: BlobbiMotion;
 }
 
 /** Stage used when the input names none, or names one we do not draw. */
@@ -203,5 +220,7 @@ export function normalizeBlobbiRenderModel(
         : { x: clampGazeAxis(input.eyeOffset.x), y: clampGazeAxis(input.eyeOffset.y) },
     accessories: input.accessories ?? [],
     instanceId: normalizeInstanceId(input.instanceId),
+    expression: normalizeBlobbiExpression(input.expression),
+    motion: normalizeBlobbiMotion(input.motion),
   };
 }
