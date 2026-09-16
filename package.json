@@ -13,7 +13,8 @@
     "typecheck": "npm run typecheck --workspace @blobbi-kit/core && npm run typecheck --workspace @blobbi-kit/react && npm run typecheck --workspace @blobbi-kit/renderer && npm run typecheck --workspace @blobbi-kit/renderer-consumer-fixture",
     "test": "vitest run --reporter=dot",
     "clean": "rimraf packages/*/dist packages/*/*.tsbuildinfo",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "verify": "npm run typecheck && npm run test && npm run build && npm run smoke"
   },
   "devDependencies": {
     "@nostrify/nostrify": "^0.54.0",

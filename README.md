@@ -245,6 +245,7 @@ npm run build      # tsup, in dependency order: core, react, renderer
 npm run typecheck  # tsc --noEmit for all four workspaces
 npm run test       # vitest, all packages, jsdom environment
 npm run smoke      # imports every dist entry under raw Node ESM; run after build
+npm run verify     # the four checks above in order; what CI runs
 npm run clean
 ```
 
@@ -280,8 +281,8 @@ What is verified in this repository:
 
 Limitations worth knowing:
 
-- There is no CI configuration in the repository. The checks above run
-  locally.
+- CI (`.github/workflows/ci.yml`) runs the same four checks on every push
+  and pull request. There is no linter or formatter configured.
 - Core validates event shape, not authorship. Author scoping is a relay filter
   in the react package, and signature verification is the host's job.
 - Streak days and daily missions use the device's local date.
