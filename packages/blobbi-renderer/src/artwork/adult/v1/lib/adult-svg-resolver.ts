@@ -1,18 +1,11 @@
 /**
  * Adult Blobbi SVG Resolver
- * 
+ *
  * Handles loading and resolving adult stage SVG assets.
- * Each adult form has its own folder with base and sleeping variants.
+ * Each adult form has a base and a sleeping variant.
  */
 
-import type { Blobbi } from '../../../core/blobbi-domain-types';
-import { 
-  type AdultForm, 
-  type AdultSvgResolverOptions,
-  ADULT_FORMS,
-  resolveAdultForm,
-  getDefaultAdultForm,
-} from '../types/adult.types';
+import type { AdultForm } from '../types/adult.types';
 import { ADULT_SVG_MAP } from './adult-svg-data';
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -29,71 +22,6 @@ export function getAdultBaseSvg(form: AdultForm): string {
  */
 export function getAdultSleepingSvg(form: AdultForm): string {
   return ADULT_SVG_MAP[form]?.sleeping ?? getFallbackAdultSvg(form);
-}
-
-/**
- * Get adult SVG by form and variant
- */
-export function getAdultSvgByVariant(
-  form: AdultForm, 
-  variant: 'base' | 'sleeping'
-): string {
-  return variant === 'sleeping' 
-    ? getAdultSleepingSvg(form) 
-    : getAdultBaseSvg(form);
-}
-
-/**
- * Resolve adult Blobbi SVG content.
- * 
- * Determines the correct form from blobbi data (evolutionForm or seed-derived),
- * then returns the appropriate SVG based on sleeping state.
- */
-export function resolveAdultSvg(
-  blobbi: Blobbi, 
-  options: AdultSvgResolverOptions = {}
-): string {
-  const { isSleeping = false } = options;
-  
-  if (blobbi.lifeStage !== 'adult') {
-    console.warn('resolveAdultSvg called with non-adult Blobbi');
-    return getFallbackAdultSvg(getDefaultAdultForm());
-  }
-  
-  const form = resolveAdultForm(blobbi);
-  return isSleeping ? getAdultSleepingSvg(form) : getAdultBaseSvg(form);
-}
-
-/**
- * Resolve adult form from Blobbi and return both form and SVG
- */
-export function resolveAdultSvgWithForm(
-  blobbi: Blobbi,
-  options: AdultSvgResolverOptions = {}
-): { form: AdultForm; svg: string } {
-  const { isSleeping = false } = options;
-  const form = resolveAdultForm(blobbi);
-  const svg = isSleeping ? getAdultSleepingSvg(form) : getAdultBaseSvg(form);
-  return { form, svg };
-}
-
-/**
- * Get all available adult forms
- */
-export function getAvailableAdultForms(): readonly AdultForm[] {
-  return ADULT_FORMS;
-}
-
-/**
- * Preload all adult SVGs for quick switching
- */
-export function preloadAdultSvgs(): void {
-  // All SVGs are inlined constants; this function exists for API consistency
-  // This function exists for API consistency
-  for (const form of ADULT_FORMS) {
-    getAdultBaseSvg(form);
-    getAdultSleepingSvg(form);
-  }
 }
 
 // ─── Fallback ─────────────────────────────────────────────────────────────────

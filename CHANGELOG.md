@@ -68,6 +68,17 @@ serializable description of how a Blobbi looks, for every host.
   `BlobbiRenderer` always applied, instead of throwing.
 - New `input-hardening.test.tsx` pins both properties with inert probe payloads
   against every entry point.
+- **Internal: the private copy of the Blobbi domain model is gone.** The V1
+  artwork modules carried `artwork/core/blobbi-domain-types.ts` (a copy of
+  core's `types/blobbi.ts`) and a set of `Blobbi`-object helpers
+  (`resolveAdultSvg`, `customizeAdultSvgFromBlobbi`, `resolveAdultForm`,
+  `preloadAdultSvgs`, their baby twins, and the variant/resolver-option
+  types) that nothing in the package called and nothing exported. The
+  package's `exports` map has a root entry only, so no consumer could import
+  them. The registry now reaches the V1 modules through the form vocabulary
+  and the colour input types alone. Public API and V1 output are unchanged
+  (fingerprints untouched).
+
 ## 0.5.2 — One modern kind 31124 contract; configurable collection (fix + additions)
 
 Backwards-compatible for every current producer: Blobbi Island and Ditto

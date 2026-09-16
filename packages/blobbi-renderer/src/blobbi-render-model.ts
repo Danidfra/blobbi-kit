@@ -73,7 +73,10 @@ export interface BlobbiVisual {
   specialMark?: string;
   /** Theme variant (e.g. a crossover theme). Carried as plain data only. */
   theme?: string;
-  /** Display name; used only for the title/tooltip. */
+  /**
+   * Display name. Carried as data only: the component's accessible name and
+   * tooltip come from its `label` / `title` props, never from here.
+   */
   name?: string;
 }
 

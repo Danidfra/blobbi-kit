@@ -1,36 +1,19 @@
 /**
  * Baby Blobbi Module
- * 
- * Self-contained module for baby stage Blobbi visuals and customization.
- * This module includes:
+ *
+ * Self-contained module for baby stage Blobbi visuals and customization:
  * - Baby SVG assets (awake and sleeping)
- * - SVG resolution and loading utilities
- * - Color and customization utilities
- * - Type definitions
- * 
- * This module is designed to be portable and can be moved to other projects.
+ * - SVG lookup
+ * - Color customization
+ *
+ * Consumed only by the artwork registry; nothing here is public API.
  */
 
 // Types
-export type { 
-  BabyVariant, 
-  BabySvgCustomization,
-  BabySvgResolverOptions 
-} from './types/baby.types';
-
-export { extractBabyCustomization } from './types/baby.types';
+export type { BabySvgCustomization } from './types/baby.types';
 
 // SVG Resolution
-export {
-  getBabyBaseSvg,
-  getBabySleepingSvg,
-  getBabySvgByVariant,
-  resolveBabySvg,
-  preloadBabySvgs,
-} from './lib/baby-svg-resolver';
+export { getBabyBaseSvg, getBabySleepingSvg } from './lib/baby-svg-resolver';
 
 // SVG Customization
-export {
-  customizeBabySvg,
-  customizeBabySvgFromBlobbi,
-} from './lib/baby-svg-customizer';
+export { customizeBabySvg } from './lib/baby-svg-customizer';

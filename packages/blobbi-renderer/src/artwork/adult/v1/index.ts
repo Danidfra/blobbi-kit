@@ -1,46 +1,22 @@
 /**
  * Adult Blobbi Module
- * 
- * Self-contained module for adult stage Blobbi visuals and customization.
- * This module includes:
+ *
+ * Self-contained module for adult stage Blobbi visuals and customization:
  * - Adult SVG assets (awake and sleeping variants for each form)
- * - SVG resolution and loading utilities
- * - Color and customization utilities
- * - Type definitions
- * 
- * This module is designed to be portable and can be moved to other projects.
+ * - SVG lookup by form
+ * - Color customization
+ * - The adult-form vocabulary
+ *
+ * Consumed only by the artwork registry; nothing here is public API.
  */
 
 // Types
-export type { 
-  AdultForm,
-  AdultVariant,
-  AdultSvgCustomization,
-  AdultSvgResolverOptions,
-} from './types/adult.types';
+export type { AdultForm, AdultSvgCustomization } from './types/adult.types';
 
-export {
-  ADULT_FORMS,
-  extractAdultCustomization,
-  isValidAdultForm,
-  getDefaultAdultForm,
-  resolveAdultForm,
-  deriveAdultFormFromSeed,
-} from './types/adult.types';
+export { ADULT_FORMS, isValidAdultForm, getDefaultAdultForm } from './types/adult.types';
 
 // SVG Resolution
-export {
-  getAdultBaseSvg,
-  getAdultSleepingSvg,
-  getAdultSvgByVariant,
-  resolveAdultSvg,
-  resolveAdultSvgWithForm,
-  getAvailableAdultForms,
-  preloadAdultSvgs,
-} from './lib/adult-svg-resolver';
+export { getAdultBaseSvg, getAdultSleepingSvg } from './lib/adult-svg-resolver';
 
 // SVG Customization
-export {
-  customizeAdultSvg,
-  customizeAdultSvgFromBlobbi,
-} from './lib/adult-svg-customizer';
+export { customizeAdultSvg } from './lib/adult-svg-customizer';

@@ -2,12 +2,11 @@
  * Baby Blobbi SVG Customizer
  *
  * Handles applying colors and customizations to baby SVG content.
- * Uses shared utilities from blobbi/ui/lib/svg for common operations.
+ * Uses the shared utilities in `src/svg` for common operations.
  */
 
-import { Blobbi } from '../../../core/blobbi-domain-types';
 import { lightenColor, uniquifySvgIds, ensureSvgFillsContainer } from '../../../../svg';
-import { BabySvgCustomization } from '../types/baby.types';
+import type { BabySvgCustomization } from '../types/baby.types';
 
 /**
  * Apply color customizations to baby SVG
@@ -106,25 +105,4 @@ function applyEyeColor(svgText: string, eyeColor: string): string {
   </radialGradient>`;
 
   return svgText.replace(eyeGradientMatch[0], newEyeGradient);
-}
-
-/**
- * Convenience function to customize baby SVG from a Blobbi instance.
- * 
- * Uses the Blobbi's ID to uniquify SVG IDs, preventing gradient collisions
- * when multiple Blobbis are rendered on the same page.
- */
-export function customizeBabySvgFromBlobbi(
-  svgText: string,
-  blobbi: Blobbi,
-  isSleeping: boolean = false
-): string {
-  const customization: BabySvgCustomization = {
-    baseColor: blobbi.baseColor,
-    secondaryColor: blobbi.secondaryColor,
-    eyeColor: blobbi.eyeColor,
-  };
-
-  // Pass blobbi.id to uniquify gradient IDs and prevent collisions
-  return customizeBabySvg(svgText, customization, isSleeping, blobbi.id);
 }

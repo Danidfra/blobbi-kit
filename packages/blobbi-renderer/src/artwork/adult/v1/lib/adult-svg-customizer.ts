@@ -7,10 +7,9 @@
  * IMPORTANT: Gradients must be preserved for 3D shading effects.
  * We replace gradient colors, not the gradient structure.
  *
- * Uses shared utilities from blobbi/ui/lib/svg for common operations.
+ * Uses the shared utilities in `src/svg` for common operations.
  */
 
-import type { Blobbi } from '../../../core/blobbi-domain-types';
 import {
   lightenColor,
   darkenColor,
@@ -752,28 +751,4 @@ function applyPupilGradient(
   }
 
   return modified;
-}
-
-// ─── Convenience Functions ────────────────────────────────────────────────────
-
-/**
- * Convenience function to customize adult SVG from a Blobbi instance.
- * 
- * Uses the Blobbi's ID to uniquify SVG IDs, preventing gradient collisions
- * when multiple Blobbis are rendered on the same page.
- */
-export function customizeAdultSvgFromBlobbi(
-  svgText: string,
-  form: AdultForm,
-  blobbi: Blobbi,
-  isSleeping: boolean = false
-): string {
-  const customization: AdultSvgCustomization = {
-    baseColor: blobbi.baseColor,
-    secondaryColor: blobbi.secondaryColor,
-    eyeColor: blobbi.eyeColor,
-  };
-
-  // Pass blobbi.id to uniquify gradient IDs and prevent collisions
-  return customizeAdultSvg(svgText, form, customization, isSleeping, blobbi.id);
 }

@@ -99,7 +99,7 @@ interface BlobbiVisual {
   pattern?: string;           // carried as data; not drawn by the current bodies
   specialMark?: string;       // carried as data; not drawn by the current bodies
   theme?: string;             // carried as data only
-  name?: string;              // tooltip text only
+  name?: string;              // carried as data; text comes from the `label` / `title` props
 }
 ```
 
