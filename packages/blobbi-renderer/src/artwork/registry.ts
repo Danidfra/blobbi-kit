@@ -2,6 +2,8 @@
  * THE ARTWORK REGISTRY: the one place that decides which drawing a Blobbi gets.
  *
  * ```
+ *   egg
+ *   └── v1                      one shell, four crack states; no face
  *   baby
  *   └── v1                      one body, awake + sleeping; rear derived
  *   adult
@@ -46,6 +48,7 @@ import {
   type AdultForm,
 } from './adult/v1';
 import { getBabyBaseSvg, getBabySleepingSvg, customizeBabySvg } from './baby/v1';
+import { getEggSvg, customizeEggSvg } from './egg/v1';
 import { getAdultV2Artwork, customizeAdultV2Svg, applyAdultV2Expression } from './adult/v2';
 import { NEUTRAL_EXPRESSION } from '../expression-model';
 import { applyRearView, sanitizeArtworkColor } from '../svg';
@@ -56,6 +59,8 @@ import { mirrorSvgHorizontally } from './mirror';
 
 /** V1 artwork is a 200x200 (adult) / 100x100 (baby) square; the body fills it loosely. */
 const V1_ANCHORS: ArtworkAnchors = { centerX: 0.5, headTopY: 0.18, eyeLineY: 0.48, groundY: 0.82 };
+/** The egg fills 10..91 of its 100 box; there is no eye line. */
+const EGG_V1_ANCHORS: ArtworkAnchors = { centerX: 0.5, headTopY: 0.1, groundY: 0.91 };
 
 /**
  * V2 anchors, measured on the authored viewBox (211.67 x 238.13): the body
@@ -118,8 +123,27 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
   // caller data straight here; resolution must stay total for any string.
   const generation = knownGeneration(request.visualGeneration);
   const { view, mirrored } = viewForFacing(generation, request.facing);
-  // The egg stage has no artwork of its own and draws the baby, historically.
-  const stage: 'baby' | 'adult' = request.stage === 'adult' ? 'adult' : 'baby';
+  const stage: 'egg' | 'baby' | 'adult' =
+    request.stage === 'adult' ? 'adult' : request.stage === 'egg' ? 'egg' : 'baby';
+
+  // The egg is one drawing for every generation and every facing: a shell
+  // has no face to turn, close or move, so gaze and expression are not
+  // supported and the rear view is the front view. Only the crack state
+  // changes the markup.
+  if (stage === 'egg') {
+    return {
+      generation: 'v1',
+      stage,
+      view: 'front',
+      mirrored: false,
+      eyesClosed: false,
+      gazeable: false,
+      supports: { expression: false, gaze: false, motion: true },
+      viewBox: { width: 100, height: 100 },
+      anchors: EGG_V1_ANCHORS,
+      markup: getEggSvg(request.eggCrack ?? 'none'),
+    };
+  }
 
   switch (generation) {
     case 'v2': {
@@ -223,6 +247,9 @@ export function finishBlobbiArtwork(
     }
     case 'v1':
     default: {
+      if (resolved.stage === 'egg') {
+        return customizeEggSvg(resolved.markup, { baseColor: colors.baseColor, secondaryColor: colors.secondaryColor }, instanceId);
+      }
       const customized =
         resolved.stage === 'adult'
           ? customizeAdultSvg(

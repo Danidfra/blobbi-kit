@@ -38,7 +38,7 @@ describe('stage and adult-type resolution', () => {
     expect(model({ visual: { stage: 'wormhole' as never } }).stage).toBe('baby');
   });
 
-  it('keeps egg as its own stage (it draws the baby body, as it always has)', () => {
+  it('keeps egg as its own stage (it draws the egg shell)', () => {
     expect(model({ visual: { stage: 'egg' } }).stage).toBe('egg');
   });
 

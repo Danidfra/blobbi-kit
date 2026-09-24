@@ -23,6 +23,7 @@ import {
   normalizeBlobbiMotion,
   type BlobbiMotion,
 } from '../motion-model';
+import { normalizeBlobbiEggCrack, type BlobbiEggCrack } from '../egg-model';
 
 export type { BlobbiView };
 
@@ -50,6 +51,8 @@ export interface RenderBlobbiSvgOptions {
    * nothing.
    */
   motion?: BlobbiMotion;
+  /** Egg shell crack state; drawn on the egg stage only. */
+  eggCrack?: BlobbiEggCrack;
   /** SVG id namespace; strongly recommended when several Blobbis share a page. */
   instanceId?: string;
   /**
@@ -69,8 +72,9 @@ export interface RenderedBlobbiSvg {
 /**
  * Render a Blobbi to an SVG string, for any generation and facing.
  *
- * Pure and deterministic. Unknown stages draw the baby; unknown V1 forms draw
- * the default form; a V2 baby draws the V1 baby until Baby V2 exists.
+ * Pure and deterministic. Unknown stages draw the baby; the egg draws the
+ * shell (with `eggCrack`); unknown V1 forms draw the default form; a V2 baby
+ * draws the V1 baby until Baby V2 exists.
  */
 export function renderBlobbiSvg(options: RenderBlobbiSvgOptions): RenderedBlobbiSvg {
   const stage = options.stage === 'adult' || options.stage === 'egg' ? options.stage : 'baby';
@@ -82,6 +86,7 @@ export function renderBlobbiSvg(options: RenderBlobbiSvgOptions): RenderedBlobbi
       facing: options.facing ?? 'front',
       eyesClosed: options.eyesClosed ?? false,
       expression: normalizeBlobbiExpression(options.expression),
+      eggCrack: normalizeBlobbiEggCrack(options.eggCrack),
     },
     {
       baseColor: options.baseColor,
@@ -123,6 +128,10 @@ function applyMotionMarkup(svgText: string, motion: BlobbiMotion, instanceId: st
  * from the front artwork by dropping its face blocks (see `svg/rear-view.ts`).
  * For V2 artwork use {@link renderBlobbiSvg}.
  */
+// NOTE: `loadBlobbiSvg('egg', ...)` keeps drawing the V1 baby, exactly as it
+// always has (pinned by `v1-fingerprints.test.ts`): this positional API is a
+// byte-for-byte compatibility surface. The egg shell is reached through
+// `renderBlobbiSvg({ stage: 'egg' })` and the component.
 export function loadBlobbiSvg(
   stage: string,
   adultType?: string,

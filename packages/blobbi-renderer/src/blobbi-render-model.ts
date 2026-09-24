@@ -13,8 +13,8 @@
  * structural fact rather than a convention.
  *
  * Documented fallback behavior for incomplete input:
- *  - unknown/absent `stage` → `'baby'` (the historical fallback artwork; note
- *    `'egg'` also draws the baby body, as it always has);
+ *  - unknown/absent `stage` → `'baby'` (the historical fallback artwork);
+ *    `'egg'` draws the egg shell;
  *  - `adultType` is carried ONLY for the adult stage, defaulting to
  *    {@link DEFAULT_ADULT_TYPE}; an unrecognized value is corrected downstream
  *    by the adult SVG resolver;
@@ -44,6 +44,7 @@ import {
   type ResolvedBlobbiExpression,
 } from './expression-model';
 import { normalizeBlobbiMotion, type BlobbiMotion } from './motion-model';
+import { normalizeBlobbiEggCrack, type BlobbiEggCrack } from './egg-model';
 
 /**
  * The visual identity of a Blobbi: the plain, serializable input the renderer
@@ -52,10 +53,7 @@ import { normalizeBlobbiMotion, type BlobbiMotion } from './motion-model';
  * event or a parsed companion. Hosts map their own model to this shape.
  */
 export interface BlobbiVisual {
-  /**
-   * Life stage. `'egg'` is accepted as data but currently draws the baby body
-   * (the historical fallback); a dedicated egg drawing is a later milestone.
-   */
+  /** Life stage. The egg draws the shell; its crack state is render state (`eggCrack`). */
   stage?: 'egg' | 'baby' | 'adult';
   /**
    * Artwork generation. `'v1'` is the original sixteen-form generation and
@@ -110,6 +108,8 @@ export interface BlobbiRenderModelInput {
   expression?: BlobbiExpression;
   /** Body motion state. See `motion-model.ts`. */
   motion?: BlobbiMotion;
+  /** Egg shell crack state. See `egg-model.ts`. Ignored unless the stage is `'egg'`. */
+  eggCrack?: BlobbiEggCrack;
 }
 
 /** Fully resolved, renderable state. Every field is defined and valid. */
@@ -146,6 +146,8 @@ export interface BlobbiRenderModel {
   expression: ResolvedBlobbiExpression;
   /** Resolved motion state; `'still'` when none was asked for. */
   motion: BlobbiMotion;
+  /** Resolved crack state; `'none'` when none was asked for or the stage is not an egg. */
+  eggCrack: BlobbiEggCrack;
 }
 
 /** Stage used when the input names none, or names one we do not draw. */
@@ -222,5 +224,6 @@ export function normalizeBlobbiRenderModel(
     instanceId: normalizeInstanceId(input.instanceId),
     expression: normalizeBlobbiExpression(input.expression),
     motion: normalizeBlobbiMotion(input.motion),
+    eggCrack: stage === 'egg' ? normalizeBlobbiEggCrack(input.eggCrack) : 'none',
   };
 }

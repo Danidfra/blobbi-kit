@@ -6,6 +6,7 @@
  */
 
 import type { ResolvedBlobbiExpression } from '../expression-model';
+import type { BlobbiEggCrack } from '../egg-model';
 
 /**
  * Artwork generation. A property of the Blobbi's identity (carried in its
@@ -63,6 +64,11 @@ export interface ArtworkRequest {
    * neutral. `eyesClosed` wins over the expression's eye state.
    */
   expression?: ResolvedBlobbiExpression;
+  /**
+   * Shell crack state. Drawn by the egg stage only; every other stage ignores
+   * it. Absent means the intact shell.
+   */
+  eggCrack?: BlobbiEggCrack;
 }
 
 /**
@@ -104,8 +110,8 @@ export interface ArtworkAnchors {
  */
 export interface ResolvedArtwork {
   generation: BlobbiVisualGeneration;
-  /** The stage actually drawn (`'egg'` resolves to the baby drawing). */
-  stage: 'baby' | 'adult';
+  /** The stage actually drawn. */
+  stage: 'egg' | 'baby' | 'adult';
   view: BlobbiArtworkView;
   /** The drawing must be flipped horizontally to face the requested way. */
   mirrored: boolean;

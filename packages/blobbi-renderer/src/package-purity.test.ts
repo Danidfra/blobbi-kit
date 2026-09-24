@@ -139,8 +139,9 @@ describe('the package reaches nothing it must not', () => {
   it('has a subtree to check, and it is small', () => {
     expect(pkg.files.length).toBeGreaterThan(10);
     // A guardrail, not a target: if the graph doubles, the boundary needs a
-    // human look rather than a silently passing test.
-    expect(pkg.files.length).toBeLessThan(45);
+    // human look rather than a silently passing test. Raised from 45 when the
+    // egg module (four files) and its model joined the V1 artwork.
+    expect(pkg.files.length).toBeLessThan(60);
   });
 
   it.each(FORBIDDEN.map((f) => [f.why, f.pattern] as const))(

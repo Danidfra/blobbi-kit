@@ -128,6 +128,8 @@ export {
   normalizeBlobbiMotion,
 } from './motion-model';
 export type { BlobbiMotion } from './motion-model';
+export { BLOBBI_EGG_CRACKS, normalizeBlobbiEggCrack, eggCrackLevel } from './egg-model';
+export type { BlobbiEggCrack } from './egg-model';
 
 // ── Stylesheets (optional, package-owned text) ─────────────────────────────
 // The renderer needs NO CSS for its geometry. These are for hosts that want

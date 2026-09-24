@@ -113,7 +113,7 @@ is the single pure function that does it):
 | absent / unrecognized `visualGeneration` | `'v1'` |
 | absent / unrecognized `facing` | `'front'` |
 | absent / unrecognized `stage` | `'baby'` |
-| `stage: 'egg'` | accepted; draws the baby body (there is no dedicated egg drawing) |
+| `stage: 'egg'` | draws the egg shell; `eggCrack` (`'none' | 'light' | 'medium' | 'heavy'`) picks the crack overlay. `loadBlobbiSvg('egg', …)` still draws the baby, for byte compatibility |
 | `stage: 'adult'` with no `adultType` | `'bloomi'` |
 | unknown `adultType` | corrected to the default form by the artwork resolver |
 | absent colors | the artwork's own colors |
@@ -333,6 +333,7 @@ artwork/
   registry.ts          which drawing for (stage, generation, adultType, facing, eyesClosed)
   types.ts             BlobbiVisualGeneration, BlobbiFacing, ArtworkRequest, ResolvedArtwork
   mirror.ts            horizontal mirroring for the profile
+  egg/v1/              the egg shell with cumulative crack groups (data, resolver, customizer)
   baby/v1/             the V1 baby (data, resolver, customizer)
   adult/v1/            the sixteen V1 forms (data, resolver, per-form customizers)
   adult/v2/            front.ts, side.ts, back.ts, closed-eyes.ts, customize.ts, parts.ts

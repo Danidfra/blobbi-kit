@@ -70,6 +70,9 @@ const PUBLIC_API = [
   'blobbiMotionAttributes',
   'blobbiMotionPhase',
   'normalizeBlobbiMotion',
+  'BLOBBI_EGG_CRACKS',
+  'eggCrackLevel',
+  'normalizeBlobbiEggCrack',
   // Optional stylesheets
   'BLOBBI_EFFECT_STYLESHEET',
   'BLOBBI_RENDERER_STYLESHEET',

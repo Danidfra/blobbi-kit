@@ -55,6 +55,7 @@ import {
 import { normalizeBlobbiRenderModel, type BlobbiVisual } from './blobbi-render-model';
 import type { BlobbiExpression } from './expression-model';
 import { BLOBBI_MOTION_STYLESHEET, blobbiMotionAttributes, type BlobbiMotion } from './motion-model';
+import type { BlobbiEggCrack } from './egg-model';
 import type { NormalizedAccessoryPlacement } from './accessory-normalize';
 import { BlobbiEffectLayer, BlobbiEffectStyles } from './effects/BlobbiEffectLayers';
 import {
@@ -120,6 +121,12 @@ export interface BlobbiRendererProps {
    * box through its world; this only makes the body look the part.
    */
   motion?: BlobbiMotion;
+  /**
+   * Egg shell crack state: `'none'` (default), `'light'`, `'medium'` or
+   * `'heavy'`. Drawn on the egg stage only. How far along an incubation is
+   * belongs to the host; this only draws the shell it names.
+   */
+  eggCrack?: BlobbiEggCrack;
   /** Optional pure post-processor for the body SVG string. */
   sanitize?: BlobbiSvgSanitizer;
   /**
@@ -273,6 +280,7 @@ export function BlobbiRenderer({
   effects,
   expression,
   motion,
+  eggCrack,
   sanitize,
   label,
   title,
@@ -301,6 +309,7 @@ export function BlobbiRenderer({
     accessories,
     expression,
     motion,
+    eggCrack,
   });
 
   // Effect resolution: pure, total and cheap, and it returns a shared frozen
@@ -326,6 +335,7 @@ export function BlobbiRenderer({
           facing: model.facing,
           eyesClosed: model.eyesClosed,
           expression: model.expression,
+          eggCrack: model.eggCrack,
         },
         {
           baseColor: model.baseColor,
@@ -362,6 +372,7 @@ export function BlobbiRenderer({
     model.expression.mouth,
     model.expression.brows,
     model.expression.blush,
+    model.eggCrack,
     gazeEnabled,
     sanitize,
   ]);
@@ -417,6 +428,8 @@ export function BlobbiRenderer({
       data-blobbi-size={box.label}
       data-blobbi-generation={model.visualGeneration}
       data-blobbi-facing={model.facing}
+      data-blobbi-stage={model.stage}
+      data-blobbi-egg-crack={model.stage === 'egg' ? model.eggCrack : undefined}
       data-blobbi-expression-support={artworkSupports.expression ? '' : undefined}
       title={title}
       onClick={onClick}

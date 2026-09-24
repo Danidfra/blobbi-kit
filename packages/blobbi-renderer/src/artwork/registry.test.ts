@@ -49,12 +49,17 @@ describe('V1 resolution is unchanged', () => {
     expect(resolved.form).toBe('catti');
   });
 
-  it('egg and baby draw the V1 baby; a V2 baby draws the V1 baby until Baby V2 exists', () => {
+  it('the egg draws its own shell for every generation; a V2 baby draws the V1 baby until Baby V2 exists', () => {
     const baby = resolveBlobbiArtwork({ stage: 'baby', visualGeneration: 'v1', facing: 'front', eyesClosed: false });
     const egg = resolveBlobbiArtwork({ stage: 'egg', visualGeneration: 'v1', facing: 'front', eyesClosed: false });
+    const v2egg = resolveBlobbiArtwork({ stage: 'egg', visualGeneration: 'v2', facing: 'left', eyesClosed: true });
     const v2baby = resolveBlobbiArtwork({ stage: 'baby', visualGeneration: 'v2', facing: 'front', eyesClosed: false });
     expect(baby.stage).toBe('baby');
-    expect(egg.markup).toBe(baby.markup);
+    expect(egg.stage).toBe('egg');
+    expect(egg.markup).not.toBe(baby.markup);
+    expect(egg.markup).toContain('data-part="egg-shell"');
+    expect(v2egg.markup).toBe(egg.markup);
+    expect(v2egg.supports).toEqual({ expression: false, gaze: false, motion: true });
     expect(v2baby.generation).toBe('v1');
     expect(v2baby.markup).toBe(baby.markup);
   });
