@@ -14,6 +14,44 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 Nothing below is published yet. The target versions are named so the release
 notes can be checked against the manifests before `npm publish`.
 
+### `@blobbi-kit/renderer` 0.3.0 (egg artwork)
+
+Eggs draw as eggs. `stage: 'egg'` no longer falls back to the baby body; it
+resolves to a dedicated V1 shell drawing with seed colours and a cumulative
+crack overlay.
+
+- **`eggCrack`** is a new render input on `BlobbiRenderer`, `renderBlobbiSvg`
+  and `BlobbiRenderModelInput`: `'none'` (default) | `'light'` | `'medium'` |
+  `'heavy'`, a closed vocabulary exported as `BLOBBI_EGG_CRACKS` with
+  `normalizeBlobbiEggCrack` and `eggCrackLevel`. How far along an incubation
+  is stays host policy; the renderer only draws the shell it is told.
+- The egg is one drawing for every generation and facing (a shell has no
+  side, face or closed eyes); `supports` reports `{ expression: false, gaze:
+  false, motion: true }`, and the component carries `data-blobbi-stage` and
+  `data-blobbi-egg-crack`.
+- Colours: `baseColor` tints the shell, `secondaryColor` the spots, through
+  the same hex-only colour boundary as every other drawing.
+- **Breaking under 0.x:** `ResolvedArtwork.stage` widens to
+  `'egg' | 'baby' | 'adult'`, and any consumer that relied on an egg visual
+  producing the baby markup through `renderBlobbiSvg` or the component now
+  gets the shell. `loadBlobbiSvg('egg', …)`, the positional V1 API, still
+  draws the baby and stays byte-identical (`v1-fingerprints.test.ts`).
+- Tests: `artwork/egg-v1.test.ts` (shell parts, cumulative cracks, facing
+  and generation invariance, deterministic colouring, unsafe colours
+  refused, string API), `registry.test.ts` updated.
+
+### `@blobbi-kit/core` and `@blobbi-kit/react` 0.6.1 (hatch primitive)
+
+- **`useBlobbiHatch`** and the pure **`planHatchTransition`**: the egg → baby
+  transition as Ditto's ceremony has published it, now shared. Same `d` and
+  `seed` (mirror traits re-derived), `stage: baby`, `state: active`, every
+  stat to `STAT_MAX`, streak credited, the egg's task and progression tags
+  cleaned by the integrity guard, content reset, and the newborn placed in
+  `evolving` with fresh evolve missions (opt out with `startEvolution:
+  false`). Eligibility (`useHatchTasks().allCompleted`) stays a host gate,
+  exactly as for `useBlobbiEvolve`. Additive; core carries no code change
+  and is bumped only to keep the lockstep version.
+
 ### `@blobbi-kit/core` and `@blobbi-kit/react` 0.6.0 (breaking)
 
 The canonical visual identity contract is closed: one validated, complete,
