@@ -18,6 +18,7 @@ export * from './useAwardDailyXp';
 export * from './useBlobbiActivityHistory';
 export * from './useBlobbiCareActivity';
 export * from './useBlobbiEvolve';
+export * from './useBlobbiHatch';
 export * from './useBlobbiIncubation';
 export * from './useBlobbiInteractions';
 export * from './useBlobbisCollection';
