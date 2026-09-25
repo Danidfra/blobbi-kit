@@ -63,24 +63,57 @@ describe('every non-neutral preset changes the face and only the face', () => {
       const preset = BLOBBI_EMOTION_PRESETS[emotion];
       const svg = baby(emotion).svg;
       expect(svg.includes(`data-blobbi-mouth="${preset.mouth}"`)).toBe(preset.mouth !== 'neutral');
-      expect(svg.includes('data-part="left-eyelid"')).toBe(preset.eyes === 'half');
+      const lidded = preset.eyes === 'half' || (preset.eyes === 'open' && preset.brows === 'lowered');
+      expect(svg.includes('data-part="left-eyelid"'), emotion).toBe(lidded);
+      expect(svg.includes('data-part="right-eyelid-line"'), emotion).toBe(lidded);
       expect(svg.includes('data-blobbi-eyes="wide"')).toBe(preset.eyes === 'wide');
       expect(svg.includes(`data-blobbi-blush="${preset.blush}"`)).toBe(preset.blush !== 'soft');
     }
   });
 
-  it('brows are not representable on the baby: a brow-only expression is neutral, and the limitation is stated', () => {
-    expect(baby({ brows: 'lowered' }).svg).toBe(neutral);
+  it('brows are drawn as the slant of the lids: lowered on open eyes is an angry lid, raised draws nothing', () => {
     expect(baby({ brows: 'raised' }).svg).toBe(neutral);
-    expect(readFileSync(resolve(__dirname, 'baby/v1/expression.ts'), 'utf8')).toMatch(/brows[\s\S]*not drawn/);
+    expect(baby({ brows: 'inner-up' }).svg).toBe(neutral);
+    const angry = baby({ brows: 'lowered' }).svg;
+    expect(angry).not.toBe(neutral);
+    expect(angry).toContain('data-part="left-eyelid" data-blobbi-eyes="open" data-blobbi-brows="lowered"');
+    // Sad, sleepy and plain half lids are three different lid shapes.
+    const lid = (e: BlobbiExpression) => /data-part="left-eyelid"/.exec(baby(e).svg) && /<path d="([^"]+)"[^>]*data-part="left-eyelid"/.exec(baby(e).svg)![1];
+    expect(new Set([lid({ eyes: 'half', brows: 'inner-up' }), lid({ eyes: 'half', brows: 'lowered' }), lid({ eyes: 'half' }), lid({ brows: 'lowered' })]).size).toBe(4);
+    expect(readFileSync(resolve(__dirname, 'baby/v1/expression.ts'), 'utf8')).toMatch(/brow state is drawn as the\s+\*\s+SLANT of the lids/);
   });
 
-  it('the half lid takes the body colour and sits after the pupils', () => {
-    const svg = baby('sleepy').svg;
-    const lid = /<path d="M 30 45 A 8 10 0 0 1 46 45 Z" fill="url\(#([^)]+)\)"[^>]*data-part="left-eyelid"/.exec(svg);
-    expect(lid).not.toBeNull();
-    expect(svg).toContain(`id="${lid![1]}"`);
-    expect(svg.indexOf('data-part="left-eyelid"')).toBeGreaterThan(svg.indexOf('blobbiPupilGradient)'));
+  it('the lid is solid skin (a body-gradient stop) with a lid line in the mouth colour, after the pupils; never a gradient fill', () => {
+    for (const emotion of ['sad', 'sleepy', 'upset'] as const) {
+      const svg = baby(emotion).svg;
+      const lid = /<path d="[^"]+" fill="([^"]+)"[^>]*data-part="left-eyelid"/.exec(svg);
+      expect(lid, emotion).not.toBeNull();
+      // Solid, and one of the body gradient's own stops, so it follows baseColor.
+      expect(lid![1]).toMatch(/^#[0-9a-fA-F]{6}$/);
+      const bodyStops = [...(/<radialGradient[^>]*blobbiBodyGradient[^>]*>([\s\S]*?)<\/radialGradient>/.exec(svg)?.[1] ?? '').matchAll(/stop-color:(#[0-9a-fA-F]{6})/g)].map((m) => m[1]);
+      expect(bodyStops).toContain(lid![1]);
+      const line = /<path d="[^"]+" stroke="(url\(#[^)]+\))"[^>]*data-part="left-eyelid-line"/.exec(svg);
+      expect(line![1]).toContain('blobbiMouthGradient');
+      expect(svg.indexOf('data-part="left-eyelid"')).toBeGreaterThan(svg.lastIndexOf('blobbiPupilGradient)'));
+    }
+    // A different base colour gives a different lid colour.
+    const other = renderBlobbiSvg({ stage: 'baby', expression: 'sad', instanceId: 'baby-x', baseColor: '#2a6fd6' }).svg;
+    expect(/fill="([^"]+)"[^>]*data-part="left-eyelid"/.exec(other)![1]).not.toBe(/fill="([^"]+)"[^>]*data-part="left-eyelid"/.exec(baby('sad').svg)![1]);
+  });
+
+  it('every mouth is the authored mouth moved a little: same neighbourhood, same stroke', () => {
+    for (const mouth of ['smile', 'grin', 'frown', 'flat'] as const) {
+      const tag = /<path d="([^"]+)"[^>]*data-part="mouth"[^>]*\/>/.exec(baby({ mouth }).svg)!;
+      const nums = [...tag[1].matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+      const xs = nums.filter((_, i) => i % 2 === 0);
+      const ys = nums.filter((_, i) => i % 2 === 1);
+      expect(Math.min(...xs)).toBeGreaterThanOrEqual(40);
+      expect(Math.max(...xs)).toBeLessThanOrEqual(60);
+      expect(Math.min(...ys)).toBeGreaterThanOrEqual(59);
+      expect(Math.max(...ys)).toBeLessThanOrEqual(72);
+      expect(tag[0]).toContain('stroke-width="2.5"');
+      expect(tag[0]).toContain('stroke-linecap="round"');
+    }
   });
 });
 

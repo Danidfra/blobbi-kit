@@ -135,4 +135,10 @@ export interface ResolvedArtwork {
   anchors: ArtworkAnchors;
   /** Raw authored markup, before any customization. */
   markup: string;
+  /**
+   * The expression the finishing step draws on this view, when the view has
+   * a face the package transforms AFTER colouring (the V1 baby front). V2
+   * draws its expression on the raw markup instead.
+   */
+  expression?: ResolvedBlobbiExpression;
 }

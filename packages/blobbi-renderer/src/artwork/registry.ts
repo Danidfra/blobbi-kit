@@ -200,15 +200,13 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
       }
       const babyGazeable = !request.eyesClosed && view !== 'back';
       // The baby front has a face the package can transform (see
-      // baby/v1/expression.ts): the expression's mouth, blush and eye state,
-      // with closed eyes (sleeping) winning as its own drawing. The back has
-      // no face and passes through.
+      // baby/v1/expression.ts): the expression's mouth, blush, eye and lid
+      // state, drawn by `finishBlobbiArtwork` on the coloured drawing, with
+      // closed eyes (sleeping) winning as its own drawing. The back has no
+      // face and passes through.
       const babyFace = view !== 'back';
-      const babyMarkup = request.eyesClosed
-        ? sleeping(getBabySleepingSvg(), request)
-        : babyFace
-          ? applyBabyV1Expression(getBabyBaseSvg(), request.expression ?? NEUTRAL_EXPRESSION)
-          : getBabyBaseSvg();
+      const babyMarkup = request.eyesClosed ? sleeping(getBabySleepingSvg(), request) : getBabyBaseSvg();
+      const babyExpression = babyFace && !request.eyesClosed ? (request.expression ?? NEUTRAL_EXPRESSION) : undefined;
       return {
         generation: 'v1',
         stage,
@@ -220,9 +218,16 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
         viewBox: { width: 100, height: 100 },
         anchors: V1_ANCHORS,
         markup: babyMarkup,
+        expression: babyExpression,
       };
     }
   }
+}
+
+/** The coloured baby, then its expression (the rule reads the final colours). */
+function babyWithExpression(resolved: ResolvedArtwork, colors: ArtworkColors, instanceId?: string): string {
+  const customized = customizeBabySvg(resolved.markup, colors, resolved.eyesClosed, instanceId);
+  return resolved.expression ? applyBabyV1Expression(customized, resolved.expression) : customized;
 }
 
 /** The V1 sleeping drawing, with or without its baked Zzz. */
@@ -274,7 +279,7 @@ export function finishBlobbiArtwork(
               resolved.eyesClosed,
               instanceId,
             )
-          : customizeBabySvg(resolved.markup, colors, resolved.eyesClosed, instanceId);
+          : babyWithExpression(resolved, colors, instanceId);
       return resolved.view === 'back' ? applyRearView(customized) : customized;
     }
   }

@@ -34,18 +34,26 @@ component are byte-identical when the new inputs are left out.
   has no baked Zzz) is untouched.
 - **V1 baby expressions.** The baby front now draws the `expression` input,
   as rules over the one authored face (`artwork/baby/v1/expression.ts`)
-  rather than a second drawing per emotion: the mouth path per state (`open`
-  becomes a small filled ellipse), a body-coloured lid over the upper half of
-  each eye for `half` (inserted after the pupils so gaze still works under
-  it), grown whites and pupils for `wide`, and faded or deepened cheeks for
-  `none`/`strong` blush. Touched parts carry `data-part`
-  (`BABY_V1_EXPRESSION_PARTS`) and `data-blobbi-mouth|eyes|blush`, the same
-  markers V2 uses. `supports.expression` is now `true` for the baby front and
-  profiles (the faceless back stays `false`), so
-  `data-blobbi-expression-support` appears on the component root. Neutral is
-  the identity. `isSleeping` still selects the sleeping drawing whatever the
-  expression. **Limitation:** the baby has no authored brows, so the `brows`
-  part is not drawn on it (documented in the README and the module).
+  rather than a second drawing per emotion, applied after colouring: the
+  authored mouth path moved a few units per state (`open` becomes a small
+  filled ellipse in the mouth's colour), lids over the upper part of each
+  eye for `half` eyes, filled with a solid skin colour from the body
+  gradient and edged with a lid line in the mouth's colour (inserted after
+  the pupils so gaze still works under them), grown whites and pupils for
+  `wide`, and faded or deepened cheeks for `none`/`strong` blush. The baby
+  has no authored brows, so a brow state is drawn as the lids' slant:
+  `inner-up` droops the outer corners (sad), `lowered` makes heavy level
+  lids on half eyes (sleepy) or a thin angry lid on open eyes (upset);
+  `raised` draws nothing. Touched parts carry `data-part`
+  (`BABY_V1_EXPRESSION_PARTS`) and `data-blobbi-mouth|eyes|brows|blush`,
+  the same markers V2 uses. `supports.expression` is now `true` for the
+  baby front and profiles (the faceless back stays `false`), so
+  `data-blobbi-expression-support` appears on the component root. Neutral
+  is the identity. `isSleeping` still selects the sleeping drawing whatever
+  the expression. (Polish before release: the lids were first filled with
+  the body gradient, which objectBoundingBox units re-centre on each lid,
+  painting a white highlight on every lid; the mouths were also quieter
+  variations of the authored one, not larger cartoon mouths.)
 - Tests: `svg/sleep-indicator.test.ts` (one removable Zzz per V1 sleeping
   drawing, idempotent, awake and V2 untouched, the defaults draw what 0.3.0
   drew), `artwork/baby-v1-expression.test.ts` (neutral identity, every

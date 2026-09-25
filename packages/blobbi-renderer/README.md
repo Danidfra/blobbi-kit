@@ -216,17 +216,32 @@ markup for every expression; `BLOBBI_EMOTION_PRESETS` and
 `normalizeBlobbiExpression` are exported for hosts that compose their own.
 
 The **V1 baby** front draws expressions too, as rules over its one authored
-face rather than a drawing per emotion (`artwork/baby/v1/expression.ts`):
-the mouth path is replaced per state (`open` becomes a small filled
-ellipse), `half` eyes get a lid over the upper half of each eye filled with
-the body gradient (so `baseColor` tints it) inserted after the pupils, so
-gaze still moves the pupils under it, `wide` eyes grow the whites and
-pupils, and `none`/`strong` blush fades or deepens the two cheeks. Touched
-parts carry `data-part` (`BABY_V1_EXPRESSION_PARTS`) and
-`data-blobbi-mouth|eyes|blush`. The baby has no authored brows, so the
-`brows` part is not drawn (sadness reads through the half-lids and the frown,
-upset through the flat mouth and the missing blush). Neutral is the identity:
-the string is the authored drawing itself, so the V1 fingerprints hold.
+face rather than a drawing per emotion (`artwork/baby/v1/expression.ts`),
+applied after colouring so the rule can read the final colours:
+
+- **mouth**: the authored path (`M 42 62 Q 50 68 58 62`) with its ends and
+  bend moved a few units per state, same stroke and caps, so a happy mouth
+  is the authored smile deepened rather than a new mouth; `open` becomes a
+  small filled ellipse in the mouth's colour; `flat` is a slight downturn
+  (a straight line would have a zero-height box and its gradient stroke
+  would not render).
+- **eyes and lids**: `half` draws a lid over the upper part of each eye,
+  filled with a **solid** skin colour taken from the body gradient's middle
+  stop, with a lid line along its edge in the mouth's colour (the stroke
+  the authored sleeping eyes use), inserted after the pupils so gaze still
+  moves the pupils under it. The fill is solid on purpose: a gradient fill
+  in objectBoundingBox units re-centres on each lid and paints a white
+  highlight on it. `wide` grows the whites and pupils.
+- **brows**: the baby has no authored brows, so a brow state is drawn as
+  the slant of the lids: `inner-up` droops the outer corners (sad),
+  `lowered` with half eyes makes heavy level lids (sleepy), `lowered` with
+  open eyes draws a thin lid slanting down toward the centre (upset).
+  `raised` draws nothing.
+- **blush**: `none` fades the two cheeks out, `strong` deepens them.
+
+Touched parts carry `data-part` (`BABY_V1_EXPRESSION_PARTS`) and
+`data-blobbi-mouth|eyes|brows|blush`. Neutral is the identity: the string
+is the coloured authored drawing itself, so the V1 fingerprints hold.
 `isSleeping` still selects the sleeping drawing whatever the expression, and
 the faceless back is never expressed.
 
