@@ -47,11 +47,11 @@ import {
   getDefaultAdultForm,
   type AdultForm,
 } from './adult/v1';
-import { getBabyBaseSvg, getBabySleepingSvg, customizeBabySvg } from './baby/v1';
+import { getBabyBaseSvg, getBabySleepingSvg, customizeBabySvg, applyBabyV1Expression } from './baby/v1';
 import { getEggSvg, customizeEggSvg } from './egg/v1';
 import { getAdultV2Artwork, customizeAdultV2Svg, applyAdultV2Expression } from './adult/v2';
 import { NEUTRAL_EXPRESSION } from '../expression-model';
-import { applyRearView, sanitizeArtworkColor } from '../svg';
+import { applyRearView, removeSleepIndicator, sanitizeArtworkColor } from '../svg';
 import { DEFAULT_VISUAL_GENERATION } from './types';
 import { mirrorSvgHorizontally } from './mirror';
 
@@ -195,10 +195,20 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
           form,
           viewBox: { width: 200, height: 200 },
           anchors: V1_ANCHORS,
-          markup: request.eyesClosed ? getAdultSleepingSvg(form) : getAdultBaseSvg(form),
+          markup: request.eyesClosed ? sleeping(getAdultSleepingSvg(form), request) : getAdultBaseSvg(form),
         };
       }
       const babyGazeable = !request.eyesClosed && view !== 'back';
+      // The baby front has a face the package can transform (see
+      // baby/v1/expression.ts): the expression's mouth, blush and eye state,
+      // with closed eyes (sleeping) winning as its own drawing. The back has
+      // no face and passes through.
+      const babyFace = view !== 'back';
+      const babyMarkup = request.eyesClosed
+        ? sleeping(getBabySleepingSvg(), request)
+        : babyFace
+          ? applyBabyV1Expression(getBabyBaseSvg(), request.expression ?? NEUTRAL_EXPRESSION)
+          : getBabyBaseSvg();
       return {
         generation: 'v1',
         stage,
@@ -206,13 +216,18 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
         mirrored: false,
         eyesClosed: request.eyesClosed,
         gazeable: babyGazeable,
-        supports: { expression: false, gaze: babyGazeable, motion: true },
+        supports: { expression: babyFace, gaze: babyGazeable, motion: true },
         viewBox: { width: 100, height: 100 },
         anchors: V1_ANCHORS,
-        markup: request.eyesClosed ? getBabySleepingSvg() : getBabyBaseSvg(),
+        markup: babyMarkup,
       };
     }
   }
+}
+
+/** The V1 sleeping drawing, with or without its baked Zzz. */
+function sleeping(markup: string, request: ArtworkRequest): string {
+  return request.sleepIndicator === 'none' ? removeSleepIndicator(markup) : markup;
 }
 
 // ─── Pipeline ────────────────────────────────────────────────────────────────

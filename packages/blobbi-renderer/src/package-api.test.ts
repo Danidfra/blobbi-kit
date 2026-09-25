@@ -73,6 +73,10 @@ const PUBLIC_API = [
   'BLOBBI_EGG_CRACKS',
   'eggCrackLevel',
   'normalizeBlobbiEggCrack',
+  // Sleep indicator (the V1 sleeping drawings' baked Zzz) and the baby face
+  'BLOBBI_SLEEP_INDICATORS',
+  'normalizeBlobbiSleepIndicator',
+  'BABY_V1_EXPRESSION_PARTS',
   // Optional stylesheets
   'BLOBBI_EFFECT_STYLESHEET',
   'BLOBBI_RENDERER_STYLESHEET',

@@ -77,7 +77,8 @@ const accessories = normalizeAccessoryPlacements([
   facing="front"              // 'front' | 'back' | 'left' | 'right'
   isSleeping={false}
   eyeOffset={{ x: 0.4, y: -0.2 }}
-  expression="happy"          // a preset, or { eyes, mouth, brows, blush }; V2 faces only
+  expression="happy"          // a preset, or { eyes, mouth, brows, blush }; V2 faces and the V1 baby
+  sleepIndicator="artwork"    // 'artwork' | 'none': keep or drop the V1 sleeping drawings' baked Zzz
   motion="idle"               // 'still' | 'idle' | 'walking'; the body's in-place motion
   accessories={accessories}
   effects={[{ id: 'celestial-aura' }, { id: 'golden-sparkles', intensity: 0.8 }]}
@@ -161,6 +162,14 @@ should not render accessories, whose sizes are fractions of the box
   artwork; on V2 it is a deterministic transformation of the one drawing (see
   "V2: the canonical anatomy"). Closed eyes receive no gaze on either
   generation.
+- `sleepIndicator` is `'artwork'` (default) or `'none'`. The V1 sleeping
+  drawings (the baby and the sixteen adult forms) carry a small baked "Zzz"
+  beside the head. It is an environmental cue, not part of the creature, and
+  a host that draws its own sleep cue in its world would otherwise show two.
+  `'none'` removes that one block and nothing else: the closed eyes and the
+  calm mouth stay, and awake drawings are byte-identical either way. V2 has
+  no baked Zzz, so the option is a no-op there. The default keeps every
+  existing consumer's output unchanged.
 - `eyeOffset` (each axis −1…1) moves only the pupils, through two CSS
   variables on the body wrapper. The SVG string is generated once per visual
   change, never per gaze change, which is what makes per-frame gaze cheap. On
@@ -202,9 +211,24 @@ inner-up`), `blush` (`none | soft | strong`). Every shape is a package
 constant applied relative to the authored geometry, so the front and the
 profile share one vocabulary and the mirrored left profile needs nothing
 extra. `isSleeping` always wins the eyes (a sleeping happy Blobbi smiles with
-closed eyes). The V2 back view and every V1 form draw exactly the same
+closed eyes). The V2 back view and every V1 adult form draw exactly the same
 markup for every expression; `BLOBBI_EMOTION_PRESETS` and
 `normalizeBlobbiExpression` are exported for hosts that compose their own.
+
+The **V1 baby** front draws expressions too, as rules over its one authored
+face rather than a drawing per emotion (`artwork/baby/v1/expression.ts`):
+the mouth path is replaced per state (`open` becomes a small filled
+ellipse), `half` eyes get a lid over the upper half of each eye filled with
+the body gradient (so `baseColor` tints it) inserted after the pupils, so
+gaze still moves the pupils under it, `wide` eyes grow the whites and
+pupils, and `none`/`strong` blush fades or deepens the two cheeks. Touched
+parts carry `data-part` (`BABY_V1_EXPRESSION_PARTS`) and
+`data-blobbi-mouth|eyes|blush`. The baby has no authored brows, so the
+`brows` part is not drawn (sadness reads through the half-lids and the frown,
+upset through the flat mouth and the missing blush). Neutral is the identity:
+the string is the authored drawing itself, so the V1 fingerprints hold.
+`isSleeping` still selects the sleeping drawing whatever the expression, and
+the faceless back is never expressed.
 
 **Motion** is *wrapper/CSS render state*: the drawing is untouched. The body
 box and both accessory layers (a hat bobs with the head) carry
@@ -222,7 +246,8 @@ body look the part.
 
 `renderBlobbiSvg(...).artwork.supports` reports `{ expression, gaze, motion }`
 per drawing: V2 front and side support all three, the V2 back supports motion
-only, V1 supports gaze (as before) and motion. The component mirrors
+only, the V1 baby front supports all three, the V1 adults support gaze (as
+before) and motion. The component mirrors
 `expression` support as `data-blobbi-expression-support` on its root.
 Blinking, looking around and any other timed behaviour are not in this
 package: they are policy, and belong to a host hook that sets `eyes` or
@@ -363,7 +388,7 @@ the front and both profiles, and the three motion states to
 ## 9. String API
 
 ```ts
-renderBlobbiSvg({ stage, visualGeneration, adultType, baseColor, secondaryColor, eyeColor, facing, eyesClosed, expression, motion, instanceId, gaze });
+renderBlobbiSvg({ stage, visualGeneration, adultType, baseColor, secondaryColor, eyeColor, facing, eyesClosed, sleepIndicator, expression, motion, instanceId, gaze });
 // -> { svg, artwork: { generation, view, mirrored, gazeable, supports, ... } }
 
 loadBlobbiSvg(stage, adultType, baseColor, secondaryColor, eyeColor, isSleeping, instanceId, view); // V1 only

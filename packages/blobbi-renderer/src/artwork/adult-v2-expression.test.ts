@@ -1,7 +1,7 @@
 /**
  * Adult V2 expressions through the string API: every preset on every view,
  * deterministic, only the face parts change, the back never changes, sleeping
- * wins the eyes, colours and ids still behave, and V1 ignores it all.
+ * wins the eyes, colours and ids still behave, and the V1 adults ignore it all.
  */
 import { describe, it, expect } from 'vitest';
 import { renderBlobbiSvg, loadBlobbiSvg } from './load-blobbi-svg';
@@ -236,9 +236,7 @@ describe('V1 ignores expression', () => {
     expect(plain.svg).toBe(loadBlobbiSvg('adult', form, COLORS.baseColor, COLORS.secondaryColor, COLORS.eyeColor, false, 'v1'));
   });
 
-  it('the baby and the egg ignore it too', () => {
-    for (const stage of ['baby', 'egg'] as const) {
-      expect(renderBlobbiSvg({ stage, expression: 'sad', instanceId: 'b' }).svg).toBe(renderBlobbiSvg({ stage, instanceId: 'b' }).svg);
-    }
+  it('the egg ignores it too (the V1 baby front draws it since 0.4.0: baby-v1-expression.test.ts)', () => {
+    expect(renderBlobbiSvg({ stage: 'egg', expression: 'sad', instanceId: 'b' }).svg).toBe(renderBlobbiSvg({ stage: 'egg', instanceId: 'b' }).svg);
   });
 });

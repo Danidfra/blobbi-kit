@@ -173,3 +173,7 @@ export type { BlobbiView, GazeMarkupOptions } from './svg';
 // Provisional: these are string-to-string transforms over an artwork
 // convention, and the convention may change with the artwork.
 export { applyGazeMarkup, applyRearView, uniquifySvgIds } from './svg';
+
+// Sleep indicator: whether the V1 sleeping drawings keep their baked Zzz
+export { BLOBBI_SLEEP_INDICATORS, normalizeBlobbiSleepIndicator, type BlobbiSleepIndicator } from './svg/sleep-indicator';
+export { BABY_V1_EXPRESSION_PARTS } from './artwork/baby/v1/expression';

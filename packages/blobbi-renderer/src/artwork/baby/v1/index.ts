@@ -17,3 +17,6 @@ export { getBabyBaseSvg, getBabySleepingSvg } from './lib/baby-svg-resolver';
 
 // SVG Customization
 export { customizeBabySvg } from './lib/baby-svg-customizer';
+
+// Expressions (rules over the authored face; neutral is the identity)
+export { applyBabyV1Expression, BABY_V1_EXPRESSION_PARTS } from './expression';

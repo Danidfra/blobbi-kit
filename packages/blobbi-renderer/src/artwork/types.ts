@@ -59,9 +59,16 @@ export interface ArtworkRequest {
   /** Draw the closed-eye variant when the generation has one. */
   eyesClosed: boolean;
   /**
-   * Resolved facial expression. Drawn by generations with a semantic face
-   * (V2 front and side); ignored by V1 and by faceless views. Absent means
-   * neutral. `eyesClosed` wins over the expression's eye state.
+   * Whether the V1 sleeping drawings keep their baked "Zzz" (`'artwork'`, the
+   * default) or draw the creature asleep only (`'none'`), for hosts that draw
+   * their own sleep cue. V2 has no baked Zzz. See `svg/sleep-indicator.ts`.
+   */
+  sleepIndicator?: 'artwork' | 'none';
+  /**
+   * Resolved facial expression. Drawn by generations with a face the package
+   * can transform (V2 front and side; the V1 baby front); ignored by the V1
+   * adults and by faceless views. Absent means neutral. `eyesClosed` wins
+   * over the expression's eye state.
    */
   expression?: ResolvedBlobbiExpression;
   /**

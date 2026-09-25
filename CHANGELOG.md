@@ -11,8 +11,49 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ## Unreleased
 
-Nothing below is published yet. The target versions are named so the release
-notes can be checked against the manifests before `npm publish`.
+The target versions are named so the release notes can be checked against
+the manifests before `npm publish`. `@blobbi-kit/renderer` 0.3.0 and
+core/react 0.6.1 below are on the registry; 0.4.0 is not yet.
+
+### `@blobbi-kit/renderer` 0.4.0 (V1 baby expressions; the sleeping Zzz becomes optional)
+
+Two things a host game asked for. Neither changes any default output: every
+V1 fingerprint (`v1-fingerprints.test.ts`) and the pre-0.4.0 DOM of the
+component are byte-identical when the new inputs are left out.
+
+- **`sleepIndicator`** is a new render input on `BlobbiRenderer`,
+  `renderBlobbiSvg` and `BlobbiRenderModelInput`: `'artwork'` (default) |
+  `'none'`, exported as `BLOBBI_SLEEP_INDICATORS` with
+  `normalizeBlobbiSleepIndicator`. The V1 sleeping drawings (the baby and
+  all sixteen adult forms) carry a small baked "Zzz" beside the head, an
+  environmental cue rather than part of the creature; a host that draws its
+  own animated sleep cue showed two. `'none'` removes that one comment block
+  (`svg/sleep-indicator.ts`, found the way `applyRearView` finds face blocks
+  and deleted only when self-contained) and nothing else: closed eyes and the
+  calm mouth stay, awake drawings are returned as the same string, V2 (which
+  has no baked Zzz) is untouched.
+- **V1 baby expressions.** The baby front now draws the `expression` input,
+  as rules over the one authored face (`artwork/baby/v1/expression.ts`)
+  rather than a second drawing per emotion: the mouth path per state (`open`
+  becomes a small filled ellipse), a body-coloured lid over the upper half of
+  each eye for `half` (inserted after the pupils so gaze still works under
+  it), grown whites and pupils for `wide`, and faded or deepened cheeks for
+  `none`/`strong` blush. Touched parts carry `data-part`
+  (`BABY_V1_EXPRESSION_PARTS`) and `data-blobbi-mouth|eyes|blush`, the same
+  markers V2 uses. `supports.expression` is now `true` for the baby front and
+  profiles (the faceless back stays `false`), so
+  `data-blobbi-expression-support` appears on the component root. Neutral is
+  the identity. `isSleeping` still selects the sleeping drawing whatever the
+  expression. **Limitation:** the baby has no authored brows, so the `brows`
+  part is not drawn on it (documented in the README and the module).
+- Tests: `svg/sleep-indicator.test.ts` (one removable Zzz per V1 sleeping
+  drawing, idempotent, awake and V2 untouched, the defaults draw what 0.3.0
+  drew), `artwork/baby-v1-expression.test.ts` (neutral identity, every
+  preset changes only the face, identity and ids unchanged, gaze on an
+  expressed face, back and sleeping never expressed, mirrored facings equal,
+  no clock or randomness in the rule), and component cases in
+  `BlobbiRenderer.expressive.test.tsx`. `adult-v2-expression.test.ts` now
+  asserts only the egg ignores expressions.
 
 ### `@blobbi-kit/renderer` 0.3.0 (egg artwork)
 

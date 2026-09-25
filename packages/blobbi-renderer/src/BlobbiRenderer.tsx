@@ -54,6 +54,7 @@ import {
 } from './blobbi-render-size';
 import { normalizeBlobbiRenderModel, type BlobbiVisual } from './blobbi-render-model';
 import type { BlobbiExpression } from './expression-model';
+import type { BlobbiSleepIndicator } from './svg/sleep-indicator';
 import { BLOBBI_MOTION_STYLESHEET, blobbiMotionAttributes, type BlobbiMotion } from './motion-model';
 import type { BlobbiEggCrack } from './egg-model';
 import type { NormalizedAccessoryPlacement } from './accessory-normalize';
@@ -111,10 +112,18 @@ export interface BlobbiRendererProps {
   /**
    * Facial expression: a preset (`'happy'`, `'sad'`, ...) or explicit parts
    * (`{ eyes, mouth, brows, blush }`), every value from a closed vocabulary.
-   * Drawn on V2 front and side; V1 and the V2 back ignore it. `isSleeping`
-   * always closes the eyes. Default: neutral, the authored face.
+   * Drawn on the V2 front and side and on the V1 baby front; the V1 adults
+   * and the faceless backs ignore it. `isSleeping` always closes the eyes.
+   * Default: neutral, the authored face.
    */
   expression?: BlobbiExpression;
+  /**
+   * The V1 sleeping drawings carry a small baked "Zzz" beside the head.
+   * `'artwork'` (default) keeps it; `'none'` draws the creature asleep only
+   * (closed eyes, calm mouth), for a host that draws its own sleep cue. V2
+   * has no baked Zzz either way.
+   */
+  sleepIndicator?: BlobbiSleepIndicator;
   /**
    * Body motion: `'still'` (default, no markup change), `'idle'` (a slow
    * breath) or `'walking'` (a bob with sway and squash). The host moves the
@@ -279,6 +288,7 @@ export function BlobbiRenderer({
   accessories = [],
   effects,
   expression,
+  sleepIndicator,
   motion,
   eggCrack,
   sanitize,
@@ -308,6 +318,7 @@ export function BlobbiRenderer({
     eyeOffset,
     accessories,
     expression,
+    sleepIndicator,
     motion,
     eggCrack,
   });
@@ -334,6 +345,7 @@ export function BlobbiRenderer({
           adultType: model.adultType,
           facing: model.facing,
           eyesClosed: model.eyesClosed,
+          sleepIndicator: model.sleepIndicator,
           expression: model.expression,
           eggCrack: model.eggCrack,
         },
@@ -364,6 +376,7 @@ export function BlobbiRenderer({
     model.secondaryColor,
     model.eyeColor,
     model.eyesClosed,
+    model.sleepIndicator,
     model.instanceId,
     model.facing,
     // The resolved expression is a frozen value object; its fields are the

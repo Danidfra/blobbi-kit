@@ -143,3 +143,55 @@ describe('gaze is screen-relative on every facing', () => {
     }
   });
 });
+
+describe('the V1 baby has an expressive face too (0.4.0)', () => {
+  const BABY: BlobbiVisual = { stage: 'baby', baseColor: '#55c4a2' };
+
+  it.each(BLOBBI_EMOTIONS.filter((e) => e !== 'neutral'))('%s changes the baby body markup and the root says so', (emotion) => {
+    const plain = render(<BlobbiRenderer visual={BABY} instanceId="bb" />);
+    const expressed = render(<BlobbiRenderer visual={BABY} instanceId="bb" expression={emotion} />);
+    expect(svg(expressed.container).outerHTML).not.toBe(svg(plain.container).outerHTML);
+    expect(expressed.container.firstElementChild?.getAttribute('data-blobbi-expression-support')).toBe('');
+  });
+
+  it('the V1 adults still ignore expressions', () => {
+    const plain = render(<BlobbiRenderer visual={V1} instanceId="v1" />);
+    const expressed = render(<BlobbiRenderer visual={V1} instanceId="v1" expression="excited" />);
+    expect(expressed.container.innerHTML).toBe(plain.container.innerHTML);
+    expect(expressed.container.firstElementChild?.getAttribute('data-blobbi-expression-support')).toBeNull();
+  });
+
+  it('isSleeping wins: the sleeping baby drawing, whatever the expression', () => {
+    const asleep = render(<BlobbiRenderer visual={BABY} instanceId="bs" isSleeping />);
+    const happyAsleep = render(<BlobbiRenderer visual={BABY} instanceId="bs" isSleeping expression="happy" />);
+    expect(happyAsleep.container.innerHTML).toBe(asleep.container.innerHTML);
+  });
+});
+
+describe('sleepIndicator', () => {
+  const BABY: BlobbiVisual = { stage: 'baby', baseColor: '#55c4a2' };
+  const zzz = (c: HTMLElement) => [...svg(c).querySelectorAll('text')].filter((t) => /^z+$/i.test(t.textContent ?? ''));
+
+  it("defaults to 'artwork': the sleeping drawing keeps its Zzz, as before", () => {
+    const plain = render(<BlobbiRenderer visual={BABY} instanceId="z" isSleeping />);
+    const explicit = render(<BlobbiRenderer visual={BABY} instanceId="z" isSleeping sleepIndicator="artwork" />);
+    expect(explicit.container.innerHTML).toBe(plain.container.innerHTML);
+    expect(zzz(plain.container).length).toBeGreaterThan(0);
+  });
+
+  it("'none' draws the creature asleep with no Zzz, on the baby and every V1 adult", () => {
+    const babyNone = render(<BlobbiRenderer visual={BABY} instanceId="z" isSleeping sleepIndicator="none" />);
+    expect(zzz(babyNone.container)).toEqual([]);
+    expect(svg(babyNone.container).innerHTML).toContain('Sleeping eyes');
+    const adultNone = render(<BlobbiRenderer visual={V1} instanceId="z" isSleeping sleepIndicator="none" />);
+    expect(svg(adultNone.container).outerHTML).not.toMatch(/Zzz/);
+    expect(svg(render(<BlobbiRenderer visual={V1} instanceId="z" isSleeping />).container).outerHTML).toMatch(/Zzz/);
+  });
+
+  it("'none' is a no-op while awake and on V2", () => {
+    const awake = render(<BlobbiRenderer visual={BABY} instanceId="z" />);
+    expect(render(<BlobbiRenderer visual={BABY} instanceId="z" sleepIndicator="none" />).container.innerHTML).toBe(awake.container.innerHTML);
+    const v2 = render(<BlobbiRenderer visual={V2} instanceId="z" isSleeping />);
+    expect(render(<BlobbiRenderer visual={V2} instanceId="z" isSleeping sleepIndicator="none" />).container.innerHTML).toBe(v2.container.innerHTML);
+  });
+});
