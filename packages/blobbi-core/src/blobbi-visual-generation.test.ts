@@ -9,7 +9,9 @@ import {
   KIND_BLOBBI_STATE,
   VISUAL_GENERATION_TAG,
   DEFAULT_VISUAL_GENERATION,
+  NEW_BLOBBI_VISUAL_GENERATION,
   buildEggTags,
+  visualGenerationTags,
   parseBlobbiEvent,
   parseVisualGeneration,
   updateBlobbiTags,
@@ -35,16 +37,45 @@ function makeEvent(tags: string[][]): NostrEvent {
   };
 }
 
-const canonicalTags = () => buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sparky');
+/** A Blobbi that existed before the marker did: built as V1, so no tag. */
+const canonicalTags = () => buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sparky', { visualGeneration: 'v1' });
 
 describe('the visual_generation tag', () => {
-  it('is named visual_generation and defaults to v1', () => {
+  it('is named visual_generation; an event without it reads as v1; a new Blobbi is born v2', () => {
     expect(VISUAL_GENERATION_TAG).toBe('visual_generation');
     expect(DEFAULT_VISUAL_GENERATION).toBe('v1');
+    expect(NEW_BLOBBI_VISUAL_GENERATION).toBe('v2');
   });
 
-  it('is absent from a freshly built Blobbi: creation stays v1 unless a host asks otherwise', () => {
-    expect(getTagValue(canonicalTags(), VISUAL_GENERATION_TAG)).toBeUndefined();
+  it('creation: buildEggTags is v2 by default, v1 on request, and the v1 output is exactly the pre-option output', () => {
+    const born = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sparky');
+    expect(getTagValue(born, VISUAL_GENERATION_TAG)).toBe('v2');
+    expect(parseBlobbiEvent(makeEvent(born))!.visualGeneration).toBe('v2');
+    expect(getTagValue(buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sparky', { visualGeneration: 'v2' }), VISUAL_GENERATION_TAG)).toBe('v2');
+    // V1 on request: no tag at all, and otherwise the same tags in the same order.
+    const v1 = canonicalTags();
+    expect(getTagValue(v1, VISUAL_GENERATION_TAG)).toBeUndefined();
+    expect(born.filter((t) => t[0] !== VISUAL_GENERATION_TAG)).toEqual(v1);
+    expect(born[born.length - 1]).toEqual([VISUAL_GENERATION_TAG, 'v2']);
+  });
+
+  it('visualGenerationTags spells the marker for hosts that build a first event by hand', () => {
+    expect(visualGenerationTags()).toEqual([[VISUAL_GENERATION_TAG, 'v2']]);
+    expect(visualGenerationTags('v2')).toEqual([[VISUAL_GENERATION_TAG, 'v2']]);
+    expect(visualGenerationTags('v1')).toEqual([]);
+  });
+
+  it('the generation is identity, not a version: a v2 egg stays v2 through every managed republish, and a v1 one never gains the tag', () => {
+    const v2 = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sparky');
+    const hatched = validateAndRepairBlobbiTags(updateBlobbiTags(v2, { stage: 'baby', state: 'active' }), v2, { cleanupTaskTags: true }).tags;
+    expect(getTagValue(hatched, VISUAL_GENERATION_TAG)).toBe('v2');
+    const grown = validateAndRepairBlobbiTags(updateBlobbiTags(hatched, { stage: 'adult', progression_state: 'none' }), hatched, { cleanupTaskTags: true }).tags;
+    expect(getTagValue(grown, VISUAL_GENERATION_TAG)).toBe('v2');
+    expect(parseBlobbiEvent(makeEvent(grown))!.visualGeneration).toBe('v2');
+    const v1 = canonicalTags();
+    const v1Grown = validateAndRepairBlobbiTags(updateBlobbiTags(updateBlobbiTags(v1, { stage: 'baby' }), { stage: 'adult' }), v1, { cleanupTaskTags: true }).tags;
+    expect(getTagValue(v1Grown, VISUAL_GENERATION_TAG)).toBeUndefined();
+    expect(parseBlobbiEvent(makeEvent(v1Grown))!.visualGeneration).toBe('v1');
   });
 
   it('parses: absent -> v1, v1 -> v1, v2 -> v2, anything unknown -> v1', () => {

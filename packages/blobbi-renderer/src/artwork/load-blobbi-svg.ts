@@ -39,6 +39,8 @@ export interface RenderBlobbiSvgOptions {
   eyesClosed?: boolean;
   /** `'artwork'` (default) keeps the V1 sleeping Zzz; `'none'` draws the creature asleep only. */
   sleepIndicator?: 'artwork' | 'none';
+  /** Whether the V2 drawings keep their baked ground shadow. `'none'` (default) draws the creature only. */
+  groundShadow?: 'none' | 'artwork';
   /**
    * Facial expression: a preset name or explicit parts. Drawn into the SVG
    * markup on artwork with a semantic face (V2 front and side); a no-op on
@@ -88,6 +90,7 @@ export function renderBlobbiSvg(options: RenderBlobbiSvgOptions): RenderedBlobbi
       facing: options.facing ?? 'front',
       eyesClosed: options.eyesClosed ?? false,
       sleepIndicator: options.sleepIndicator === 'none' ? 'none' : 'artwork',
+      groundShadow: options.groundShadow === 'artwork' ? 'artwork' : 'none',
       expression: normalizeBlobbiExpression(options.expression),
       eggCrack: normalizeBlobbiEggCrack(options.eggCrack),
     },

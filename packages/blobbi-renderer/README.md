@@ -255,9 +255,15 @@ stylesheet once instead. `'still'` (the default) emits nothing at all, so a
 motionless Blobbi has exactly the DOM it always had. The phase is a hash of
 `instanceId`, so a crowd does not bob in lockstep, deterministically; there
 is no timer and no randomness anywhere. Idle is a four-second breath of about
-one percent; walking is a half-second bob with a degree of sway and a hint of
-squash. The host moves the box through its world; the renderer only makes the
-body look the part.
+one percent. Walking is one word for the host and two gaits for the artwork:
+V1 and the baby have no legs, so they walk as they always have, a half-second
+bob with a degree of sway and a hint of squash; the V2 adult has legs, so the
+same stylesheet, scoped by the `data-blobbi-generation` the drawing carries,
+sways the body without bouncing it and lifts and strides each leg group
+(`left-leg`/`right-leg` on the front and back, `near-leg`/`far-leg` on the
+profile) in turn, at the same cycle and phase. Reduced motion stills the legs
+with the body. The host moves the box through its world; the renderer only
+makes the body look the part, and never knows where the feet are going.
 
 `renderBlobbiSvg(...).artwork.supports` reports `{ expression, gaze, motion }`
 per drawing: V2 front and side support all three, the V2 back supports motion
@@ -329,14 +335,17 @@ by an Inkscape group name.
 | `front` | authored diagonal view | two eyes with movable `*-eye-inner` groups, eyebrows, cheeks, mouth, tuft, side pattern, shine |
 | `side` | authored right-facing profile | one `eye`/`eye-inner`, `near-*`/`far-*` limbs; **`left` is this drawing mirrored** (`data-blobbi-mirrored="x"`) |
 | `back` | derived from the front | same body, feet, arms, tufts and shadows; arms and tufts stacked behind the body; no face parts at all |
+| ground shadow | authored, off by default | the blurred `ground-shadow` pool on the floor is an environmental element; `groundShadow="none"` (default) removes exactly it, `'artwork'` keeps it. The creature's own contact shading (`body-shadow`, `*-foot-shadow`) is always drawn |
 | closed eyes | derived from any view | `isSleeping`/`eyesClosed`: each eye group keeps its transform and is marked `data-blobbi-eyes="closed"`; its white and `*-eye-inner` children are removed and one lid stroke (`left-eye-closed`, `right-eye-closed`, `eye-closed`) is drawn in the mouth's `#21102e`. Eyebrows, cheeks, mouth and body are byte-identical to the awake drawing; the back view is unchanged. No separate sleeping SVG exists. |
 
 Parts (see `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`,
 `ADULT_V2_CLOSED_EYE_PARTS`):
 `character`, `body-base`, `body-shadow`, `ground-shadow`, `body-shine`,
 `left-arm`/`right-arm` (front, back), `near-arm`/`far-arm` (side),
-`left-foot`/`right-foot` and their shadows (front, back), `near-foot`/`far-foot`
-(side), `tuft-main`, `tuft-secondary`, `tuft-detail-left`/`-right`,
+`left-leg`/`right-leg` each wrapping `left-foot`/`right-foot`, and the foot
+shadows (front, back), `near-leg`/`far-leg` wrapping `near-foot`/`far-foot`
+(side) (`ADULT_V2_LEG_PARTS`), `tuft-main`, `tuft-secondary`,
+`tuft-detail-left`/`-right`,
 `left-eye`/`right-eye`/`eye` with `*-eye-white`, `*-eye-inner` (movable),
 `*-iris`, `*-pupil`, `*-eye-highlight-primary`/`-secondary`,
 `left-eyebrow`/`right-eyebrow`/`eyebrow`, `left-cheek`/`right-cheek`/`cheek`
@@ -360,8 +369,10 @@ are carried in identity but **not yet drawn** on V2. Closed eyes are drawn (as
 a transformation, above). Baby V2 does not exist yet; a V2 baby draws the V1
 baby.
 
-Nothing moves: the renderer stays a pure function of its props. The semantic
-part map exists so that parts can be selected by name rather than by id.
+Nothing moves in the markup: the renderer stays a pure function of its props,
+and the SVG string is the same for every motion state. What moves is CSS over
+the semantic parts (the leg groups, for the V2 walk), which is why the part
+map exists: parts are selected by name rather than by id.
 
 ### Adding artwork
 

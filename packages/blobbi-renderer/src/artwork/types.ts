@@ -65,6 +65,12 @@ export interface ArtworkRequest {
    */
   sleepIndicator?: 'artwork' | 'none';
   /**
+   * Whether the V2 drawings keep their baked ground shadow (`'artwork'`) or
+   * draw the creature only (`'none'`, the default), for hosts that draw the
+   * ground shadow in their world. V1 has none. See `svg/ground-shadow.ts`.
+   */
+  groundShadow?: 'none' | 'artwork';
+  /**
    * Resolved facial expression. Drawn by generations with a face the package
    * can transform (V2 front and side; the V1 baby front); ignored by the V1
    * adults and by faceless views. Absent means neutral. `eyesClosed` wins

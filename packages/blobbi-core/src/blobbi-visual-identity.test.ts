@@ -26,7 +26,8 @@ function makeCompanion(
   extraTags: string[][] = [],
   name = 'Sparky',
 ): BlobbiCompanion {
-  const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, name)
+  // An EXISTING Blobbi: born before the generation marker, so V1 unless a test appends the tag.
+  const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, name, { visualGeneration: 'v1' })
     .map((t) => (t[0] === 'stage' ? ['stage', stage] : t))
     .concat(extraTags);
   const event: NostrEvent = {

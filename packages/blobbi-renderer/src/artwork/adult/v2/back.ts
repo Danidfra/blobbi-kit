@@ -45,8 +45,12 @@ export const ADULT_V2_BACK_SVG = `<svg viewBox="0 0 211.66666 238.125" version="
         <ellipse id="ground-shadow" data-part="ground-shadow" cx="408.65656" cy="830.79346" rx="205" ry="30" fill="#2f183f" opacity="0.18" filter="url(#blur18)" style="filter:url(#blur18-4)" />
         <ellipse id="right-foot-shadow" data-part="right-foot-shadow" cx="314.65656" cy="768.79346" rx="77" ry="55" fill="#2d0d68" opacity="0.22" filter="url(#blur10)" style="filter:url(#blur10-8)" />
         <ellipse id="left-foot-shadow" data-part="left-foot-shadow" cx="502.65656" cy="768.79346" rx="77" ry="55" fill="#2d0d68" opacity="0.22" filter="url(#blur10)" style="filter:url(#blur10-8)" />
-        <ellipse id="right-foot" data-part="right-foot" cx="221.64038" cy="776.80133" rx="79" ry="57" fill="url(#footGradient)" transform="rotate(-7)" style="fill:url(#linearGradient13)" />
-        <ellipse id="left-foot" data-part="left-foot" cx="589.58069" cy="677.19592" rx="79" ry="57" fill="url(#footGradient)" transform="rotate(7)" style="fill:url(#linearGradient14)" />
+        <g id="right-leg" data-part="right-leg">
+          <ellipse id="right-foot" data-part="right-foot" cx="221.64038" cy="776.80133" rx="79" ry="57" fill="url(#footGradient)" transform="rotate(-7)" style="fill:url(#linearGradient13)" />
+        </g>
+        <g id="left-leg" data-part="left-leg">
+          <ellipse id="left-foot" data-part="left-foot" cx="589.58069" cy="677.19592" rx="79" ry="57" fill="url(#footGradient)" transform="rotate(7)" style="fill:url(#linearGradient14)" />
+        </g>
         <path id="right-arm" data-part="right-arm" d="m 148.21229,496.57208 c -44,24 -42,99 2,133 34,26 63,-5 63,-45 -1,-45 -21,-76 -65,-88 z" fill="url(#limbGradient)" style="fill:url(#linearGradient17)" />
         <path id="left-arm" data-part="left-arm" d="m 669.10084,497.92126 c 44,24 42,99 -2,133 -34,26 -63,-5 -63,-45 1,-45 21,-76 65,-88 z" fill="url(#limbGradient)" style="fill:url(#linearGradient18)" />
         <ellipse id="tuft-main" data-part="tuft-main" cx="423.08154" cy="-4.1489954" rx="32" ry="49" fill="url(#limbGradient)" transform="rotate(18)" style="fill:url(#linearGradient15)" />

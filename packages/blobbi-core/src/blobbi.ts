@@ -130,6 +130,29 @@ export const VISUAL_GENERATION_TAG = 'visual_generation';
 /** The generation of every event that carries no {@link VISUAL_GENERATION_TAG}. */
 export const DEFAULT_VISUAL_GENERATION: BlobbiVisualGeneration = 'v1';
 
+/**
+ * The generation a NEW Blobbi is born with, today. This is the creation rule
+ * of the ecosystem, owned here so that no application has to remember a
+ * tag: {@link buildEggTags} applies it unless a host asks for another
+ * generation explicitly. It is distinct from {@link DEFAULT_VISUAL_GENERATION},
+ * which is how an event WITHOUT the tag is read: every Blobbi that existed
+ * before the marker did stays V1, without any migration, and a stage
+ * transition never changes a generation (the tag is persistent identity;
+ * see `blobbi-visual-generation.test.ts`).
+ */
+export const NEW_BLOBBI_VISUAL_GENERATION: BlobbiVisualGeneration = 'v2';
+
+/**
+ * The tag list that names a generation on a NEW event: `[]` for `'v1'`
+ * (absence is V1, so a V1 creation is byte-identical to one made before
+ * the marker existed) and `[["visual_generation", "v2"]]` for `'v2'`. For
+ * hosts that assemble a first kind 31124 by hand instead of through
+ * {@link buildEggTags}: the one place the spelling lives.
+ */
+export function visualGenerationTags(generation: BlobbiVisualGeneration = NEW_BLOBBI_VISUAL_GENERATION): string[][] {
+  return generation === DEFAULT_VISUAL_GENERATION ? [] : [[VISUAL_GENERATION_TAG, generation]];
+}
+
 const VISUAL_GENERATIONS: ReadonlySet<string> = new Set<BlobbiVisualGeneration>(['v1', 'v2']);
 
 /**
@@ -1428,11 +1451,22 @@ export function buildBlobbonautTags(pubkey: string): string[][] {
  * Visual traits are derived from the seed and explicitly stored
  * to ensure consistent rendering across clients.
  */
+export interface BuildEggTagsOptions {
+  /**
+   * Which artwork generation the new Blobbi is born into. Defaults to
+   * {@link NEW_BLOBBI_VISUAL_GENERATION} (`'v2'`). Pass `'v1'` for an
+   * application that deliberately creates original-generation Blobbis; that
+   * output carries no `visual_generation` tag, exactly as before this option.
+   */
+  visualGeneration?: BlobbiVisualGeneration;
+}
+
 export function buildEggTags(
   pubkey: string,
   petId: string,
   createdAt: number,
-  name = 'Egg'
+  name = 'Egg',
+  options: BuildEggTagsOptions = {}
 ): string[][] {
   const d = getCanonicalBlobbiD(pubkey, petId);
   const seed = deriveBlobbiSeedV1(pubkey, d, createdAt);
@@ -1469,6 +1503,8 @@ export function buildEggTags(
     ['pattern', pattern],
     ['special_mark', specialMark],
     ['size', size],
+    // Identity from birth: which artwork family draws this Blobbi (see NEW_BLOBBI_VISUAL_GENERATION).
+    ...visualGenerationTags(options.visualGeneration ?? NEW_BLOBBI_VISUAL_GENERATION),
   ];
 }
 

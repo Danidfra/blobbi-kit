@@ -55,6 +55,7 @@ import {
 import { normalizeBlobbiRenderModel, type BlobbiVisual } from './blobbi-render-model';
 import type { BlobbiExpression } from './expression-model';
 import type { BlobbiSleepIndicator } from './svg/sleep-indicator';
+import type { BlobbiGroundShadow } from './svg/ground-shadow';
 import { BLOBBI_MOTION_STYLESHEET, blobbiMotionAttributes, type BlobbiMotion } from './motion-model';
 import type { BlobbiEggCrack } from './egg-model';
 import type { NormalizedAccessoryPlacement } from './accessory-normalize';
@@ -125,9 +126,19 @@ export interface BlobbiRendererProps {
    */
   sleepIndicator?: BlobbiSleepIndicator;
   /**
+   * The V2 drawings carry a baked ground shadow under the creature. `'none'`
+   * (default) draws the creature only, for a host that draws the ground
+   * shadow in its world (where the floor, the depth and the bed are known);
+   * `'artwork'` keeps the drawing as authored. V1 has no ground shadow.
+   */
+  groundShadow?: BlobbiGroundShadow;
+  /**
    * Body motion: `'still'` (default, no markup change), `'idle'` (a slow
-   * breath) or `'walking'` (a bob with sway and squash). The host moves the
-   * box through its world; this only makes the body look the part.
+   * breath) or `'walking'`. Walking is a bob with sway and squash on V1 and
+   * the baby (they have no legs); the V2 adult walks on its legs (a sway of
+   * the body, each foot lifting and striding in turn) through the same
+   * stylesheet. The host moves the box through its world; this only makes
+   * the body look the part.
    */
   motion?: BlobbiMotion;
   /**
@@ -289,6 +300,7 @@ export function BlobbiRenderer({
   effects,
   expression,
   sleepIndicator,
+  groundShadow,
   motion,
   eggCrack,
   sanitize,
@@ -319,6 +331,7 @@ export function BlobbiRenderer({
     accessories,
     expression,
     sleepIndicator,
+    groundShadow,
     motion,
     eggCrack,
   });
@@ -346,6 +359,7 @@ export function BlobbiRenderer({
           facing: model.facing,
           eyesClosed: model.eyesClosed,
           sleepIndicator: model.sleepIndicator,
+          groundShadow: model.groundShadow,
           expression: model.expression,
           eggCrack: model.eggCrack,
         },
@@ -377,6 +391,7 @@ export function BlobbiRenderer({
     model.eyeColor,
     model.eyesClosed,
     model.sleepIndicator,
+    model.groundShadow,
     model.instanceId,
     model.facing,
     // The resolved expression is a frozen value object; its fields are the

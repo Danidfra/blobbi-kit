@@ -12,8 +12,85 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 ## Unreleased
 
 The target versions are named so the release notes can be checked against
-the manifests before `npm publish`. `@blobbi-kit/renderer` 0.3.0 and
-core/react 0.6.1 below are on the registry; 0.4.0 is not yet.
+the manifests before `npm publish`. `@blobbi-kit/renderer` 0.4.0 and
+core/react 0.6.1 below are on the registry; renderer 0.5.0 and core/react
+0.7.0 are not yet.
+
+### `@blobbi-kit/core` and `@blobbi-kit/react` 0.7.0 (a new Blobbi is born V2)
+
+**Breaking under 0.x, for creation only.** The visual generation is identity
+from birth, and the creation rule now lives in core instead of in every
+application's memory of a tag.
+
+- **`buildEggTags` writes `["visual_generation", "v2"]` by default.** New
+  export `NEW_BLOBBI_VISUAL_GENERATION` (`'v2'`) names the rule; a fifth
+  argument `options: { visualGeneration }` overrides it, and `'v1'` produces
+  exactly the pre-0.7.0 tag list (no tag: absence is V1). New export
+  `visualGenerationTags(generation)` spells the marker (`[]` for `'v1'`) for
+  hosts that assemble a first kind 31124 by hand. `DEFAULT_VISUAL_GENERATION`
+  (`'v1'`, how an event WITHOUT the tag is read) is unchanged, so every
+  existing Blobbi stays V1 without any migration.
+- **Nothing else changes a generation.** `updateBlobbiTags` carries the tag
+  through every republish, the repair pass recovers it as a persistent tag,
+  and neither `planHatchTransition`/`useBlobbiHatch` nor `useBlobbiEvolve`
+  writes or drops it: a V2 egg hatches into a V2 baby and evolves into a V2
+  adult, a V1 Blobbi stays V1 through both, and no transition ever
+  "upgrades" the artwork. The adult FORM is the seed's on both generations
+  (the transition only writes the seed's mirror `adult_type`). Pinned in
+  `blobbi-visual-generation.test.ts` (core) and the new
+  `lifecycle-generation.test.tsx` (react, at the hook level).
+- `@blobbi-kit/react` has no code change of its own; it moves to 0.7.0 in
+  lockstep and its core peer to `^0.7.0`.
+
+Compatibility decision: a host that deliberately creates V1 Blobbis passes
+`{ visualGeneration: 'v1' }` and gets byte-identical output; a host that
+builds its first event by hand adds `...visualGenerationTags()`; every
+other host gets V2 by upgrading. Existing events are never rewritten.
+
+### `@blobbi-kit/renderer` 0.5.0 (the V2 adult walks on its legs; its ground shadow is the world's)
+
+**Breaking under 0.x**: the default V2 output loses one element (the baked
+ground shadow), and the V2 drawings gain four leg groups. Every V1 fingerprint
+(`v1-fingerprints.test.ts`) and every V1 and baby walk are byte-identical.
+
+- **Leg groups.** Each V2 foot is wrapped in a `<g>` carrying a new part:
+  `left-leg`/`right-leg` (front and back) and `near-leg`/`far-leg` (the
+  profile), exported as `ADULT_V2_LEG_PARTS` and listed in the view part
+  lists. A group, not the foot, because the authored feet carry their own
+  `transform` (a rotation about the origin) that a CSS transform on the same
+  element would replace; the feet keep every authored attribute.
+- **The V2 walk.** `motion="walking"` is unchanged as an input. On a V2
+  drawing `BLOBBI_MOTION_STYLESHEET` now scopes a different gait by the
+  `data-blobbi-generation` the drawing already carries: the body only sways
+  (`blobbi-motion-walk-v2`, a degree either way and a slight rise at each
+  step, no squash), and the leg groups do the walking, at the same
+  `0.56 s` cycle and the same per-instance phase, so a host that keys its
+  ground shadow to the cycle sees one clock. Front and back: each leg lifts
+  in its half of the cycle (`blobbi-motion-step-left/right`, in the
+  drawing's inner units under its 0.2646 document scale), pressing down a
+  little while the other lifts so the planted foot stays on the ground as
+  the body rises. Profile: near and far legs stride half a cycle apart
+  (`blobbi-motion-stride-near/far`), back along the ground while planted, up
+  and forward while lifted; the mirrored left profile mirrors the stride.
+  Nothing moves the feet for `still` or `idle`, `prefers-reduced-motion`
+  stills the legs with the body, and the SVG string is the same for every
+  motion (`v2-gait.test.tsx`). The V1 and baby rules are the exact text they
+  were.
+- **`groundShadow: 'none' | 'artwork'`** is a new render input on
+  `BlobbiRenderer`, `renderBlobbiSvg` and `BlobbiRenderModelInput`, exported
+  with `BLOBBI_GROUND_SHADOWS` and `normalizeBlobbiGroundShadow`. The V2
+  drawings carry a blurred `ground-shadow` ellipse on the floor under the
+  creature: an environmental element, not the creature, and every host that
+  moves a Blobbi through a world draws its own and showed two. **`'none'` is
+  the default**: the renderer draws the creature only (`svg/ground-shadow.ts`
+  removes exactly that one element, idempotently; the creature's own contact
+  shading, `body-shadow` and the foot shadows, stays). `'artwork'` keeps the
+  drawing as authored, for a host with no ground of its own. V1 has no
+  ground shadow either way, so V1 output is unchanged.
+
+Ownership, stated once: the renderer draws the creature, its expressions,
+its sleep and how its body moves in place; the world owns position, the
+floor, the bed, the ground shadow and when the creature walks.
 
 ### `@blobbi-kit/renderer` 0.4.0 (V1 baby expressions; the sleeping Zzz becomes optional)
 

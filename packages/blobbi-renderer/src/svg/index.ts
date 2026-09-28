@@ -22,6 +22,7 @@ export { uniquifySvgIds } from './ids';
 export { ensureSvgFillsContainer } from './container';
 export { applyGazeMarkup, type GazeMarkupOptions } from './gaze';
 export { removeSleepIndicator, hasSleepIndicator, normalizeBlobbiSleepIndicator, SLEEP_INDICATOR_BLOCKS, BLOBBI_SLEEP_INDICATORS, type BlobbiSleepIndicator } from './sleep-indicator';
+export { removeGroundShadow, hasGroundShadow, normalizeBlobbiGroundShadow, GROUND_SHADOW_PART, BLOBBI_GROUND_SHADOWS, type BlobbiGroundShadow } from './ground-shadow';
 export {
   applyRearView,
   findRearViewRemovals,

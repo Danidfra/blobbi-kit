@@ -76,6 +76,9 @@ const PUBLIC_API = [
   // Sleep indicator (the V1 sleeping drawings' baked Zzz) and the baby face
   'BLOBBI_SLEEP_INDICATORS',
   'normalizeBlobbiSleepIndicator',
+  // Ground shadow (the V2 drawings' baked floor shadow; the creature only by default)
+  'BLOBBI_GROUND_SHADOWS',
+  'normalizeBlobbiGroundShadow',
   'BABY_V1_EXPRESSION_PARTS',
   // Optional stylesheets
   'BLOBBI_EFFECT_STYLESHEET',
@@ -83,6 +86,7 @@ const PUBLIC_API = [
   // Artwork vocabulary
   'ADULT_V2_CLOSED_EYE_PARTS',
   'ADULT_V2_EXPRESSION_PARTS',
+  'ADULT_V2_LEG_PARTS',
   'ADULT_V2_FACE_PARTS',
   'ADULT_V2_GAZE_PARTS',
   'ADULT_V2_PARTS',

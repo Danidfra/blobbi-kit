@@ -13,9 +13,9 @@ npm under the `@blobbi-kit` scope.
 
 | Package | Version | What it is | Runtime dependencies |
 | --- | --- | --- | --- |
-| [`@blobbi-kit/core`](./packages/blobbi-core) | 0.6.1 | Event kinds, parsing, domain rules, decay, seed identity. No React, no DOM, no Nostr library. | `@noble/hashes` |
-| [`@blobbi-kit/react`](./packages/blobbi-react) | 0.6.1 | React hooks over core: reading a user's Blobbis, projecting state, syncing and publishing through host-supplied functions. Browser only. | peers: core, `react`, `@tanstack/react-query`, `@nostrify/react` |
-| [`@blobbi-kit/renderer`](./packages/blobbi-renderer) | 0.3.0 | React component and string API that draws a Blobbi as SVG from plain visual data. Imports neither kit package. | peer: `react` |
+| [`@blobbi-kit/core`](./packages/blobbi-core) | 0.7.0 | Event kinds, parsing, domain rules, decay, seed identity. No React, no DOM, no Nostr library. | `@noble/hashes` |
+| [`@blobbi-kit/react`](./packages/blobbi-react) | 0.7.0 | React hooks over core: reading a user's Blobbis, projecting state, syncing and publishing through host-supplied functions. Browser only. | peers: core, `react`, `@tanstack/react-query`, `@nostrify/react` |
+| [`@blobbi-kit/renderer`](./packages/blobbi-renderer) | 0.5.0 | React component and string API that draws a Blobbi as SVG from plain visual data. Imports neither kit package. | peer: `react` |
 | [`renderer-consumer-fixture`](./packages/blobbi-renderer-consumer) | private | Test-only consumer of the renderer. Proves it renders with no provider, no host CSS and no kit package around it. | |
 
 `core` and `react` are versioned and released together. `renderer` is versioned
@@ -85,8 +85,15 @@ map.
   `instanceId` and the effect id, not `Math.random`.
 - Two artwork generations: V1 (sixteen adult forms plus a baby, with a derived
   rear view) and V2 (one adult anatomy with `data-part` selectors, authored
-  front and side views, derived back and closed eyes). Which generation a
-  Blobbi uses is carried on its event as `visual_generation`; absent means V1.
+  front and side views, derived back and closed eyes, and legs that walk).
+  Which generation a Blobbi uses is carried on its event as
+  `visual_generation`; absent means V1. Core's `buildEggTags` gives a new
+  Blobbi the current generation (`NEW_BLOBBI_VISUAL_GENERATION`, V2), and no
+  transition ever changes it.
+- `motion: 'walking'` is one word for the host; the gait is the artwork's:
+  V1 and the baby bob, the V2 adult walks on its leg groups. The V2 drawings'
+  baked ground shadow is off by default (`groundShadow`): the ground shadow
+  belongs to the world, which knows the floor, the depth and the bed.
 - Every SVG id is prefixed with the `instanceId` you pass, so several Blobbis
   can share a page.
 - It draws one Blobbi in one box. World position, shadows, z-order, inventory

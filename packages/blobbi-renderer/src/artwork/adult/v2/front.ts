@@ -111,8 +111,12 @@ export const ADULT_V2_FRONT_SVG = `<svg viewBox="0 0 211.66666 238.125" version=
         <ellipse id="ground-shadow" data-part="ground-shadow" cx="408.65656" cy="830.79346" rx="205" ry="30" fill="#2f183f" opacity="0.18" filter="url(#blur18)" style="filter:url(#blur18-4)" />
         <ellipse id="left-foot-shadow" data-part="left-foot-shadow" cx="314.65656" cy="768.79346" rx="77" ry="55" fill="#2d0d68" opacity="0.22" filter="url(#blur10)" style="filter:url(#blur10-8)" />
         <ellipse id="right-foot-shadow" data-part="right-foot-shadow" cx="502.65656" cy="768.79346" rx="77" ry="55" fill="#2d0d68" opacity="0.22" filter="url(#blur10)" style="filter:url(#blur10-8)" />
-        <ellipse id="left-foot" data-part="left-foot" cx="221.64038" cy="776.80133" rx="79" ry="57" fill="url(#footGradient)" transform="rotate(-7)" style="fill:url(#linearGradient13)" />
-        <ellipse id="right-foot" data-part="right-foot" cx="589.58069" cy="677.19592" rx="79" ry="57" fill="url(#footGradient)" transform="rotate(7)" style="fill:url(#linearGradient14)" />
+        <g id="left-leg" data-part="left-leg">
+          <ellipse id="left-foot" data-part="left-foot" cx="221.64038" cy="776.80133" rx="79" ry="57" fill="url(#footGradient)" transform="rotate(-7)" style="fill:url(#linearGradient13)" />
+        </g>
+        <g id="right-leg" data-part="right-leg">
+          <ellipse id="right-foot" data-part="right-foot" cx="589.58069" cy="677.19592" rx="79" ry="57" fill="url(#footGradient)" transform="rotate(7)" style="fill:url(#linearGradient14)" />
+        </g>
         <path id="body-base" data-part="body-base" d="m 408.65657,136.79346 c 72,0 130,36.36624 174,95.70063 47,63.16242 76,154.07802 90,255.52069 16,115.79777 -42,213.41241 -141,254.56369 -37,15.3121 -78,22.96815 -123,24.88216 -45,-1.91401 -86,-9.57006 -123,-24.88216 -99,-41.15128 -157,-138.76592 -141,-254.56369 14,-101.44267 43,-192.35827 90,-255.52069 44,-59.33439 102,-95.70063 174,-95.70063 z" fill="url(#bodyGradient)" style="fill:url(#bodyGradient-4);stroke-width:0.978267" />
         <ellipse id="tuft-main" data-part="tuft-main" cx="423.08154" cy="-4.1489954" rx="32" ry="49" fill="url(#limbGradient)" transform="rotate(18)" style="fill:url(#linearGradient15)" />
         <ellipse id="tuft-secondary" data-part="tuft-secondary" cx="381.62637" cy="-259.77301" rx="23" ry="37" fill="url(#limbGradient)" transform="rotate(52)" style="fill:url(#linearGradient16)" />

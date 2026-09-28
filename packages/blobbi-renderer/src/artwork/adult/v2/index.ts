@@ -29,6 +29,7 @@ export {
   ADULT_V2_BACK_PARTS,
   ADULT_V2_FACE_PARTS,
   ADULT_V2_GAZE_PARTS,
+  ADULT_V2_LEG_PARTS,
   type AdultV2Part,
 } from './parts';
 

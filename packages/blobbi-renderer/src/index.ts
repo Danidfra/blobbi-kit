@@ -156,6 +156,7 @@ export {
   ADULT_V2_GAZE_PARTS,
   ADULT_V2_CLOSED_EYE_PARTS,
   ADULT_V2_EXPRESSION_PARTS,
+  ADULT_V2_LEG_PARTS,
 } from './artwork/adult/v2';
 export type { AdultV2Part } from './artwork/adult/v2';
 
@@ -176,4 +177,6 @@ export { applyGazeMarkup, applyRearView, uniquifySvgIds } from './svg';
 
 // Sleep indicator: whether the V1 sleeping drawings keep their baked Zzz
 export { BLOBBI_SLEEP_INDICATORS, normalizeBlobbiSleepIndicator, type BlobbiSleepIndicator } from './svg/sleep-indicator';
+// Ground shadow: the V2 drawings' baked floor shadow is the world's to draw; off by default
+export { BLOBBI_GROUND_SHADOWS, normalizeBlobbiGroundShadow, type BlobbiGroundShadow } from './svg/ground-shadow';
 export { BABY_V1_EXPRESSION_PARTS } from './artwork/baby/v1/expression';

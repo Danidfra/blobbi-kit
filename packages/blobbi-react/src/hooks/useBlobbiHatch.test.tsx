@@ -33,7 +33,8 @@ const NOW = CREATED_AT + 86_400;
 function incubatingEgg(extra: string[][] = []): NostrEvent {
   const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Shell')
     .map((t) => (t[0] === 'progression_state' ? ['progression_state', 'incubating'] : t))
-    .concat([['progression_started_at', String(CREATED_AT + 60)], ['visual_generation', 'v2'], ['custom_host_tag', 'keep-me'], ...extra]);
+    // `buildEggTags` names the generation itself (v2 today); nothing is appended for it here.
+    .concat([['progression_started_at', String(CREATED_AT + 60)], ['custom_host_tag', 'keep-me'], ...extra]);
   return {
     id: 'e'.repeat(64),
     pubkey: PUBKEY,

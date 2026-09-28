@@ -51,7 +51,7 @@ import { getBabyBaseSvg, getBabySleepingSvg, customizeBabySvg, applyBabyV1Expres
 import { getEggSvg, customizeEggSvg } from './egg/v1';
 import { getAdultV2Artwork, customizeAdultV2Svg, applyAdultV2Expression } from './adult/v2';
 import { NEUTRAL_EXPRESSION } from '../expression-model';
-import { applyRearView, removeSleepIndicator, sanitizeArtworkColor } from '../svg';
+import { applyRearView, removeGroundShadow, removeSleepIndicator, sanitizeArtworkColor } from '../svg';
 import { DEFAULT_VISUAL_GENERATION } from './types';
 import { mirrorSvgHorizontally } from './mirror';
 
@@ -156,7 +156,9 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
         // expression is the identity there.
         const expression = request.expression ?? NEUTRAL_EXPRESSION;
         const eyesClosed = request.eyesClosed || expression.eyes === 'closed';
-        const markup = art.hasFace ? applyAdultV2Expression(art.markup, expression, request.eyesClosed) : art.markup;
+        const expressed = art.hasFace ? applyAdultV2Expression(art.markup, expression, request.eyesClosed) : art.markup;
+        // The creature only, unless the host has no ground of its own (svg/ground-shadow.ts).
+        const markup = request.groundShadow === 'artwork' ? expressed : removeGroundShadow(expressed);
         const gazeable = art.hasFace && !eyesClosed;
         return {
           generation: 'v2',

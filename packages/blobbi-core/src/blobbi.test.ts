@@ -213,6 +213,9 @@ describe('buildEggTags (new Blobbi creation)', () => {
     expect(getTagValue(tags, 'progression_state')).toBe('none');
     expect(getTagValue(tags, 'seed')).toHaveLength(64);
     expect(isCanonicalBlobbiD(getTagValue(tags, 'd')!)).toBe(true);
+    // Born into the current generation; see blobbi-visual-generation.test.ts for the rule.
+    expect(getTagValue(tags, 'visual_generation')).toBe('v2');
+    expect(getTagValue(buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Egg', { visualGeneration: 'v1' }), 'visual_generation')).toBeUndefined();
   });
 });
 

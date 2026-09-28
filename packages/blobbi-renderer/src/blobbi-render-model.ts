@@ -44,6 +44,7 @@ import {
   type ResolvedBlobbiExpression,
 } from './expression-model';
 import { normalizeBlobbiSleepIndicator, type BlobbiSleepIndicator } from './svg/sleep-indicator';
+import { normalizeBlobbiGroundShadow, type BlobbiGroundShadow } from './svg/ground-shadow';
 import { normalizeBlobbiMotion, type BlobbiMotion } from './motion-model';
 import { normalizeBlobbiEggCrack, type BlobbiEggCrack } from './egg-model';
 
@@ -109,6 +110,8 @@ export interface BlobbiRenderModelInput {
   expression?: BlobbiExpression;
   /** `'artwork'` (default) keeps the V1 sleeping drawings' baked Zzz; `'none'` draws the creature asleep only. */
   sleepIndicator?: BlobbiSleepIndicator;
+  /** Whether the V2 drawings keep their baked ground shadow. See `svg/ground-shadow.ts`. */
+  groundShadow?: BlobbiGroundShadow;
   /** Body motion state. See `motion-model.ts`. */
   motion?: BlobbiMotion;
   /** Egg shell crack state. See `egg-model.ts`. Ignored unless the stage is `'egg'`. */
@@ -142,6 +145,8 @@ export interface BlobbiRenderModel {
   eyesClosed: boolean;
   /** Resolved sleep indicator; `'artwork'` unless `'none'` was asked for. */
   sleepIndicator: BlobbiSleepIndicator;
+  /** Resolved ground-shadow choice; `'none'` (the creature only) when none was asked for. */
+  groundShadow: BlobbiGroundShadow;
   /** Clamped gaze, or null when gaze must not be applied at all. */
   gaze: { x: number; y: number } | null;
   accessories: readonly NormalizedAccessoryPlacement[];
@@ -222,6 +227,7 @@ export function normalizeBlobbiRenderModel(
     view: isRearFacing ? 'rear' : 'front',
     eyesClosed: isSleeping || eyesClosed,
     sleepIndicator: normalizeBlobbiSleepIndicator(input.sleepIndicator),
+    groundShadow: normalizeBlobbiGroundShadow(input.groundShadow),
     gaze:
       input.eyeOffset === undefined || isRearFacing
         ? null

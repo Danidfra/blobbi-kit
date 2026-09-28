@@ -23,7 +23,9 @@ export const ADULT_V2_FRONT_PARTS = [
   'ground-shadow',
   'left-foot-shadow',
   'right-foot-shadow',
+  'left-leg',
   'left-foot',
+  'right-leg',
   'right-foot',
   'body-base',
   'tuft-main',
@@ -65,12 +67,14 @@ export const ADULT_V2_SIDE_PARTS = [
   'character',
   'body-shadow',
   'ground-shadow',
+  'far-leg',
   'far-foot',
   'far-arm',
   'body-base',
   'tuft-main',
   'tuft-secondary',
   'near-arm',
+  'near-leg',
   'near-foot',
   'cheek',
   'cheek-highlight',
@@ -97,8 +101,10 @@ export const ADULT_V2_BACK_PARTS = [
   'ground-shadow',
   'left-foot-shadow',
   'right-foot-shadow',
-  'left-foot',
+  'right-leg',
   'right-foot',
+  'left-leg',
+  'left-foot',
   'left-arm',
   'right-arm',
   'tuft-main',
@@ -110,6 +116,16 @@ export const ADULT_V2_BACK_PARTS = [
   'side-pattern-mark',
   'body-shine',
 ] as const;
+
+/**
+ * The leg groups: one `<g>` around each foot, the element the walk animates
+ * (`motion-model.ts`). A group, not the foot itself, because the authored
+ * feet carry their own `transform` (a small rotation about the origin) and a
+ * CSS transform on the same element would replace it; translating the group
+ * keeps every authored attribute intact. Front and back name them by side,
+ * the profile by depth.
+ */
+export const ADULT_V2_LEG_PARTS = ['left-leg', 'right-leg', 'near-leg', 'far-leg'] as const;
 
 /** The face parts: present on front and side, deliberately absent on back. */
 export const ADULT_V2_FACE_PARTS = [
