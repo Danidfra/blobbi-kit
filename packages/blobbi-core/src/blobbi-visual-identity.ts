@@ -41,6 +41,7 @@ import type {
   BlobbiVisualGeneration,
 } from './blobbi';
 import { getTagValue, parseVisualGeneration } from './blobbi';
+import { parseBlobbiV3Identity, type BlobbiV3Colors, type BlobbiV3Traits } from './blobbi-v3-identity';
 import { isValidAdultForm, type AdultForm } from './types/adult';
 
 /**
@@ -57,11 +58,27 @@ export interface BlobbiVisualIdentity {
   /** Life stage: `'egg' | 'baby' | 'adult'`. */
   stage: BlobbiStage;
   /**
-   * Artwork generation: `'v1'` (the original sixteen adult forms) or `'v2'`
-   * (the canonical anatomy). Always present in the projection; `'v1'` for
-   * every event without a `visual_generation` tag.
+   * Artwork generation: `'v1'` (the original sixteen adult forms), `'v2'`
+   * (the canonical anatomy) or `'v3'` (procedural). Always present in the
+   * projection; `'v1'` for every event without a `visual_generation` tag.
    */
   visualGeneration: BlobbiVisualGeneration;
+  /**
+   * The V3 identity, present only for a `'v3'` Blobbi: what a procedural
+   * renderer generates this individual from. Structurally the renderer's
+   * `BlobbiV3Visual`, so the whole projection is still handed over as-is.
+   *
+   * For V3 the seed IS visual identity (every proportion and every trait's
+   * shape derive from it), which is the one exception to "transport data is
+   * not identity" above. Fields the event does not state are absent; the
+   * renderer resolves them from the seed.
+   */
+  v3?: {
+    seed?: string;
+    algorithm: number;
+    colors: Partial<BlobbiV3Colors>;
+    traits: Partial<BlobbiV3Traits>;
+  };
   /**
    * Adult form, always one of {@link ADULT_FORMS} (`'bloomi'`, `'catti'`, ...).
    * Seed-derived for every adult with a seed. A value outside the vocabulary
@@ -69,7 +86,12 @@ export interface BlobbiVisualIdentity {
    * omitted, and the renderer's own default applies.
    */
   adultType?: AdultForm;
-  /** Canonical CSS hex color. */
+  /**
+   * Canonical CSS hex color. For a V3 Blobbi that states its colours these
+   * three are ITS colours (body, markings, iris), so a host that tints a card
+   * or an aura from the identity matches the creature it draws; otherwise
+   * they are the seed's.
+   */
   baseColor: string;
   /** Canonical CSS hex color. */
   secondaryColor: string;
@@ -105,7 +127,7 @@ export interface BlobbiVisualIdentity {
  * been a Nostr event.
  */
 export type BlobbiVisualIdentitySource = Pick<BlobbiCompanion, 'stage' | 'visualTraits'> &
-  Partial<Pick<BlobbiCompanion, 'adultType' | 'name' | 'allTags' | 'visualGeneration'>>;
+  Partial<Pick<BlobbiCompanion, 'adultType' | 'name' | 'allTags' | 'visualGeneration' | 'v3Identity'>>;
 
 /**
  * Project a Blobbi's domain state onto its visual identity.
@@ -122,13 +144,14 @@ export type BlobbiVisualIdentitySource = Pick<BlobbiCompanion, 'stage' | 'visual
  * is a canonical adult form. That is not policy, it is the type of the field.
  */
 export function getBlobbiVisualIdentity(blobbi: BlobbiVisualIdentitySource): BlobbiVisualIdentity {
-  const { stage, visualTraits, adultType, name, allTags, visualGeneration } = blobbi;
+  const { stage, visualTraits, adultType, name, allTags, visualGeneration, v3Identity } = blobbi;
+  const generation = visualGeneration ?? parseVisualGeneration(allTags ?? []);
 
   const identity: BlobbiVisualIdentity = {
     stage,
     // A parsed companion carries the generation already; a minimal source
     // (adoption preview, fixture) may carry only tags, or nothing: then v1.
-    visualGeneration: visualGeneration ?? parseVisualGeneration(allTags ?? []),
+    visualGeneration: generation,
     baseColor: visualTraits.baseColor,
     secondaryColor: visualTraits.secondaryColor,
     eyeColor: visualTraits.eyeColor,
@@ -136,6 +159,18 @@ export function getBlobbiVisualIdentity(blobbi: BlobbiVisualIdentitySource): Blo
     specialMark: visualTraits.specialMark,
     size: visualTraits.size,
   };
+
+  if (generation === 'v3') {
+    // A parsed companion carries it; a minimal source may carry only tags.
+    const v3 = v3Identity ?? (allTags ? parseBlobbiV3Identity(allTags) : undefined);
+    if (v3) {
+      identity.v3 = { algorithm: v3.algorithm, colors: { ...v3.colors }, traits: { ...v3.traits } };
+      if (v3.seed !== undefined) identity.v3.seed = v3.seed;
+      if (v3.colors.base) identity.baseColor = v3.colors.base;
+      if (v3.colors.secondary) identity.secondaryColor = v3.colors.secondary;
+      if (v3.colors.eye) identity.eyeColor = v3.colors.eye;
+    }
+  }
 
   if (adultType !== undefined && isValidAdultForm(adultType)) {
     identity.adultType = adultType;

@@ -374,6 +374,74 @@ and the SVG string is the same for every motion state. What moves is CSS over
 the semantic parts (the leg groups, for the V2 walk), which is why the part
 map exists: parts are selected by name rather than by id.
 
+### V3: the procedural generation
+
+V3 has no authored drawing per Blobbi. Each one is an **individual**,
+generated from its own identity as an egg, a baby and an adult, from the
+front, in profile and from behind:
+
+```
+identity ──► genome ──► morphology ──► geometry ──► SVG
+(visual.v3)  (genes)    (per life stage)  (per view)
+                                              ▲
+                              state: stage, facing, expression, gaze, sleeping, motion, egg crack
+```
+
+```tsx
+import { BlobbiRenderer, createBlobbiV3Identity } from '@blobbi-kit/renderer';
+
+// ONCE, when the Blobbi is created; the result is stored in its event.
+const v3 = createBlobbiV3Identity(seed);
+
+<BlobbiRenderer visual={{ stage: 'adult', visualGeneration: 'v3', v3 }} instanceId={id} facing="right" motion="walking" expression="happy" />
+```
+
+**Identity** (`BlobbiV3Visual`, plain data) has two layers:
+
+| | What | Where it lives |
+| --- | --- | --- |
+| explicit | four colours (`base`, `secondary`, `eye`, optional `accent`) and the kind of each trait (`antenna`, `horns`, `ears`, `tail`, `spots`, `belly`, `freckles`) | stated in the identity; `@blobbi-kit/core` writes them to the event |
+| derived | every proportion and every trait's own shape and place | from `seed`, under `algorithm` |
+
+The explicit layer exists so that a Blobbi is never repainted because the
+colour generator was tuned: `createBlobbiV3Identity(seed)` is called once, at
+creation, and from then on the stored identity is the truth. The derived layer
+is reproducible because the **algorithm version is frozen**
+(`BLOBBI_V3_ALGORITHM_VERSION`, currently `1`): gene names, keyed random
+streams, trait odds, ranges and stage plans are pinned by
+`procedural/vectors.json`, and changing any of them for existing Blobbis means
+a new version beside this one, never an edit. A missing or malformed field is
+filled from the seed, field by field; a V3 visual with no seed at all draws the
+canonical body in its plain colours.
+
+**What is drawn.** The canonical V3 individual (every gene at zero) IS the
+official artwork: the V2 adult, the V1 baby and the V1 egg, which
+`BlobbiRenderer.v3.test.tsx` and `procedural/fidelity.test.ts` hold it to by
+rasterizing both. Individuals vary around it within bounded ranges: body and
+face proportions, tuft, limbs, and optional antennae, horns (forehead, top,
+side), ears (round, pointed), a tail (nub, curl, leaf), flank spots, a belly
+patch and freckles, each developed for the life stage (a baby has buds). The
+egg shows the same individual's colours and markings and hides the rest.
+
+**State is the kit's existing vocabulary**, with nothing V3-specific a host
+must learn: `facing` (the profile is drawn, both ways, and the back),
+`expression` (presets and parts as on V2; a `{ blend }` is drawn continuously),
+`isSleeping`, `eyeOffset` (the same CSS variables, with this individual's own
+eye travel), `eggCrack`, `groundShadow`, and `motion`.
+
+**Motion differs in mechanism only.** A V3 drawing moves by its own rig (legs,
+arms, tuft, antennae, ears, tail; a baby hops and hovers; an egg rocks), so the
+component does not wrap its body in the `data-blobbi-motion` animation: the
+drawing's root carries `data-blobbi-rig-motion`, and the part of the rig
+stylesheet it needs is mounted beside it (a few kilobytes; a walking adult,
+about twenty). `BLOBBI_V3_MOTION_STYLESHEET` is the whole sheet for a host
+that prefers to mount it once. `renderBlobbiSvg({ motion, motionPhase })`
+bakes one frame as plain markup. Accessory layers still take the wrapper
+motion, which is not synchronized with the rig.
+
+The engine lives in `src/procedural/` and is **not** part of the public API:
+a host states an identity and a state, never a gene.
+
 ### Adding artwork
 
 Sources live under `src/artwork/` as typed SVG strings, one file per drawing,
@@ -384,6 +452,7 @@ artwork/
   registry.ts          which drawing for (stage, generation, adultType, facing, eyesClosed)
   types.ts             BlobbiVisualGeneration, BlobbiFacing, ArtworkRequest, ResolvedArtwork
   mirror.ts            horizontal mirroring for the profile
+  v3/                  the V3 adapter: identity (types, creation, normalization) and render
   egg/v1/              the egg shell with cumulative crack groups (data, resolver, customizer)
   baby/v1/             the V1 baby (data, resolver, customizer)
   adult/v1/            the sixteen V1 forms (data, resolver, per-form customizers)
@@ -400,11 +469,11 @@ artwork/
 - **Baby V2**: add `baby/v2/` (views, parts, customizer) and a `stage ===
   'baby'` branch in the registry's `'v2'` case, mirroring the adult one; remove
   the "V2 baby draws V1 baby" fallback.
-- **A future generation** (`'v3'`): add it to `BlobbiVisualGeneration` in both
-  this package and `@blobbi-kit/core` (they are declared independently on
-  purpose), add a `v3/` folder with its own customizer and pipeline, and one
-  new `case` in each `switch` of the registry. Nothing outside `artwork/`
-  should need to change.
+- **A future generation**: add it to `BlobbiVisualGeneration` in both this
+  package and `@blobbi-kit/core` (they are declared independently on
+  purpose), add a folder with its own pipeline, and one new `case` in each
+  `switch` of the registry, as `v3/` does. Nothing outside `artwork/` should
+  need to know which generation it is drawing.
 
 Run `npm run build` then `npm run preview` in this package to write a static
 visual preview of V1, every V2 view and palette, every expression preset on
@@ -414,7 +483,7 @@ the front and both profiles, and the three motion states to
 ## 9. String API
 
 ```ts
-renderBlobbiSvg({ stage, visualGeneration, adultType, baseColor, secondaryColor, eyeColor, facing, eyesClosed, sleepIndicator, expression, motion, instanceId, gaze });
+renderBlobbiSvg({ stage, visualGeneration, adultType, baseColor, secondaryColor, eyeColor, facing, eyesClosed, sleepIndicator, expression, motion, instanceId, gaze, v3, motionPhase });
 // -> { svg, artwork: { generation, view, mirrored, gazeable, supports, ... } }
 
 loadBlobbiSvg(stage, adultType, baseColor, secondaryColor, eyeColor, isSleeping, instanceId, view); // V1 only
@@ -491,14 +560,16 @@ Everything is exported from the package root; there are no deep imports and no
 | Box | `BLOBBI_RENDER_SIZE_PX`, `resolveBlobbiRenderSize`, `blobbiRenderSizePx`, `accessoryBasePx`, `ACCESSORY_BASE_RATIO`, `ACCESSORY_BASE_PERCENT`, `BlobbiRenderSize`, `BlobbiRendererSize` |
 | Accessories | `normalizeAccessoryPlacements`, `ACCESSORY_SLOT_RANK`, `REAR_VIEW_HIDDEN_SLOTS`, `DEFAULT_ACCESSORY_SOURCES`, and their types |
 | Effects | `BLOBBI_VISUAL_EFFECT_IDS`, `EFFECT_SLOTS`, `EFFECT_SLOT_ORDER`, `normalizeBlobbiVisualEffects`, `isBlobbiVisualEffectId`, `getBlobbiVisualEffectInfo`, intensity and piece-cap constants, and their types |
-| Expression | `BLOBBI_EMOTIONS`, `BLOBBI_EMOTION_PRESETS`, `NEUTRAL_EXPRESSION`, `BLOBBI_EYE_STATES`, `BLOBBI_MOUTH_STATES`, `BLOBBI_BROW_STATES`, `BLOBBI_BLUSH_STATES`, `isBlobbiEmotion`, `normalizeBlobbiExpression`; types `BlobbiExpression`, `BlobbiEmotion`, `BlobbiExpressionParts`, `BlobbiEyeState`, `BlobbiMouthState`, `BlobbiBrowState`, `BlobbiBlushState`, `ResolvedBlobbiExpression` |
+| Expression | `BLOBBI_EMOTIONS`, `BLOBBI_EMOTION_PRESETS`, `NEUTRAL_EXPRESSION`, `BLOBBI_EYE_STATES`, `BLOBBI_MOUTH_STATES`, `BLOBBI_BROW_STATES`, `BLOBBI_BLUSH_STATES`, `isBlobbiEmotion`, `normalizeBlobbiExpression`; types `BlobbiExpression`, `BlobbiEmotion`, `BlobbiExpressionParts`, `BlobbiEyeState`, `BlobbiMouthState`, `BlobbiBrowState`, `BlobbiBlushState`, `BlobbiExpressionBlend`, `ResolvedBlobbiExpression` |
 | Motion | `BLOBBI_MOTIONS`, `BLOBBI_MOTION_PHASES`, `BLOBBI_MOTION_STYLESHEET`, `normalizeBlobbiMotion`, `blobbiMotionPhase`, `blobbiMotionAttributes`; type `BlobbiMotion` |
 | Stylesheets | `BLOBBI_RENDERER_STYLESHEET`, `BLOBBI_EFFECT_STYLESHEET` |
+| V3 identity | `createBlobbiV3Identity`, `normalizeBlobbiV3Visual`, `BLOBBI_V3_ALGORITHM_VERSION`, `BLOBBI_V3_ANTENNAE`, `BLOBBI_V3_HORNS`, `BLOBBI_V3_EARS`, `BLOBBI_V3_TAILS`, `BLOBBI_V3_MOTION_STYLESHEET`; types `BlobbiV3Visual`, `BlobbiV3Identity`, `BlobbiV3Colors`, `BlobbiV3Traits`, `BlobbiV3Antenna`, `BlobbiV3Horns`, `BlobbiV3Ears`, `BlobbiV3Tail` |
 | Artwork | `DEFAULT_VISUAL_GENERATION`, `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`, `ADULT_V2_CLOSED_EYE_PARTS`, `ADULT_V2_EXPRESSION_PARTS`; types `BlobbiVisualGeneration`, `BlobbiFacing`, `ArtworkAnchors`, `BlobbiArtworkSupport`, `AdultV2Part` |
 | String API | `renderBlobbiSvg`, `loadBlobbiSvg`, `applyGazeMarkup`, `applyRearView`, `uniquifySvgIds`; types `RenderBlobbiSvgOptions`, `RenderedBlobbiSvg`, `BlobbiView`, `GazeMarkupOptions` |
 
 Deliberately **not** exported: the artwork modules and customizers, the color
-helpers, the SVG id internals, the effect presets, and any Tailwind class map.
+helpers, the SVG id internals, the effect presets, any Tailwind class map, and
+the V3 procedural engine (genome, morphology, geometry, RNG).
 
 ## 15. Build and compatibility
 

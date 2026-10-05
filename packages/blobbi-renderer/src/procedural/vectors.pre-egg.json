@@ -1,0 +1,1352 @@
+{
+  "version": "v3-proto",
+  "vectors": [
+    {
+      "seed": "",
+      "codeUnits": [],
+      "hash": [
+        41608494,
+        3485963809,
+        1435736333,
+        1262568316
+      ],
+      "draws": [
+        780688151,
+        1369530603,
+        4170761935,
+        2420727049,
+        3315390910,
+        31621017,
+        4095259433,
+        4180064351
+      ],
+      "genes": {
+        "morphology.bodyWidth": 0.7017050080467016,
+        "morphology.bodyHeight": -0.279444947373122,
+        "morphology.topWidth": -0.4802137827500701,
+        "morphology.belly": -0.06649913149885833,
+        "morphology.roundness": 0.23686914099380374,
+        "morphology.lean": -0.05696421931497753,
+        "morphology.eyeSize": 0.3133150963112712,
+        "morphology.eyeSpacing": 0.012325105722993612,
+        "morphology.eyeHeight": 0.5374166280962527,
+        "morphology.eyeTilt": 0.12135618715547025,
+        "morphology.pupilSize": -0.5077836003620178,
+        "morphology.mouthWidth": -0.1537603496108204,
+        "morphology.mouthHeight": -0.5755919532384723,
+        "morphology.mouthCurve": -0.42667945846915245,
+        "morphology.browHeight": -0.4274468943476677,
+        "morphology.cheekSize": 0.17722775228321552,
+        "morphology.armSize": 0.7202035889495164,
+        "morphology.armHeight": -0.2989051965996623,
+        "morphology.footSize": -0.6929378325585276,
+        "morphology.footSpacing": -0.7579988969955593,
+        "morphology.tuftSize": 0.551471228711307,
+        "morphology.tuftTilt": 0.47971014212816954,
+        "morphology.tuftSpread": 0.18660032539628446,
+        "morphology.tuftLength": 0.06308788829483092,
+        "antenna.position": 0.39536354574374855,
+        "antenna.length": 0.22747705155052245,
+        "antenna.thickness": -0.48726316867396235,
+        "antenna.curvature": -0.342045605648309,
+        "antenna.tilt": 0.5722740492783487,
+        "antenna.sweep": 0.22339343396015465,
+        "antenna.tipSize": -0.7432234189473093,
+        "antenna.asymmetry": -0.5308469769079238,
+        "horns.length": 0.08319043763913214,
+        "horns.width": -0.04966443101875484,
+        "horns.curvature": 0.9021454146131873,
+        "horns.tilt": 0.5197046785615385,
+        "horns.roundness": 0.4161444464698434,
+        "horns.asymmetry": 0.21994230686686933,
+        "ears.size": -0.1789889687206596,
+        "ears.tilt": -0.27697020513005555,
+        "ears.flop": -0.23778718314133584,
+        "tail.size": 0.23540386254899204,
+        "tail.length": -0.11556873400695622,
+        "tail.curvature": 0.9159840987995267,
+        "tail.lift": 0.5612517851404846,
+        "spots.0.dx": 0.13509926293045282,
+        "spots.2.rotation": -0.06333772465586662,
+        "freckles.1.size": -0.536644286243245,
+        "belly.size": 0.20696994848549366
+      },
+      "rolls": {
+        "antenna.kind": 3149400493,
+        "antenna.side": 1496316818,
+        "horns.kind": 4055937731,
+        "ears.kind": 26647435,
+        "tail.kind": 1630414333,
+        "spots.enabled": 100637046,
+        "spots.side": 1978551036,
+        "spots.count": 1796637672,
+        "belly.enabled": 1680352995,
+        "freckles.enabled": 561543294
+      },
+      "genome": {
+        "version": "v3-proto",
+        "seed": "",
+        "colors": {},
+        "morphology": {
+          "bodyWidth": 0.7017050080467016,
+          "bodyHeight": -0.279444947373122,
+          "topWidth": -0.4802137827500701,
+          "belly": -0.06649913149885833,
+          "roundness": 0.23686914099380374,
+          "lean": -0.05696421931497753,
+          "eyeSize": 0.3133150963112712,
+          "eyeSpacing": 0.012325105722993612,
+          "eyeHeight": 0.5374166280962527,
+          "eyeTilt": 0.12135618715547025,
+          "pupilSize": -0.5077836003620178,
+          "mouthWidth": -0.1537603496108204,
+          "mouthHeight": -0.5755919532384723,
+          "mouthCurve": -0.42667945846915245,
+          "browHeight": -0.4274468943476677,
+          "cheekSize": 0.17722775228321552,
+          "armSize": 0.7202035889495164,
+          "armHeight": -0.2989051965996623,
+          "footSize": -0.6929378325585276,
+          "footSpacing": -0.7579988969955593,
+          "tuftSize": 0.551471228711307,
+          "tuftTilt": 0.47971014212816954,
+          "tuftSpread": 0.18660032539628446,
+          "tuftLength": 0.06308788829483092
+        },
+        "traits": {
+          "antenna": {
+            "count": 1,
+            "side": 1,
+            "position": 0.39536354574374855,
+            "length": 0.22747705155052245,
+            "thickness": -0.48726316867396235,
+            "curvature": -0.342045605648309,
+            "tilt": 0.5722740492783487,
+            "sweep": 0.22339343396015465,
+            "tipSize": -0.7432234189473093,
+            "asymmetry": -0.5308469769079238
+          },
+          "horns": {
+            "kind": "side",
+            "length": 0.08319043763913214,
+            "width": -0.04966443101875484,
+            "curvature": 0.9021454146131873,
+            "tilt": 0.5197046785615385,
+            "roundness": 0.4161444464698434,
+            "asymmetry": 0.21994230686686933
+          },
+          "ears": {
+            "kind": "none",
+            "size": -0.1789889687206596,
+            "tilt": -0.27697020513005555,
+            "flop": -0.23778718314133584
+          },
+          "tail": {
+            "kind": "none",
+            "size": 0.23540386254899204,
+            "length": -0.11556873400695622,
+            "curvature": 0.9159840987995267,
+            "lift": 0.5612517851404846
+          },
+          "spots": {
+            "enabled": true,
+            "side": "left",
+            "count": 3,
+            "marks": [
+              {
+                "dx": 0.13509926293045282,
+                "dy": -0.3012671784963459,
+                "size": 0.16854148730635643,
+                "rotation": 0.08026981283910573
+              },
+              {
+                "dx": -0.7034883790183812,
+                "dy": 0.7257217287551612,
+                "size": 0.1380328587256372,
+                "rotation": -0.11705056927166879
+              },
+              {
+                "dx": -0.1761104203760624,
+                "dy": 0.08715147222392261,
+                "size": -0.16306511289440095,
+                "rotation": -0.06333772465586662
+              }
+            ]
+          },
+          "belly": {
+            "enabled": false,
+            "size": 0.20696994848549366,
+            "height": -0.4096463674213737
+          },
+          "freckles": {
+            "enabled": true,
+            "dots": [
+              {
+                "dx": 0.3071089768782258,
+                "dy": -0.07703706412576139,
+                "size": -0.07095380243845284
+              },
+              {
+                "dx": -0.9071359934750944,
+                "dy": -0.16844738693907857,
+                "size": -0.536644286243245
+              },
+              {
+                "dx": -0.07648716447874904,
+                "dy": 0.6690823633689433,
+                "size": -0.4073773017153144
+              }
+            ]
+          }
+        }
+      },
+      "colors": {
+        "base": "#5385ee",
+        "secondary": "#00526e",
+        "eye": "#002d46",
+        "scheme": "analogous"
+      }
+    },
+    {
+      "seed": "abc123",
+      "codeUnits": [
+        97,
+        98,
+        99,
+        49,
+        50,
+        51
+      ],
+      "hash": [
+        4242534554,
+        1957773047,
+        2864583559,
+        3576110275
+      ],
+      "draws": [
+        1803475699,
+        92020461,
+        46599070,
+        2053735372,
+        213943825,
+        2046015978,
+        2972775463,
+        2578383989
+      ],
+      "genes": {
+        "morphology.bodyWidth": 0.6432768895756453,
+        "morphology.bodyHeight": 0.0005334888119250536,
+        "morphology.topWidth": 0.15920067462138832,
+        "morphology.belly": -0.3035032106563449,
+        "morphology.roundness": 0.8460127301514149,
+        "morphology.lean": 0.4571840420830995,
+        "morphology.eyeSize": -0.7328125261701643,
+        "morphology.eyeSpacing": -0.12818535137921572,
+        "morphology.eyeHeight": 0.39060130971483886,
+        "morphology.eyeTilt": -0.6022683863993734,
+        "morphology.pupilSize": 0.13988051703199744,
+        "morphology.mouthWidth": 0.17442266969010234,
+        "morphology.mouthHeight": 0.3625242861453444,
+        "morphology.mouthCurve": -0.25621516397222877,
+        "morphology.browHeight": -0.24845838220790029,
+        "morphology.cheekSize": 0.5340936249122024,
+        "morphology.armSize": 0.8574656129349023,
+        "morphology.armHeight": -0.09425280545838177,
+        "morphology.footSize": -0.4159887619316578,
+        "morphology.footSpacing": -0.34508335683494806,
+        "morphology.tuftSize": 0.47372131631709635,
+        "morphology.tuftTilt": 0.17191838449798524,
+        "morphology.tuftSpread": -0.47280537709593773,
+        "morphology.tuftLength": 0.2745420050341636,
+        "antenna.position": -0.6062341772485524,
+        "antenna.length": 0.5066614679526538,
+        "antenna.thickness": 0.5480944309383631,
+        "antenna.curvature": -0.5942918625660241,
+        "antenna.tilt": 0.1792652173899114,
+        "antenna.sweep": 0.2441827531438321,
+        "antenna.tipSize": -0.3075578713323921,
+        "antenna.asymmetry": 0.09528417000547051,
+        "horns.length": -0.5186221613548696,
+        "horns.width": 0.35365754761733115,
+        "horns.curvature": 0.08484522136859596,
+        "horns.tilt": -0.14319605170749128,
+        "horns.roundness": -0.08510498073883355,
+        "horns.asymmetry": 0.309973610797897,
+        "ears.size": -0.5585558463353664,
+        "ears.tilt": 0.6836671971250325,
+        "ears.flop": 0.08677173894830048,
+        "tail.size": 0.6023193383589387,
+        "tail.length": 0.09322948195040226,
+        "tail.curvature": -0.5713661548215896,
+        "tail.lift": -0.3378391901496798,
+        "spots.0.dx": 0.6275207698345184,
+        "spots.2.rotation": -0.6914830838795751,
+        "freckles.1.size": 0.07315581059083343,
+        "belly.size": 0.5230359933339059
+      },
+      "rolls": {
+        "antenna.kind": 2424042070,
+        "antenna.side": 861862301,
+        "horns.kind": 1770316551,
+        "ears.kind": 1507844674,
+        "tail.kind": 2851526368,
+        "spots.enabled": 602433941,
+        "spots.side": 3696683698,
+        "spots.count": 2901448905,
+        "belly.enabled": 2632838645,
+        "freckles.enabled": 3371601611
+      },
+      "genome": {
+        "version": "v3-proto",
+        "seed": "abc123",
+        "colors": {},
+        "morphology": {
+          "bodyWidth": 0.6432768895756453,
+          "bodyHeight": 0.0005334888119250536,
+          "topWidth": 0.15920067462138832,
+          "belly": -0.3035032106563449,
+          "roundness": 0.8460127301514149,
+          "lean": 0.4571840420830995,
+          "eyeSize": -0.7328125261701643,
+          "eyeSpacing": -0.12818535137921572,
+          "eyeHeight": 0.39060130971483886,
+          "eyeTilt": -0.6022683863993734,
+          "pupilSize": 0.13988051703199744,
+          "mouthWidth": 0.17442266969010234,
+          "mouthHeight": 0.3625242861453444,
+          "mouthCurve": -0.25621516397222877,
+          "browHeight": -0.24845838220790029,
+          "cheekSize": 0.5340936249122024,
+          "armSize": 0.8574656129349023,
+          "armHeight": -0.09425280545838177,
+          "footSize": -0.4159887619316578,
+          "footSpacing": -0.34508335683494806,
+          "tuftSize": 0.47372131631709635,
+          "tuftTilt": 0.17191838449798524,
+          "tuftSpread": -0.47280537709593773,
+          "tuftLength": 0.2745420050341636
+        },
+        "traits": {
+          "antenna": {
+            "count": 1,
+            "side": 1,
+            "position": -0.6062341772485524,
+            "length": 0.5066614679526538,
+            "thickness": 0.5480944309383631,
+            "curvature": -0.5942918625660241,
+            "tilt": 0.1792652173899114,
+            "sweep": 0.2441827531438321,
+            "tipSize": -0.3075578713323921,
+            "asymmetry": 0.09528417000547051
+          },
+          "horns": {
+            "kind": "none",
+            "length": -0.5186221613548696,
+            "width": 0.35365754761733115,
+            "curvature": 0.08484522136859596,
+            "tilt": -0.14319605170749128,
+            "roundness": -0.08510498073883355,
+            "asymmetry": 0.309973610797897
+          },
+          "ears": {
+            "kind": "none",
+            "size": -0.5585558463353664,
+            "tilt": 0.6836671971250325,
+            "flop": 0.08677173894830048
+          },
+          "tail": {
+            "kind": "nub",
+            "size": 0.6023193383589387,
+            "length": 0.09322948195040226,
+            "curvature": -0.5713661548215896,
+            "lift": -0.3378391901496798
+          },
+          "spots": {
+            "enabled": true,
+            "side": "both",
+            "count": 3,
+            "marks": [
+              {
+                "dx": 0.6275207698345184,
+                "dy": -0.41234154580160975,
+                "size": 0.10720940143801272,
+                "rotation": 0.6095795319415629
+              },
+              {
+                "dx": 0.7249525617808104,
+                "dy": -0.18322460097260773,
+                "size": 0.4808082287199795,
+                "rotation": -0.049406679812818766
+              },
+              {
+                "dx": -0.098516836296767,
+                "dy": -0.4636303912848234,
+                "size": 0.10727093135938048,
+                "rotation": -0.6914830838795751
+              }
+            ]
+          },
+          "belly": {
+            "enabled": false,
+            "size": 0.5230359933339059,
+            "height": -0.5337941229809076
+          },
+          "freckles": {
+            "enabled": false,
+            "dots": [
+              {
+                "dx": -0.07130386284552515,
+                "dy": -0.2561207194812596,
+                "size": -0.1821269851643592
+              },
+              {
+                "dx": -0.08480591420084238,
+                "dy": -0.07176771271042526,
+                "size": 0.07315581059083343
+              },
+              {
+                "dx": 0.15379052236676216,
+                "dy": 0.36009404668584466,
+                "size": -0.05167937627993524
+              }
+            ]
+          }
+        }
+      },
+      "colors": {
+        "base": "#35d89e",
+        "secondary": "#00807f",
+        "eye": "#143500",
+        "scheme": "analogous"
+      }
+    },
+    {
+      "seed": "blobbi-1",
+      "codeUnits": [
+        98,
+        108,
+        111,
+        98,
+        98,
+        105,
+        45,
+        49
+      ],
+      "hash": [
+        1317689859,
+        4153021976,
+        3569115798,
+        2894405686
+      ],
+      "draws": [
+        389732752,
+        1364040698,
+        1210696327,
+        2232226545,
+        243532551,
+        843393244,
+        954991560,
+        289988080
+      ],
+      "genes": {
+        "morphology.bodyWidth": -0.14396589086391032,
+        "morphology.bodyHeight": 0.1628989155869931,
+        "morphology.topWidth": -0.4030219085980207,
+        "morphology.belly": -0.370581338647753,
+        "morphology.roundness": -0.17381640174426138,
+        "morphology.lean": 0.04629926267080009,
+        "morphology.eyeSize": 0.2064412860199809,
+        "morphology.eyeSpacing": 0.7286047067027539,
+        "morphology.eyeHeight": -0.396699117962271,
+        "morphology.eyeTilt": 0.260282970033586,
+        "morphology.pupilSize": 0.6177681293338537,
+        "morphology.mouthWidth": 0.4770527291111648,
+        "morphology.mouthHeight": -0.3504936408717185,
+        "morphology.mouthCurve": -0.40793942124582827,
+        "morphology.browHeight": 0.27086862456053495,
+        "morphology.cheekSize": 0.15917985839769244,
+        "morphology.armSize": -0.48735420033335686,
+        "morphology.armHeight": 0.4989975243806839,
+        "morphology.footSize": -0.20870787953026593,
+        "morphology.footSpacing": 0.3527086894027889,
+        "morphology.tuftSize": -0.38534628227353096,
+        "morphology.tuftTilt": 0.5400126739405096,
+        "morphology.tuftSpread": 0.4170127285178751,
+        "morphology.tuftLength": 0.2345857066102326,
+        "antenna.position": -0.13638002309016883,
+        "antenna.length": 0.08026214060373604,
+        "antenna.thickness": -0.29921403410844505,
+        "antenna.curvature": -0.15295565617270768,
+        "antenna.tilt": 0.0813978286460042,
+        "antenna.sweep": -0.05271347868256271,
+        "antenna.tipSize": 0.028472308302298188,
+        "antenna.asymmetry": 0.6212961846031249,
+        "horns.length": -0.7948442788328975,
+        "horns.width": 0.3341087969020009,
+        "horns.curvature": 0.3426130113657564,
+        "horns.tilt": 0.5218114419840276,
+        "horns.roundness": 0.33930435683578253,
+        "horns.asymmetry": 0.5638122498057783,
+        "ears.size": -0.5623681163415313,
+        "ears.tilt": 0.07696205237880349,
+        "ears.flop": 0.17614251212216914,
+        "tail.size": -0.18184576905332506,
+        "tail.length": 0.4846401452086866,
+        "tail.curvature": 0.1082910809200257,
+        "tail.lift": -0.18388475850224495,
+        "spots.0.dx": -0.11363723198883235,
+        "spots.2.rotation": -0.3459470991510898,
+        "freckles.1.size": -0.45011048833839595,
+        "belly.size": -0.4437265517190099
+      },
+      "rolls": {
+        "antenna.kind": 3904219633,
+        "antenna.side": 1599683358,
+        "horns.kind": 3475391947,
+        "ears.kind": 4252859188,
+        "tail.kind": 2623187453,
+        "spots.enabled": 4069980466,
+        "spots.side": 731942711,
+        "spots.count": 1832840302,
+        "belly.enabled": 2811740912,
+        "freckles.enabled": 3516517071
+      },
+      "genome": {
+        "version": "v3-proto",
+        "seed": "blobbi-1",
+        "colors": {},
+        "morphology": {
+          "bodyWidth": -0.14396589086391032,
+          "bodyHeight": 0.1628989155869931,
+          "topWidth": -0.4030219085980207,
+          "belly": -0.370581338647753,
+          "roundness": -0.17381640174426138,
+          "lean": 0.04629926267080009,
+          "eyeSize": 0.2064412860199809,
+          "eyeSpacing": 0.7286047067027539,
+          "eyeHeight": -0.396699117962271,
+          "eyeTilt": 0.260282970033586,
+          "pupilSize": 0.6177681293338537,
+          "mouthWidth": 0.4770527291111648,
+          "mouthHeight": -0.3504936408717185,
+          "mouthCurve": -0.40793942124582827,
+          "browHeight": 0.27086862456053495,
+          "cheekSize": 0.15917985839769244,
+          "armSize": -0.48735420033335686,
+          "armHeight": 0.4989975243806839,
+          "footSize": -0.20870787953026593,
+          "footSpacing": 0.3527086894027889,
+          "tuftSize": -0.38534628227353096,
+          "tuftTilt": 0.5400126739405096,
+          "tuftSpread": 0.4170127285178751,
+          "tuftLength": 0.2345857066102326
+        },
+        "traits": {
+          "antenna": {
+            "count": 2,
+            "side": 1,
+            "position": -0.13638002309016883,
+            "length": 0.08026214060373604,
+            "thickness": -0.29921403410844505,
+            "curvature": -0.15295565617270768,
+            "tilt": 0.0813978286460042,
+            "sweep": -0.05271347868256271,
+            "tipSize": 0.028472308302298188,
+            "asymmetry": 0.6212961846031249
+          },
+          "horns": {
+            "kind": "forehead",
+            "length": -0.7948442788328975,
+            "width": 0.3341087969020009,
+            "curvature": 0.3426130113657564,
+            "tilt": 0.5218114419840276,
+            "roundness": 0.33930435683578253,
+            "asymmetry": 0.5638122498057783
+          },
+          "ears": {
+            "kind": "none",
+            "size": -0.5623681163415313,
+            "tilt": 0.07696205237880349,
+            "flop": 0.17614251212216914
+          },
+          "tail": {
+            "kind": "nub",
+            "size": -0.18184576905332506,
+            "length": 0.4846401452086866,
+            "curvature": 0.1082910809200257,
+            "lift": -0.18388475850224495
+          },
+          "spots": {
+            "enabled": false,
+            "side": "right",
+            "count": 3,
+            "marks": [
+              {
+                "dx": -0.11363723198883235,
+                "dy": -0.26695414911955595,
+                "size": 0.33171318750828505,
+                "rotation": 0.9735432446468621
+              },
+              {
+                "dx": -0.6377059896476567,
+                "dy": 0.041715904138982296,
+                "size": -0.050685068126767874,
+                "rotation": 0.6707821539603174
+              },
+              {
+                "dx": -0.5158242059405893,
+                "dy": 0.6224450336303562,
+                "size": -0.03980645351111889,
+                "rotation": -0.3459470991510898
+              }
+            ]
+          },
+          "belly": {
+            "enabled": false,
+            "size": -0.4437265517190099,
+            "height": 0.1583888209424913
+          },
+          "freckles": {
+            "enabled": false,
+            "dots": [
+              {
+                "dx": -0.46960339276120067,
+                "dy": 0.3121564597822726,
+                "size": -0.5884344743099064
+              },
+              {
+                "dx": -0.16416279459372163,
+                "dy": 0.017253879457712173,
+                "size": -0.45011048833839595
+              },
+              {
+                "dx": 0.6231003012508154,
+                "dy": 0.2513201297260821,
+                "size": -0.128937769215554
+              }
+            ]
+          }
+        }
+      },
+      "colors": {
+        "base": "#75de62",
+        "secondary": "#7e8700",
+        "eye": "#41114a",
+        "scheme": "complementary",
+        "accent": "#c551dc"
+      }
+    },
+    {
+      "seed": "canonical",
+      "codeUnits": [
+        99,
+        97,
+        110,
+        111,
+        110,
+        105,
+        99,
+        97,
+        108
+      ],
+      "hash": [
+        3914343582,
+        2920076561,
+        1276728906,
+        3829530126
+      ],
+      "draws": [
+        257531999,
+        1998142805,
+        4199390675,
+        476064934,
+        686532538,
+        4003579357,
+        789965308,
+        911273256
+      ],
+      "genes": {
+        "morphology.bodyWidth": -0.7338730797637254,
+        "morphology.bodyHeight": -0.39584137103520334,
+        "morphology.topWidth": -0.15671930857934058,
+        "morphology.belly": -0.29920371901243925,
+        "morphology.roundness": -0.24004284595139325,
+        "morphology.lean": -0.013609415153041482,
+        "morphology.eyeSize": -0.05029001226648688,
+        "morphology.eyeSpacing": -0.6723058728966862,
+        "morphology.eyeHeight": 0.6894444385543466,
+        "morphology.eyeTilt": -0.5786351333372295,
+        "morphology.pupilSize": -0.016808803658932447,
+        "morphology.mouthWidth": 0.7376723135821521,
+        "morphology.mouthHeight": 0.3747789047192782,
+        "morphology.mouthCurve": 0.7292483518831432,
+        "morphology.browHeight": 0.04365412192419171,
+        "morphology.cheekSize": -0.3026235669385642,
+        "morphology.armSize": 0.25205360213294625,
+        "morphology.armHeight": 0.13407099875621498,
+        "morphology.footSize": -0.5865078533533961,
+        "morphology.footSpacing": -0.47497117053717375,
+        "morphology.tuftSize": -0.21275254478678107,
+        "morphology.tuftTilt": 0.8937037293799222,
+        "morphology.tuftSpread": -0.4344493090175092,
+        "morphology.tuftLength": -0.40161040844395757,
+        "antenna.position": -0.06714225513860583,
+        "antenna.length": -0.4625433194451034,
+        "antenna.thickness": 0.2698984695598483,
+        "antenna.curvature": -0.09935389552265406,
+        "antenna.tilt": -0.7871885113418102,
+        "antenna.sweep": -0.28029170306399465,
+        "antenna.tipSize": -0.6756527123507112,
+        "antenna.asymmetry": 0.067105523776263,
+        "horns.length": -0.03646713704802096,
+        "horns.width": 0.046302726957947016,
+        "horns.curvature": -0.05538312066346407,
+        "horns.tilt": 0.1586622796021402,
+        "horns.roundness": 0.020933465100824833,
+        "horns.asymmetry": 0.4801857671700418,
+        "ears.size": 0.8099024349357933,
+        "ears.tilt": 0.29080362990498543,
+        "ears.flop": -0.9019578832667321,
+        "tail.size": -0.24074199399910867,
+        "tail.length": 0.09872333542443812,
+        "tail.curvature": 0.6204916585702449,
+        "tail.lift": 0.11696923640556633,
+        "spots.0.dx": -0.4282518057152629,
+        "spots.2.rotation": 0.2259772135876119,
+        "freckles.1.size": 0.10234172479249537,
+        "belly.size": 0.33683718321844935
+      },
+      "rolls": {
+        "antenna.kind": 3223163172,
+        "antenna.side": 3978302488,
+        "horns.kind": 844277478,
+        "ears.kind": 1670293129,
+        "tail.kind": 1685081223,
+        "spots.enabled": 751257938,
+        "spots.side": 2168366250,
+        "spots.count": 1728400453,
+        "belly.enabled": 1493736429,
+        "freckles.enabled": 3357583768
+      },
+      "genome": {
+        "version": "v3-proto",
+        "seed": "canonical",
+        "colors": {},
+        "morphology": {
+          "bodyWidth": -0.7338730797637254,
+          "bodyHeight": -0.39584137103520334,
+          "topWidth": -0.15671930857934058,
+          "belly": -0.29920371901243925,
+          "roundness": -0.24004284595139325,
+          "lean": -0.013609415153041482,
+          "eyeSize": -0.05029001226648688,
+          "eyeSpacing": -0.6723058728966862,
+          "eyeHeight": 0.6894444385543466,
+          "eyeTilt": -0.5786351333372295,
+          "pupilSize": -0.016808803658932447,
+          "mouthWidth": 0.7376723135821521,
+          "mouthHeight": 0.3747789047192782,
+          "mouthCurve": 0.7292483518831432,
+          "browHeight": 0.04365412192419171,
+          "cheekSize": -0.3026235669385642,
+          "armSize": 0.25205360213294625,
+          "armHeight": 0.13407099875621498,
+          "footSize": -0.5865078533533961,
+          "footSpacing": -0.47497117053717375,
+          "tuftSize": -0.21275254478678107,
+          "tuftTilt": 0.8937037293799222,
+          "tuftSpread": -0.4344493090175092,
+          "tuftLength": -0.40161040844395757
+        },
+        "traits": {
+          "antenna": {
+            "count": 1,
+            "side": -1,
+            "position": -0.06714225513860583,
+            "length": -0.4625433194451034,
+            "thickness": 0.2698984695598483,
+            "curvature": -0.09935389552265406,
+            "tilt": -0.7871885113418102,
+            "sweep": -0.28029170306399465,
+            "tipSize": -0.6756527123507112,
+            "asymmetry": 0.067105523776263
+          },
+          "horns": {
+            "kind": "none",
+            "length": -0.03646713704802096,
+            "width": 0.046302726957947016,
+            "curvature": -0.05538312066346407,
+            "tilt": 0.1586622796021402,
+            "roundness": 0.020933465100824833,
+            "asymmetry": 0.4801857671700418
+          },
+          "ears": {
+            "kind": "none",
+            "size": 0.8099024349357933,
+            "tilt": 0.29080362990498543,
+            "flop": -0.9019578832667321
+          },
+          "tail": {
+            "kind": "none",
+            "size": -0.24074199399910867,
+            "length": 0.09872333542443812,
+            "curvature": 0.6204916585702449,
+            "lift": 0.11696923640556633
+          },
+          "spots": {
+            "enabled": true,
+            "side": "left",
+            "count": 3,
+            "marks": [
+              {
+                "dx": -0.4282518057152629,
+                "dy": -0.26902497420087457,
+                "size": -0.4519853878300637,
+                "rotation": 0.38766622450202703
+              },
+              {
+                "dx": -0.7807303143199533,
+                "dy": 0.3310415195301175,
+                "size": -0.4759298521094024,
+                "rotation": -0.1928993039764464
+              },
+              {
+                "dx": 0.2208366310223937,
+                "dy": -0.035321863600984216,
+                "size": 0.1940948641858995,
+                "rotation": 0.2259772135876119
+              }
+            ]
+          },
+          "belly": {
+            "enabled": false,
+            "size": 0.33683718321844935,
+            "height": 0.2842166665941477
+          },
+          "freckles": {
+            "enabled": false,
+            "dots": [
+              {
+                "dx": -0.09893807745538652,
+                "dy": 0.5680955464486033,
+                "size": 0.25613704742863774
+              },
+              {
+                "dx": -0.48144301981665194,
+                "dy": -0.3469712994992733,
+                "size": 0.10234172479249537
+              },
+              {
+                "dx": 0.6051200102083385,
+                "dy": -0.3261110985185951,
+                "size": -0.6257393225096166
+              }
+            ]
+          }
+        }
+      },
+      "colors": {
+        "base": "#54add2",
+        "secondary": "#005f6c",
+        "eye": "#002d30",
+        "scheme": "analogous"
+      }
+    },
+    {
+      "seed": "8f2d6c1e9b7a40f3a5d2c8e1b6f4937d0a1c5e7f2b9d4a6c8e0f1a3b5c7d9e2f",
+      "codeUnits": [
+        56,
+        102,
+        50,
+        100,
+        54,
+        99,
+        49,
+        101,
+        57,
+        98,
+        55,
+        97,
+        52,
+        48,
+        102,
+        51,
+        97,
+        53,
+        100,
+        50,
+        99,
+        56,
+        101,
+        49,
+        98,
+        54,
+        102,
+        52,
+        57,
+        51,
+        55,
+        100,
+        48,
+        97,
+        49,
+        99,
+        53,
+        101,
+        55,
+        102,
+        50,
+        98,
+        57,
+        100,
+        52,
+        97,
+        54,
+        99,
+        56,
+        101,
+        48,
+        102,
+        49,
+        97,
+        51,
+        98,
+        53,
+        99,
+        55,
+        100,
+        57,
+        101,
+        50,
+        102
+      ],
+      "hash": [
+        4033066144,
+        3668758122,
+        3565880304,
+        1631178426
+      ],
+      "draws": [
+        2196647344,
+        2227437318,
+        1721557366,
+        2638002327,
+        4243445135,
+        2705506208,
+        3661766268,
+        1139506737
+      ],
+      "genes": {
+        "morphology.bodyWidth": 0.432496092049405,
+        "morphology.bodyHeight": -0.290902015985921,
+        "morphology.topWidth": -0.5829754467122257,
+        "morphology.belly": -0.35848040226846933,
+        "morphology.roundness": -0.2536960563156754,
+        "morphology.lean": 0.11971341073513031,
+        "morphology.eyeSize": 0.519467813661322,
+        "morphology.eyeSpacing": -0.20113807450979948,
+        "morphology.eyeHeight": 0.04146594740450382,
+        "morphology.eyeTilt": -0.032132067484781146,
+        "morphology.pupilSize": 0.2805804926902056,
+        "morphology.mouthWidth": -0.0019858581945300102,
+        "morphology.mouthHeight": -0.8302054721862078,
+        "morphology.mouthCurve": 0.7627449217252433,
+        "morphology.browHeight": -0.15004965965636075,
+        "morphology.cheekSize": -0.6090807123109698,
+        "morphology.armSize": -0.8014461500570178,
+        "morphology.armHeight": -0.06824154872447252,
+        "morphology.footSize": -0.023536419263109565,
+        "morphology.footSpacing": -0.1874667329248041,
+        "morphology.tuftSize": 0.5721300314180553,
+        "morphology.tuftTilt": -0.3433894324116409,
+        "morphology.tuftSpread": 0.6679417856503278,
+        "morphology.tuftLength": 0.11966419289819896,
+        "antenna.position": 0.21914665447548032,
+        "antenna.length": -0.7256231929641217,
+        "antenna.thickness": -0.30437828437425196,
+        "antenna.curvature": 0.05807453370653093,
+        "antenna.tilt": -0.2841790462844074,
+        "antenna.sweep": 0.4435635816771537,
+        "antenna.tipSize": 0.41228322335518897,
+        "antenna.asymmetry": 0.8877101568505168,
+        "horns.length": -0.13623595400713384,
+        "horns.width": -0.004437123658135533,
+        "horns.curvature": -0.056748535949736834,
+        "horns.tilt": 0.30459724157117307,
+        "horns.roundness": 0.8362614640500396,
+        "horns.asymmetry": 0.26617941865697503,
+        "ears.size": -0.46661712671630085,
+        "ears.tilt": 0.08067886927165091,
+        "ears.flop": 0.19792158366180956,
+        "tail.size": 0.19255244522355497,
+        "tail.length": 0.11295526474714279,
+        "tail.curvature": -0.12025124626234174,
+        "tail.lift": 0.12445725011639297,
+        "spots.0.dx": 0.4694067947566509,
+        "spots.2.rotation": -0.16818554745987058,
+        "freckles.1.size": 0.3071160151157528,
+        "belly.size": 0.5963419482577592
+      },
+      "rolls": {
+        "antenna.kind": 2146787059,
+        "antenna.side": 913911298,
+        "horns.kind": 250915061,
+        "ears.kind": 3256808054,
+        "tail.kind": 614315236,
+        "spots.enabled": 3806911336,
+        "spots.side": 1800316682,
+        "spots.count": 4152157772,
+        "belly.enabled": 4289746199,
+        "freckles.enabled": 3242087339
+      },
+      "genome": {
+        "version": "v3-proto",
+        "seed": "8f2d6c1e9b7a40f3a5d2c8e1b6f4937d0a1c5e7f2b9d4a6c8e0f1a3b5c7d9e2f",
+        "colors": {},
+        "morphology": {
+          "bodyWidth": 0.432496092049405,
+          "bodyHeight": -0.290902015985921,
+          "topWidth": -0.5829754467122257,
+          "belly": -0.35848040226846933,
+          "roundness": -0.2536960563156754,
+          "lean": 0.11971341073513031,
+          "eyeSize": 0.519467813661322,
+          "eyeSpacing": -0.20113807450979948,
+          "eyeHeight": 0.04146594740450382,
+          "eyeTilt": -0.032132067484781146,
+          "pupilSize": 0.2805804926902056,
+          "mouthWidth": -0.0019858581945300102,
+          "mouthHeight": -0.8302054721862078,
+          "mouthCurve": 0.7627449217252433,
+          "browHeight": -0.15004965965636075,
+          "cheekSize": -0.6090807123109698,
+          "armSize": -0.8014461500570178,
+          "armHeight": -0.06824154872447252,
+          "footSize": -0.023536419263109565,
+          "footSpacing": -0.1874667329248041,
+          "tuftSize": 0.5721300314180553,
+          "tuftTilt": -0.3433894324116409,
+          "tuftSpread": 0.6679417856503278,
+          "tuftLength": 0.11966419289819896
+        },
+        "traits": {
+          "antenna": {
+            "count": 0,
+            "side": 1,
+            "position": 0.21914665447548032,
+            "length": -0.7256231929641217,
+            "thickness": -0.30437828437425196,
+            "curvature": 0.05807453370653093,
+            "tilt": -0.2841790462844074,
+            "sweep": 0.4435635816771537,
+            "tipSize": 0.41228322335518897,
+            "asymmetry": 0.8877101568505168
+          },
+          "horns": {
+            "kind": "none",
+            "length": -0.13623595400713384,
+            "width": -0.004437123658135533,
+            "curvature": -0.056748535949736834,
+            "tilt": 0.30459724157117307,
+            "roundness": 0.8362614640500396,
+            "asymmetry": 0.26617941865697503
+          },
+          "ears": {
+            "kind": "none",
+            "size": -0.46661712671630085,
+            "tilt": 0.08067886927165091,
+            "flop": 0.19792158366180956
+          },
+          "tail": {
+            "kind": "none",
+            "size": 0.19255244522355497,
+            "length": 0.11295526474714279,
+            "curvature": -0.12025124626234174,
+            "lift": 0.12445725011639297
+          },
+          "spots": {
+            "enabled": false,
+            "side": "right",
+            "count": 2,
+            "marks": [
+              {
+                "dx": 0.4694067947566509,
+                "dy": -0.7969136112369597,
+                "size": 0.5609120093286037,
+                "rotation": 0.44443950057029724
+              },
+              {
+                "dx": -0.8024750899057835,
+                "dy": 0.013466989854350686,
+                "size": 0.10454466473311186,
+                "rotation": -0.4316319590434432
+              },
+              {
+                "dx": 0.25437323306687176,
+                "dy": -0.15294411242939532,
+                "size": -0.42839828971773386,
+                "rotation": -0.16818554745987058
+              }
+            ]
+          },
+          "belly": {
+            "enabled": false,
+            "size": 0.5963419482577592,
+            "height": -0.5197313500102609
+          },
+          "freckles": {
+            "enabled": false,
+            "dots": [
+              {
+                "dx": 0.4078845642507076,
+                "dy": -0.7145100752823055,
+                "size": 0.027038930682465434
+              },
+              {
+                "dx": -0.5590835206676275,
+                "dy": -0.20610432233661413,
+                "size": 0.3071160151157528
+              },
+              {
+                "dx": -0.048759581753984094,
+                "dy": 0.16202200250700116,
+                "size": -0.2747634348925203
+              }
+            ]
+          }
+        }
+      },
+      "colors": {
+        "base": "#1fa5d3",
+        "secondary": "#006965",
+        "eye": "#00222e",
+        "scheme": "analogous"
+      }
+    },
+    {
+      "seed": "Brötchen ñandú 🌱",
+      "codeUnits": [
+        66,
+        114,
+        246,
+        116,
+        99,
+        104,
+        101,
+        110,
+        32,
+        241,
+        97,
+        110,
+        100,
+        250,
+        32,
+        55356,
+        57137
+      ],
+      "hash": [
+        4010244479,
+        2380730871,
+        3875030431,
+        2491815338
+      ],
+      "draws": [
+        1582816159,
+        3549114791,
+        2981287405,
+        2711218698,
+        1597799487,
+        82216141,
+        3492909503,
+        3696743527
+      ],
+      "genes": {
+        "morphology.bodyWidth": 0.18388708774000406,
+        "morphology.bodyHeight": -0.4693772387690842,
+        "morphology.topWidth": 0.17721512401476502,
+        "morphology.belly": -0.5577087493147701,
+        "morphology.roundness": -0.5750849235337228,
+        "morphology.lean": 0.08092926512472332,
+        "morphology.eyeSize": 0.42889993940480053,
+        "morphology.eyeSpacing": -0.07495146431028843,
+        "morphology.eyeHeight": -0.11462173983454704,
+        "morphology.eyeTilt": -0.07458942499943078,
+        "morphology.pupilSize": 0.17720883362926543,
+        "morphology.mouthWidth": 0.18774550966918468,
+        "morphology.mouthHeight": -0.14037489471957088,
+        "morphology.mouthCurve": -0.35160595062188804,
+        "morphology.browHeight": -0.06273287045769393,
+        "morphology.cheekSize": -0.28614969621412456,
+        "morphology.armSize": 0.5740858640056103,
+        "morphology.armHeight": -0.34819633373990655,
+        "morphology.footSize": -0.582292809151113,
+        "morphology.footSpacing": 0.0437788178678602,
+        "morphology.tuftSize": -0.2853498109616339,
+        "morphology.tuftTilt": -0.05350189842283726,
+        "morphology.tuftSpread": 0.5740571608766913,
+        "morphology.tuftLength": 0.130563426297158,
+        "antenna.position": -0.4828522172756493,
+        "antenna.length": -0.8263527688104659,
+        "antenna.thickness": -0.19578292756341398,
+        "antenna.curvature": -0.5289209820330143,
+        "antenna.tilt": -0.18665278470143676,
+        "antenna.sweep": 0.11907245707698166,
+        "antenna.tipSize": 0.4395106858573854,
+        "antenna.asymmetry": -0.14396691764704883,
+        "horns.length": -0.31956755509600043,
+        "horns.width": -0.07146961404941976,
+        "horns.curvature": -0.13941423711366951,
+        "horns.tilt": 0.17964621004648507,
+        "horns.roundness": -0.44238391215913,
+        "horns.asymmetry": -0.22646891744807363,
+        "ears.size": -0.23767820675857365,
+        "ears.tilt": -0.07159445900470018,
+        "ears.flop": 0.399718732573092,
+        "tail.size": 0.36996708903461695,
+        "tail.length": -0.19602215779013932,
+        "tail.curvature": -0.6600056397728622,
+        "tail.lift": -0.21676164399832487,
+        "spots.0.dx": -0.44072272651828825,
+        "spots.2.rotation": 0.22642424399964511,
+        "freckles.1.size": -0.4971458246000111,
+        "belly.size": -0.6586041490081698
+      },
+      "rolls": {
+        "antenna.kind": 167210163,
+        "antenna.side": 1505973238,
+        "horns.kind": 3763735980,
+        "ears.kind": 2667489219,
+        "tail.kind": 2417188086,
+        "spots.enabled": 3943357139,
+        "spots.side": 4259494512,
+        "spots.count": 716784608,
+        "belly.enabled": 928598525,
+        "freckles.enabled": 3258111277
+      },
+      "genome": {
+        "version": "v3-proto",
+        "seed": "Brötchen ñandú 🌱",
+        "colors": {},
+        "morphology": {
+          "bodyWidth": 0.18388708774000406,
+          "bodyHeight": -0.4693772387690842,
+          "topWidth": 0.17721512401476502,
+          "belly": -0.5577087493147701,
+          "roundness": -0.5750849235337228,
+          "lean": 0.08092926512472332,
+          "eyeSize": 0.42889993940480053,
+          "eyeSpacing": -0.07495146431028843,
+          "eyeHeight": -0.11462173983454704,
+          "eyeTilt": -0.07458942499943078,
+          "pupilSize": 0.17720883362926543,
+          "mouthWidth": 0.18774550966918468,
+          "mouthHeight": -0.14037489471957088,
+          "mouthCurve": -0.35160595062188804,
+          "browHeight": -0.06273287045769393,
+          "cheekSize": -0.28614969621412456,
+          "armSize": 0.5740858640056103,
+          "armHeight": -0.34819633373990655,
+          "footSize": -0.582292809151113,
+          "footSpacing": 0.0437788178678602,
+          "tuftSize": -0.2853498109616339,
+          "tuftTilt": -0.05350189842283726,
+          "tuftSpread": 0.5740571608766913,
+          "tuftLength": 0.130563426297158
+        },
+        "traits": {
+          "antenna": {
+            "count": 0,
+            "side": 1,
+            "position": -0.4828522172756493,
+            "length": -0.8263527688104659,
+            "thickness": -0.19578292756341398,
+            "curvature": -0.5289209820330143,
+            "tilt": -0.18665278470143676,
+            "sweep": 0.11907245707698166,
+            "tipSize": 0.4395106858573854,
+            "asymmetry": -0.14396691764704883
+          },
+          "horns": {
+            "kind": "forehead",
+            "length": -0.31956755509600043,
+            "width": -0.07146961404941976,
+            "curvature": -0.13941423711366951,
+            "tilt": 0.17964621004648507,
+            "roundness": -0.44238391215913,
+            "asymmetry": -0.22646891744807363
+          },
+          "ears": {
+            "kind": "none",
+            "size": -0.23767820675857365,
+            "tilt": -0.07159445900470018,
+            "flop": 0.399718732573092
+          },
+          "tail": {
+            "kind": "nub",
+            "size": 0.36996708903461695,
+            "length": -0.19602215779013932,
+            "curvature": -0.6600056397728622,
+            "lift": -0.21676164399832487
+          },
+          "spots": {
+            "enabled": false,
+            "side": "both",
+            "count": 3,
+            "marks": [
+              {
+                "dx": -0.44072272651828825,
+                "dy": 0.028754075756296515,
+                "size": -0.7170492878649384,
+                "rotation": 0.09098241361789405
+              },
+              {
+                "dx": 0.0002661112230271101,
+                "dy": 0.2736861708108336,
+                "size": -0.46492333454079926,
+                "rotation": -0.1365167300682515
+              },
+              {
+                "dx": -0.24525217153131962,
+                "dy": 0.13255762215703726,
+                "size": -0.7891995687969029,
+                "rotation": 0.22642424399964511
+              }
+            ]
+          },
+          "belly": {
+            "enabled": true,
+            "size": -0.6586041490081698,
+            "height": -0.4662777485791594
+          },
+          "freckles": {
+            "enabled": false,
+            "dots": [
+              {
+                "dx": 0.38425583811476827,
+                "dy": 0.48418079735711217,
+                "size": 0.18769767577759922
+              },
+              {
+                "dx": -0.1418993091210723,
+                "dy": -0.1881102581974119,
+                "size": -0.4971458246000111
+              },
+              {
+                "dx": 0.12200370291247964,
+                "dy": 0.7885832036845386,
+                "size": -0.09671261417679489
+              }
+            ]
+          }
+        }
+      },
+      "colors": {
+        "base": "#3797dd",
+        "secondary": "#243a90",
+        "eye": "#422300",
+        "scheme": "complementary",
+        "accent": "#e8a057"
+      }
+    }
+  ]
+}

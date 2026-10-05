@@ -87,11 +87,17 @@ export interface GazeMarkupOptions {
    * negated here to keep the screen meaning. V1 never mirrors.
    */
   mirrored?: boolean;
+  /**
+   * How far a full deflection travels, in the marked elements' own units,
+   * when the drawing knows its own (V3 does: its eyes differ per individual
+   * and per life stage). Absent: the generation's fixed travel.
+   */
+  travel?: number;
 }
 
 export function applyGazeMarkup(
   svgText: string,
-  generation: 'v1' | 'v2' | number = 'v1',
+  generation: 'v1' | 'v2' | 'v3' | number = 'v1',
   options: GazeMarkupOptions = {},
 ): string {
   // Already processed: avoid double-injecting the style.
@@ -100,8 +106,15 @@ export function applyGazeMarkup(
   }
 
   // Historical signature: a numeric second argument is the V1 travel in px.
-  const gen: 'v1' | 'v2' = generation === 'v2' ? 'v2' : 'v1';
-  const maxPx = typeof generation === 'number' ? generation : GAZE_TRAVEL_UNITS[gen];
+  // V3 names its movable eye content exactly as V2 does (`*-eye-inner`
+  // groups), so it is marked the same way; only its travel is its own.
+  const gen: 'v1' | 'v2' = generation === 'v2' || generation === 'v3' ? 'v2' : 'v1';
+  const maxPx =
+    typeof generation === 'number'
+      ? generation
+      : typeof options.travel === 'number' && Number.isFinite(options.travel)
+        ? options.travel
+        : GAZE_TRAVEL_UNITS[gen];
 
   let modified = svgText;
   if (gen === 'v2') {

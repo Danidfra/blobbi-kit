@@ -7,6 +7,9 @@
 
 import type { ResolvedBlobbiExpression } from '../expression-model';
 import type { BlobbiEggCrack } from '../egg-model';
+import type { BlobbiMotion } from '../motion-model';
+import type { BlobbiV3Visual } from './v3/identity';
+import type { ProceduralArtwork } from './v3/render';
 
 /**
  * Artwork generation. A property of the Blobbi's identity (carried in its
@@ -20,11 +23,16 @@ import type { BlobbiEggCrack } from '../egg-model';
  *   (body, arms, feet, tuft, eyes, eyebrows, cheeks, mouth) and authored
  *   directional artwork (front, side, back). The foundation for future
  *   movement, clothing and expressions.
+ * - `'v3'`: the procedural generation. No authored drawing per Blobbi: each
+ *   one is an individual, generated from its own identity (a seed, its
+ *   colours, its trait kinds; see `artwork/v3/identity.ts`) as an egg, a
+ *   baby and an adult, from the front, in profile and from behind. The
+ *   canonical V3 individual is the V2 adult, the V1 baby and the V1 egg.
  *
  * Declared here independently of `@blobbi-kit/core`'s identical union: the two
  * packages never import each other.
  */
-export type BlobbiVisualGeneration = 'v1' | 'v2';
+export type BlobbiVisualGeneration = 'v1' | 'v2' | 'v3';
 
 /** The generation of every visual that names none. */
 export const DEFAULT_VISUAL_GENERATION: BlobbiVisualGeneration = 'v1';
@@ -82,6 +90,28 @@ export interface ArtworkRequest {
    * it. Absent means the intact shell.
    */
   eggCrack?: BlobbiEggCrack;
+  /**
+   * The V3 identity (seed, colours, trait kinds). Read by the V3 generation
+   * only; V1 and V2 never look at it, whatever it holds.
+   */
+  v3?: BlobbiV3Visual;
+  /**
+   * Body motion, for generations that animate THEIR OWN PARTS (V3: its rig).
+   * V1 and V2 ignore it: their motion is a wrapper animation the caller
+   * applies around the finished drawing.
+   */
+  motion?: BlobbiMotion;
+  /**
+   * Draw one frame of the motion (0..1 through its cycle) instead of leaving
+   * it to the stylesheet. V3 only.
+   */
+  motionPhase?: number;
+  /**
+   * A gaze drawn INTO the markup (-1..1 per axis, screen-relative), for a
+   * static picture. Live gaze does not use this: it moves the marked eye
+   * parts through CSS variables. V3 only.
+   */
+  gaze?: { x: number; y: number };
 }
 
 /**
@@ -147,4 +177,19 @@ export interface ResolvedArtwork {
    * draws its expression on the raw markup instead.
    */
   expression?: ResolvedBlobbiExpression;
+  /**
+   * How far a full gaze deflection moves the marked eye parts, in their own
+   * units, when the drawing knows (V3: from this individual's eyes). Absent:
+   * the generation's fixed travel.
+   */
+  gazeTravel?: number;
+  /**
+   * Present when the drawing ANIMATES ITSELF (V3: its rig parts move). It is
+   * the stylesheet text this drawing's motion needs, possibly empty (still,
+   * or a baked frame). A caller must then mount this instead of wrapping the
+   * drawing in the kit's own motion animation. Absent for V1 and V2.
+   */
+  motionStyles?: string;
+  /** What the V3 finishing step draws from. Internal to the artwork layer. */
+  procedural?: ProceduralArtwork;
 }

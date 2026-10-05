@@ -78,11 +78,14 @@ describe('the visual_generation tag', () => {
     expect(parseBlobbiEvent(makeEvent(v1Grown))!.visualGeneration).toBe('v1');
   });
 
-  it('parses: absent -> v1, v1 -> v1, v2 -> v2, anything unknown -> v1', () => {
+  it('parses: absent -> v1, v1 -> v1, v2 -> v2, v3 -> v3, anything unknown -> v1', () => {
     expect(parseVisualGeneration([])).toBe('v1');
     expect(parseVisualGeneration([[VISUAL_GENERATION_TAG, 'v1']])).toBe('v1');
     expect(parseVisualGeneration([[VISUAL_GENERATION_TAG, 'v2']])).toBe('v2');
-    expect(parseVisualGeneration([[VISUAL_GENERATION_TAG, 'v3']])).toBe('v1');
+    expect(parseVisualGeneration([[VISUAL_GENERATION_TAG, 'v3']])).toBe('v3');
+    // A generation this kit does not know is still drawn as V1, never as the newest it has.
+    expect(parseVisualGeneration([[VISUAL_GENERATION_TAG, 'v4']])).toBe('v1');
+    expect(parseVisualGeneration([[VISUAL_GENERATION_TAG, 'V3']])).toBe('v1');
     expect(parseVisualGeneration([[VISUAL_GENERATION_TAG, '']])).toBe('v1');
     expect(parseVisualGeneration([[VISUAL_GENERATION_TAG, 'V2']])).toBe('v1');
   });

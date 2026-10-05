@@ -33,7 +33,10 @@
  *  - MOTION is wrapper/CSS render state. The body box and the two accessory
  *    layers (so a hat bobs with the head) carry `data-blobbi-motion*`
  *    attributes and a package-owned `<style>` animates them; the SVG string
- *    is untouched, and `'still'` emits neither attribute nor style.
+ *    is untouched, and `'still'` emits neither attribute nor style. A
+ *    drawing that animates ITS OWN parts (V3: a rig of legs, arms, tuft and
+ *    traits) says so through the registry; its body box is then not wrapped,
+ *    and the stylesheet it names is mounted instead.
  * The component represents the state; when and why a Blobbi is walking or
  * happy is the host's decision.
  *
@@ -111,10 +114,12 @@ export interface BlobbiRendererProps {
    */
   effects?: readonly BlobbiVisualEffect[];
   /**
-   * Facial expression: a preset (`'happy'`, `'sad'`, ...) or explicit parts
-   * (`{ eyes, mouth, brows, blush }`), every value from a closed vocabulary.
-   * Drawn on the V2 front and side and on the V1 baby front; the V1 adults
-   * and the faceless backs ignore it. `isSleeping` always closes the eyes.
+   * Facial expression: a preset (`'happy'`, `'sad'`, ...), explicit parts
+   * (`{ eyes, mouth, brows, blush }`), every value from a closed vocabulary,
+   * or a blend of presets (`{ blend: { happy: 0.6 } }`). Drawn on the V2 and
+   * V3 front and side and on the V1 baby front; the V1 adults and the
+   * faceless backs ignore it. V3 draws a blend continuously; V1 and V2 draw
+   * the preset that dominates it. `isSleeping` always closes the eyes.
    * Default: neutral, the authored face.
    */
   expression?: BlobbiExpression;
@@ -347,6 +352,13 @@ export function BlobbiRenderer({
   // the CSS variables below move.
   const gazeEnabled = model.gaze !== null;
 
+  // Motion goes into the request for the drawings that animate their own
+  // parts (the registry decides which, and says so through `motionStyles`).
+  // A drawing that does not ignores it and returns the same string, so a
+  // motion change costs it one cheap rebuild and no DOM update.
+  // A blend's weights, as a memo key (a fresh but equal object must not rebuild).
+  const blendKey = model.expression.blend ? JSON.stringify(model.expression.blend) : '';
+
   const rendered = useMemo(() => {
     try {
       // The registry decides WHICH drawing (generation, form, view, mirroring)
@@ -362,6 +374,8 @@ export function BlobbiRenderer({
           groundShadow: model.groundShadow,
           expression: model.expression,
           eggCrack: model.eggCrack,
+          v3: model.v3 ?? undefined,
+          motion: model.motion,
         },
         {
           baseColor: model.baseColor,
@@ -375,12 +389,12 @@ export function BlobbiRenderer({
       // untouched, so previews/modals/cards render exactly as before.
       const withGaze =
         gazeEnabled && artwork.gazeable
-          ? applyGazeMarkup(svg, artwork.generation, { mirrored: artwork.mirrored })
+          ? applyGazeMarkup(svg, artwork.generation, { mirrored: artwork.mirrored, travel: artwork.gazeTravel })
           : svg;
-      return { svg: sanitize ? sanitize(withGaze) : withGaze, supports: artwork.supports };
+      return { svg: sanitize ? sanitize(withGaze) : withGaze, supports: artwork.supports, motionStyles: artwork.motionStyles };
     } catch (err) {
       console.error('Failed to load Blobbi SVG:', err);
-      return { svg: '', supports: { expression: false, gaze: false, motion: false } };
+      return { svg: '', supports: { expression: false, gaze: false, motion: false }, motionStyles: undefined };
     }
   }, [
     model.stage,
@@ -400,13 +414,24 @@ export function BlobbiRenderer({
     model.expression.mouth,
     model.expression.brows,
     model.expression.blush,
+    blendKey,
     model.eggCrack,
+    model.v3Key,
+    model.motion,
     gazeEnabled,
     sanitize,
   ]);
 
   const svgContent = rendered.svg;
+  // One object per SVG string. React compares this prop by identity: a fresh
+  // object on every render makes it write `innerHTML` again even when the
+  // markup is unchanged, which replaces every element inside the body and so
+  // restarts any animation running there (a V3 rig mid-stride, a V2 leg)
+  // each time the host re-renders for something unrelated, such as a gaze.
+  const bodyHtml = useMemo(() => ({ __html: svgContent }), [svgContent]);
   const artworkSupports = rendered.supports;
+  // Defined when the drawing moves by its own parts: the body box is then left alone.
+  const ownMotionStyles = rendered.motionStyles;
   if (!svgContent) return null;
 
   const box = resolveBlobbiRenderSize(size);
@@ -464,6 +489,7 @@ export function BlobbiRenderer({
     >
       <BlobbiEffectStyles effects={resolvedEffects} />
       {motionAttrs ? <style data-blobbi-motion-styles="">{BLOBBI_MOTION_STYLESHEET}</style> : null}
+      {ownMotionStyles ? <style data-blobbi-rig-motion-styles="">{ownMotionStyles}</style> : null}
       <BlobbiEffectLayer effects={resolvedEffects} layer="behind" instanceId={model.instanceId} />
       <AccessoryLayerView placements={model.accessories} layer="behind" motion={motionAttrs} />
       {/* The body fills the renderer box exactly: the wrapper is absolutely
@@ -473,8 +499,8 @@ export function BlobbiRenderer({
       <div
         data-blobbi-body-box=""
         style={bodyStyle}
-        {...motionAttrs}
-        dangerouslySetInnerHTML={{ __html: svgContent }}
+        {...(ownMotionStyles === undefined ? motionAttrs : null)}
+        dangerouslySetInnerHTML={bodyHtml}
       />
       {/* Between the body and the front accessories: where a body-overlay
           effect (Pixel Glitch, Electric Charge) belongs. It paints ON the

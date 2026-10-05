@@ -54,6 +54,9 @@ export {
 // Pure domain -> renderer visual identity projection (no renderer import).
 export * from './blobbi-visual-identity';
 
+// V3 identity on the event: tag names, parsing, validation (provisional representation).
+export * from './blobbi-v3-identity';
+
 // Async Nostr helpers.
 export * from './fetchFreshEvent';
 export * from './fetchFreshBlobbonautProfile';

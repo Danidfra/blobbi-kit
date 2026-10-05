@@ -98,7 +98,8 @@ the result as-is.
 ```ts
 interface BlobbiVisualIdentity {
   stage: 'egg' | 'baby' | 'adult';
-  visualGeneration: 'v1' | 'v2';   // absent tag means 'v1'
+  visualGeneration: 'v1' | 'v2' | 'v3';        // absent tag means 'v1'
+  v3?: { seed?, algorithm, colors, traits };   // 'v3' only: see V3 identity, below
   adultType?: AdultForm;           // one of ADULT_FORMS; seed-derived for adults
   baseColor: string;               // '#RRGGBB'
   secondaryColor: string;
@@ -122,10 +123,58 @@ interface BlobbiVisualIdentity {
   it is carried as the opaque tag value. It is not an application UI theme,
   and the kit draws nothing from it.
 - Not included: render state (facing, sleeping, gaze, box size), host inputs
-  (accessories, effects) and transport (the event, `d`, the seed).
+  (accessories, effects) and transport (the event, `d`, the seed). The one
+  exception is `v3.seed`: for a procedural Blobbi the seed is what its
+  proportions derive from, so it is visual identity.
+- For a V3 Blobbi that states its colours, `baseColor`, `secondaryColor` and
+  `eyeColor` are its own (so a card tinted from the identity matches the
+  creature); the `base_color` tags on its event stay mirrors of the seed.
 
 The projection is pure and deterministic, and the result survives
 `JSON.parse(JSON.stringify(...))`.
+
+## V3 identity (provisional)
+
+A `visual_generation = v3` Blobbi is drawn procedurally: its proportions and
+trait shapes derive from its `seed`, and its colours and trait kinds are
+**stated explicitly** so they never depend on how a generator is tuned later.
+
+```
+visual_generation = v3
+seed              = <64 hex>      (the existing tag)
+v3_algorithm      = 1             the procedural algorithm version
+v3_base_color, v3_secondary_color, v3_eye_color = #rrggbb
+v3_accent_color   = #rrggbb       optional: absent means no accent
+v3_antenna        = none | single | double
+v3_horns          = none | forehead | top | side
+v3_ears           = none | round | pointed
+v3_tail           = none | nub | curl | leaf
+v3_spots, v3_belly, v3_freckles = true | false
+```
+
+```ts
+import { createBlobbiV3Identity } from '@blobbi-kit/renderer';   // the creation rule's visual half
+
+const tags = buildEggTags(pubkey, petId, createdAt, name, { visualGeneration: 'v3', v3: createBlobbiV3Identity });
+parseBlobbiEvent(event).v3Identity;        // exactly what the tags state, plus `missing`
+getBlobbiVisualIdentity(companion).v3;     // what a renderer takes
+```
+
+- **Opt-in.** `NEW_BLOBBI_VISUAL_GENERATION` is still `'v2'`. A host asks for
+  V3 and must hand over a complete identity; `buildEggTags` throws on a
+  missing, partial, malformed or foreign one.
+- **Its own tags, on purpose.** `base_color` and its siblings are rewritten
+  from the seed on every republish, here and in every deployed client, so an
+  explicit colour stored there would not survive. Tags a client does not know
+  pass through every republish untouched, which is what keeps a V3 identity
+  intact when an older client feeds the Blobbi. That client draws it as V1
+  from the seed mirrors, as it does any generation it does not know.
+- **Identity, never invented.** The tags are managed, persistent and valid at
+  every stage: they ride through care updates, hatching and evolution, are
+  recovered from the previous event if dropped, and are never made up.
+- **Provisional.** The tag names and value spellings are a working
+  convention, kept in one module (`blobbi-v3-identity.ts`) so they can be
+  revised before anything is specified publicly.
 
 ## Tags and compatibility
 
@@ -160,8 +209,9 @@ When you republish through `updateBlobbiTags`, `updateBlobbonautTags` or the
   previous event. It will not invent a `name`, `seed`, `d` or personality tag
   that was not there before. It returns errors instead of throwing.
 
-An event without `visual_generation` is V1; an unknown value is also V1. An
-unknown `progression_state` becomes `none`.
+An event without `visual_generation` is V1; an unknown value is also V1
+(`v1`, `v2` and `v3` are the known ones). An unknown `progression_state`
+becomes `none`.
 
 ## What this package does not do
 

@@ -140,8 +140,15 @@ describe('the package reaches nothing it must not', () => {
     expect(pkg.files.length).toBeGreaterThan(10);
     // A guardrail, not a target: if the graph doubles, the boundary needs a
     // human look rather than a silently passing test. Raised from 45 when the
-    // egg module (four files) and its model joined the V1 artwork.
-    expect(pkg.files.length).toBeLessThan(60);
+    // egg module (four files) and its model joined the V1 artwork, and from
+    // 60 when the V3 procedural engine did (`procedural/`, twenty-odd files,
+    // and `artwork/v3/`): self-contained math and markup that import nothing
+    // outside this package, asserted just below.
+    expect(pkg.files.length).toBeLessThan(95);
+    const engine = pkg.files.filter((f) => f.startsWith('src/procedural/'));
+    expect(engine.length).toBeGreaterThan(15);
+    // The engine is pure: no React, no DOM helper, nothing external at all.
+    expect(pkg.edges.filter(({ file, specifier }) => file.startsWith('src/procedural/') && !specifier.startsWith('.'))).toEqual([]);
   });
 
   it.each(FORBIDDEN.map((f) => [f.why, f.pattern] as const))(

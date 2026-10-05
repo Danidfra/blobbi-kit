@@ -48,6 +48,9 @@ const emitAsFiles = {
   },
 };
 
+/** Modules only tests import: shared helpers and the vector computation. */
+const TEST_SUPPORT = new Set(['test-helpers.ts', 'vectors.ts']);
+
 function entries(): string[] {
   const out: string[] = [];
   const walk = (dir: string) => {
@@ -57,7 +60,9 @@ function entries(): string[] {
       else if (
         /\.tsx?$/.test(e.name) &&
         !/\.test\.tsx?$/.test(e.name) &&
-        !/\.d\.ts$/.test(e.name)
+        !/\.d\.ts$/.test(e.name) &&
+        // Test support that lives beside the engine it tests; never shipped.
+        !TEST_SUPPORT.has(e.name)
       ) {
         out.push(full);
       }

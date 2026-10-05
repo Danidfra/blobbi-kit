@@ -3,17 +3,26 @@
  *
  * ```
  *   egg
- *   └── v1                      one shell, four crack states; no face
+ *   ├── v1                      one shell, four crack states; no face (V1 and V2)
+ *   └── v3                      this individual's shell, from its genome
  *   baby
- *   └── v1                      one body, awake + sleeping; rear derived
+ *   ├── v1                      one body, awake + sleeping; rear derived (V1 and V2)
+ *   └── v3                      this individual as a baby; front, side, back
  *   adult
  *   ├── v1                      sixteen forms, awake + sleeping; rear derived
  *   │   └── forms 1..16
- *   └── v2                      one canonical anatomy, authored views;
- *       ├── front                 closed eyes DERIVED from any view
- *       ├── side                right-facing; left is a mirror
- *       └── back
+ *   ├── v2                      one canonical anatomy, authored views;
+ *   │   ├── front                 closed eyes DERIVED from any view
+ *   │   ├── side                right-facing; left is a mirror
+ *   │   └── back
+ *   └── v3                      this individual as an adult; front, side, back
  * ```
+ *
+ * V1 and V2 are AUTHORED artwork, customized. V3 is PROCEDURAL: there is no
+ * drawing to pick, only an identity to generate one from (`artwork/v3/`,
+ * over the engine in `procedural/`). It goes through the same two functions,
+ * so it is still true that nothing outside this file asks which generation
+ * it is drawing.
  *
  * Resolution is a pure function of the request: no clock, no randomness, no
  * DOM, no network, no host knowledge. `resolveBlobbiArtwork` picks the raw
@@ -54,6 +63,7 @@ import { NEUTRAL_EXPRESSION } from '../expression-model';
 import { applyRearView, removeGroundShadow, removeSleepIndicator, sanitizeArtworkColor } from '../svg';
 import { DEFAULT_VISUAL_GENERATION } from './types';
 import { mirrorSvgHorizontally } from './mirror';
+import { finishV3Artwork, resolveV3Artwork } from './v3';
 
 // ─── Anchors ─────────────────────────────────────────────────────────────────
 
@@ -80,6 +90,7 @@ export function viewForFacing(
   facing: BlobbiFacing,
 ): { view: BlobbiArtworkView; mirrored: boolean } {
   switch (generation) {
+    case 'v3':
     case 'v2':
       switch (facing) {
         case 'back':
@@ -101,7 +112,7 @@ export function viewForFacing(
   }
 }
 
-const KNOWN_GENERATIONS: ReadonlySet<string> = new Set(['v1', 'v2']);
+const KNOWN_GENERATIONS: ReadonlySet<string> = new Set(['v1', 'v2', 'v3']);
 
 /** A generation the registry draws; anything else is the default generation. */
 function knownGeneration(value: unknown): BlobbiVisualGeneration {
@@ -126,10 +137,13 @@ export function resolveBlobbiArtwork(request: ArtworkRequest): ResolvedArtwork {
   const stage: 'egg' | 'baby' | 'adult' =
     request.stage === 'adult' ? 'adult' : request.stage === 'egg' ? 'egg' : 'baby';
 
-  // The egg is one drawing for every generation and every facing: a shell
-  // has no face to turn, close or move, so gaze and expression are not
-  // supported and the rear view is the front view. Only the crack state
-  // changes the markup.
+  // V3 is generated, not picked: every stage of it, the egg included, comes
+  // from the identity (artwork/v3/render.ts).
+  if (generation === 'v3') return resolveV3Artwork({ ...request, stage, visualGeneration: 'v3' });
+
+  // The V1 and V2 egg is one drawing for every facing: a shell has no face to
+  // turn, close or move, so gaze and expression are not supported and the
+  // rear view is the front view. Only the crack state changes the markup.
   if (stage === 'egg') {
     return {
       generation: 'v1',
@@ -263,6 +277,9 @@ export function finishBlobbiArtwork(
     eyeColor: sanitizeArtworkColor(rawColors.eyeColor),
   };
   switch (resolved.generation) {
+    case 'v3':
+      // Generated from the identity; the plain colours matter only when the visual carried none.
+      return finishV3Artwork(resolved, colors, instanceId);
     case 'v2': {
       const customized = customizeAdultV2Svg(resolved.markup, colors, instanceId);
       return resolved.mirrored ? mirrorSvgHorizontally(customized, resolved.viewBox.width) : customized;

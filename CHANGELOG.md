@@ -13,8 +13,80 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 The target versions are named so the release notes can be checked against
 the manifests before `npm publish`. `@blobbi-kit/renderer` 0.4.0 and
-core/react 0.6.1 below are on the registry; renderer 0.5.0 and core/react
-0.7.0 are not yet.
+core/react 0.6.1 are on the registry; everything in this section is not yet:
+renderer 0.5.0 and core/react 0.7.0 (further down), and renderer 0.6.0 and
+core/react 0.8.0 (the V3 entries directly below).
+
+### `@blobbi-kit/renderer` 0.6.0 (V3: the procedural generation)
+
+**Additive.** Every V1 fingerprint and every V2 drawing is byte-identical; a
+visual that does not name `'v3'` is drawn exactly as before, whatever else it
+carries.
+
+- **`visualGeneration: 'v3'`** draws a Blobbi generated from its identity
+  (`visual.v3`: a seed, four colours, its trait kinds) as an egg, a baby and
+  an adult, from the front, in profile (both ways) and from behind. The
+  engine is the `blobbi-procedural` prototype, ported file for file into
+  `src/procedural/` (its tests with it) and reached only through the
+  artwork registry (`artwork/v3/`): identity -> genome -> morphology ->
+  geometry -> SVG. It is not exported.
+- **Identity.** New exports `createBlobbiV3Identity(seed)` (the creation
+  rule's visual half: called once, its result stored), `normalizeBlobbiV3Visual`,
+  `BLOBBI_V3_ALGORITHM_VERSION` (`1`) and the trait vocabularies. Colours and
+  trait kinds are explicit; proportions and trait shapes derive from the seed
+  under a FROZEN algorithm version, pinned by `procedural/vectors.json` and,
+  against the prototype's own vectors, by hash.
+- **State is unchanged vocabulary**: `facing`, `expression`, `isSleeping`,
+  `eyeOffset`, `eggCrack`, `groundShadow`, `motion`. New: an expression may
+  be a blend of presets (`{ blend: { happy: 0.6 } }`), drawn continuously on
+  V3 and as the dominant preset on V1 and V2; `renderBlobbiSvg` takes
+  `motionPhase` (one baked frame) and a gaze direction for V3.
+- **Motion.** A V3 drawing animates its own rig, so its body box is not
+  wrapped in the `data-blobbi-motion` animation; the registry reports this
+  through `ResolvedArtwork.motionStyles` and the component mounts the part of
+  the rig stylesheet the drawing needs. `BLOBBI_V3_MOTION_STYLESHEET` is the
+  whole sheet.
+- **Fix, all generations:** the body's `dangerouslySetInnerHTML` object is
+  now stable across renders. Under React 19 a fresh object rewrote
+  `innerHTML` on every render, replacing the drawing's elements and
+  restarting any animation inside it (a V2 leg mid-stride) whenever a host
+  re-rendered for something unrelated, such as a gaze.
+- New dev dependency (repository root): `@resvg/resvg-js`, for the raster
+  fidelity tests. Nothing is added to any package's runtime dependencies.
+
+### `@blobbi-kit/core` and `@blobbi-kit/react` 0.8.0 (V3 identity on the event)
+
+**Breaking under 0.x in one reading only:** `parseVisualGeneration` now
+returns `'v3'` for `["visual_generation", "v3"]`, which it used to read as
+unknown (`'v1'`). Nothing creates V3 unless a host asks.
+
+- **`BlobbiVisualGeneration` gains `'v3'`.** `NEW_BLOBBI_VISUAL_GENERATION`
+  stays `'v2'`: V3 is opt-in, because the default is what every application
+  that upgrades the kit starts writing.
+- **V3 identity tags (provisional)**, in `blobbi-v3-identity.ts`:
+  `v3_algorithm`, `v3_base_color`, `v3_secondary_color`, `v3_eye_color`,
+  `v3_accent_color`, `v3_antenna`, `v3_horns`, `v3_ears`, `v3_tail`,
+  `v3_spots`, `v3_belly`, `v3_freckles`. Explicit, because the existing
+  colour tags are seed mirrors that every republish rewrites. New exports:
+  `BLOBBI_V3_TAGS`, `BLOBBI_V3_TAG_NAMES`, `validateBlobbiV3Identity`,
+  `blobbiV3IdentityTags`, `parseBlobbiV3Identity`, `normalizeBlobbiV3Color`,
+  the kind vocabularies and types.
+- **Creation:** `buildEggTags(..., { visualGeneration: 'v3', v3 })`, where
+  `v3` is a complete identity or a function of the new seed (the renderer's
+  `createBlobbiV3Identity`). A V3 Blobbi is never born with a partial
+  identity: it throws instead.
+- **Reading:** `BlobbiCompanion.v3Identity` (what the tags state, plus
+  `missing`) and `BlobbiVisualIdentity.v3`. Core never fills a gap.
+- **Persistence:** the tags are managed, persistent, valid at every stage and
+  never invented; they survive care updates, hatch and evolve
+  (`blobbi-v3-identity.test.ts`, `lifecycle-generation.test.tsx`).
+- `@blobbi-kit/react` has no code change; it moves in lockstep.
+
+Compatibility decision: V1 and V2 events, and events with no marker, are read
+and republished exactly as before. A client that predates V3 draws a V3
+Blobbi as V1 from its seed mirrors and carries its identity tags through
+untouched.
+
 
 ### `@blobbi-kit/core` and `@blobbi-kit/react` 0.7.0 (a new Blobbi is born V2)
 

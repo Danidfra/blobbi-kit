@@ -250,7 +250,8 @@ describe('visual_generation on the parsed companion', () => {
     ['absent', undefined, 'v1'],
     ['v1', 'v1', 'v1'],
     ['v2', 'v2', 'v2'],
-    ['unknown (v3)', 'v3', 'v1'],
+    ['v3', 'v3', 'v3'],
+    ['unknown (v4)', 'v4', 'v1'],
     ['wrong case (V2)', 'V2', 'v1'],
     ['empty', '', 'v1'],
   ])('%s -> %s', (_label, value, expected) => {
@@ -260,7 +261,7 @@ describe('visual_generation on the parsed companion', () => {
   });
 
   it('never makes an event legacy or invalid, whatever its value', () => {
-    for (const value of ['v1', 'v2', 'v9', '']) {
+    for (const value of ['v1', 'v2', 'v3', 'v9', '']) {
       const e = event([...islandEggTags(), ['visual_generation', value]]);
       expect(isUnsupportedLegacyBlobbiEvent(e)).toBe(false);
       expect(isLegacyBlobbiEvent(e)).toBe(false);

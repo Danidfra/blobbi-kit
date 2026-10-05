@@ -1,0 +1,21 @@
+export {
+  BLOBBI_V3_ALGORITHM_VERSION,
+  BLOBBI_V3_ANTENNAE,
+  BLOBBI_V3_EARS,
+  BLOBBI_V3_HORNS,
+  BLOBBI_V3_TAILS,
+  blobbiV3Genome,
+  blobbiV3Key,
+  createBlobbiV3Identity,
+  fallbackV3Genome,
+  normalizeBlobbiV3Visual,
+  type BlobbiV3Antenna,
+  type BlobbiV3Colors,
+  type BlobbiV3Ears,
+  type BlobbiV3Horns,
+  type BlobbiV3Identity,
+  type BlobbiV3Tail,
+  type BlobbiV3Traits,
+  type BlobbiV3Visual,
+} from './identity';
+export { finishV3Artwork, resolveV3Artwork, type ProceduralArtwork } from './render';

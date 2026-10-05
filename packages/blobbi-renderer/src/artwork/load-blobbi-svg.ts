@@ -24,6 +24,7 @@ import {
   type BlobbiMotion,
 } from '../motion-model';
 import { normalizeBlobbiEggCrack, type BlobbiEggCrack } from '../egg-model';
+import type { BlobbiV3Visual } from './v3/identity';
 
 export type { BlobbiView };
 
@@ -57,14 +58,28 @@ export interface RenderBlobbiSvgOptions {
   motion?: BlobbiMotion;
   /** Egg shell crack state; drawn on the egg stage only. */
   eggCrack?: BlobbiEggCrack;
+  /**
+   * The V3 identity (seed, colours, trait kinds); read only when
+   * `visualGeneration` is `'v3'`. See `artwork/v3/identity.ts`.
+   */
+  v3?: BlobbiV3Visual;
+  /**
+   * V3 only: draw ONE FRAME of `motion`, this far through its cycle (0..1),
+   * instead of leaving the motion to the stylesheet. For sprite sheets,
+   * thumbnails and tests: the frame is plain markup, identical everywhere.
+   */
+  motionPhase?: number;
   /** SVG id namespace; strongly recommended when several Blobbis share a page. */
   instanceId?: string;
   /**
    * Mark the movable eye parts and inject the gaze stylesheet, so a host can
    * steer the pupils through the `--blobbi-eye-x` / `--blobbi-eye-y` CSS
    * variables. Off by default: static drawings carry no extra markup.
+   *
+   * V3 also accepts a direction (`{ x, y }`, each -1..1, screen-relative) and
+   * draws that gaze into the markup: a static picture looking somewhere.
    */
-  gaze?: boolean;
+  gaze?: boolean | { x: number; y: number };
 }
 
 export interface RenderedBlobbiSvg {
@@ -78,10 +93,12 @@ export interface RenderedBlobbiSvg {
  *
  * Pure and deterministic. Unknown stages draw the baby; the egg draws the
  * shell (with `eggCrack`); unknown V1 forms draw the default form; a V2 baby
- * draws the V1 baby until Baby V2 exists.
+ * draws the V1 baby until Baby V2 exists; a V3 Blobbi is generated from
+ * `v3`, at any stage.
  */
 export function renderBlobbiSvg(options: RenderBlobbiSvgOptions): RenderedBlobbiSvg {
   const stage = options.stage === 'adult' || options.stage === 'egg' ? options.stage : 'baby';
+  const motion = normalizeBlobbiMotion(options.motion);
   const { svg, artwork } = buildBlobbiMarkup(
     {
       stage,
@@ -93,6 +110,10 @@ export function renderBlobbiSvg(options: RenderBlobbiSvgOptions): RenderedBlobbi
       groundShadow: options.groundShadow === 'artwork' ? 'artwork' : 'none',
       expression: normalizeBlobbiExpression(options.expression),
       eggCrack: normalizeBlobbiEggCrack(options.eggCrack),
+      v3: options.v3,
+      motion,
+      motionPhase: typeof options.motionPhase === 'number' && Number.isFinite(options.motionPhase) ? options.motionPhase : undefined,
+      gaze: typeof options.gaze === 'object' && options.gaze !== null ? bakedGaze(options.gaze) : undefined,
     },
     {
       baseColor: options.baseColor,
@@ -102,13 +123,28 @@ export function renderBlobbiSvg(options: RenderBlobbiSvgOptions): RenderedBlobbi
     options.instanceId,
   );
   const withGaze =
-    options.gaze && artwork.gazeable
-      ? applyGazeMarkup(svg, artwork.generation, { mirrored: artwork.mirrored })
+    options.gaze === true && artwork.gazeable
+      ? applyGazeMarkup(svg, artwork.generation, { mirrored: artwork.mirrored, travel: artwork.gazeTravel })
       : svg;
   return {
-    svg: applyMotionMarkup(withGaze, normalizeBlobbiMotion(options.motion), options.instanceId ?? ''),
+    svg:
+      artwork.motionStyles === undefined
+        ? applyMotionMarkup(withGaze, motion, options.instanceId ?? '')
+        : applyOwnMotionStyles(withGaze, artwork.motionStyles),
     artwork,
   };
+}
+
+const axis = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0);
+const bakedGaze = (gaze: { x: number; y: number }) => ({ x: axis(gaze.x), y: axis(gaze.y) });
+
+/**
+ * A drawing that animates its own parts carries its motion in its markup
+ * already; all that is missing for a self-contained string is its stylesheet.
+ */
+function applyOwnMotionStyles(svgText: string, styles: string): string {
+  if (!styles) return svgText;
+  return svgText.replace(/<svg\b([^>]*)>/i, (open: string) => `${open}<style data-blobbi-rig-motion-styles="">${styles}</style>`);
 }
 
 /**

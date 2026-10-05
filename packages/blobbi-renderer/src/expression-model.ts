@@ -59,8 +59,22 @@ export const BLOBBI_EMOTIONS: readonly BlobbiEmotion[] = [
   'neutral', 'happy', 'excited', 'sad', 'sleepy', 'surprised', 'upset',
 ];
 
-/** What a caller sends: a preset name, or explicit parts. Plain, serializable. */
-export type BlobbiExpression = BlobbiEmotion | BlobbiExpressionParts;
+/**
+ * A BLEND of presets: how much of each emotion the face shows, each 0..1
+ * (`{ blend: { happy: 0.6, sad: 0.2 } }`). The weights are clamped, and
+ * scaled down together if they sum past 1, so a blend never leaves the
+ * shapes the presets span.
+ *
+ * Drawn continuously by artwork whose face is geometry (V3). Artwork with
+ * drawn faces (V1, V2) cannot interpolate and draws the preset that
+ * dominates the blend (weight of at least a half), or the neutral face.
+ */
+export interface BlobbiExpressionBlend {
+  blend: Partial<Record<Exclude<BlobbiEmotion, 'neutral'>, number>>;
+}
+
+/** What a caller sends: a preset name, explicit parts, or a blend of presets. Plain, serializable. */
+export type BlobbiExpression = BlobbiEmotion | BlobbiExpressionParts | BlobbiExpressionBlend;
 
 /** A fully resolved expression: every part decided. */
 export interface ResolvedBlobbiExpression {
@@ -68,6 +82,12 @@ export interface ResolvedBlobbiExpression {
   mouth: BlobbiMouthState;
   brows: BlobbiBrowState;
   blush: BlobbiBlushState;
+  /**
+   * The normalized weights, when the caller sent a blend with any weight in
+   * it. The four parts above are then the dominant preset's (what artwork
+   * that cannot interpolate draws).
+   */
+  blend?: Readonly<Partial<Record<Exclude<BlobbiEmotion, 'neutral'>, number>>>;
 }
 
 /**
@@ -121,6 +141,7 @@ export function normalizeBlobbiExpression(input: unknown): ResolvedBlobbiExpress
   if (typeof input !== 'object' || Array.isArray(input)) return NEUTRAL_EXPRESSION;
 
   const parts = input as Record<string, unknown>;
+  if (parts.blend !== undefined) return normalizeBlend(parts.blend);
   const resolved: ResolvedBlobbiExpression = {
     eyes: pick(parts.eyes, EYE_SET, NEUTRAL_EXPRESSION.eyes),
     mouth: pick(parts.mouth, MOUTH_SET, NEUTRAL_EXPRESSION.mouth),
@@ -131,12 +152,38 @@ export function normalizeBlobbiExpression(input: unknown): ResolvedBlobbiExpress
   return Object.freeze(resolved);
 }
 
+/** A blend's weights, clamped and made convex; the parts of the preset that dominates it. */
+function normalizeBlend(input: unknown): ResolvedBlobbiExpression {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return NEUTRAL_EXPRESSION;
+  const raw = input as Record<string, unknown>;
+  const weights: Partial<Record<Exclude<BlobbiEmotion, 'neutral'>, number>> = {};
+  let total = 0;
+  for (const emotion of BLOBBI_EMOTIONS) {
+    if (emotion === 'neutral') continue;
+    const value = raw[emotion];
+    const weight = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+    if (weight > 0) {
+      weights[emotion] = weight;
+      total += weight;
+    }
+  }
+  if (total === 0) return NEUTRAL_EXPRESSION;
+  let dominant: Exclude<BlobbiEmotion, 'neutral'> | null = null;
+  for (const emotion of Object.keys(weights) as Exclude<BlobbiEmotion, 'neutral'>[]) {
+    if (total > 1) weights[emotion] = weights[emotion]! / total;
+    if (dominant === null || weights[emotion]! > weights[dominant]!) dominant = emotion;
+  }
+  const preset = dominant !== null && weights[dominant]! >= 0.5 ? BLOBBI_EMOTION_PRESETS[dominant] : NEUTRAL_EXPRESSION;
+  return Object.freeze({ ...preset, blend: Object.freeze(weights) });
+}
+
 /** Whether a resolved expression is the neutral face (draws the authored artwork unchanged). */
 export function isNeutral(expression: ResolvedBlobbiExpression): boolean {
   return (
     expression.eyes === NEUTRAL_EXPRESSION.eyes &&
     expression.mouth === NEUTRAL_EXPRESSION.mouth &&
     expression.brows === NEUTRAL_EXPRESSION.brows &&
-    expression.blush === NEUTRAL_EXPRESSION.blush
+    expression.blush === NEUTRAL_EXPRESSION.blush &&
+    expression.blend === undefined
   );
 }

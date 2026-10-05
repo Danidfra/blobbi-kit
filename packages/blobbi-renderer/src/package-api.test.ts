@@ -30,6 +30,15 @@ const PUBLIC_API = [
   'FALLBACK_INSTANCE_ID',
   'normalizeBlobbiRenderModel',
   'normalizeInstanceId',
+  // V3: procedural identity (the engine behind it is internal)
+  'BLOBBI_V3_ALGORITHM_VERSION',
+  'BLOBBI_V3_ANTENNAE',
+  'BLOBBI_V3_EARS',
+  'BLOBBI_V3_HORNS',
+  'BLOBBI_V3_TAILS',
+  'BLOBBI_V3_MOTION_STYLESHEET',
+  'createBlobbiV3Identity',
+  'normalizeBlobbiV3Visual',
   // The canonical box
   'ACCESSORY_BASE_PERCENT',
   'ACCESSORY_BASE_RATIO',
@@ -153,6 +162,29 @@ describe('the public API is exactly what it claims to be', () => {
       'rangeFor',
       'pickFor',
       'hashString',
+      // The procedural engine. A host states an identity and a state; genes,
+      // morphology, geometry and the RNG are implementation, frozen per
+      // algorithm version, and exporting them would make every gene name and
+      // every range a public promise.
+      'generateGenome',
+      'canonicalGenome',
+      'deriveMorphology',
+      'buildBlobbiGeometry',
+      'renderGeometryToSvg',
+      'renderEggSvg',
+      'generateColors',
+      'derivePalette',
+      'geneRng',
+      'createRng',
+      'motionPose',
+      'motionStylesheetFor',
+      'MOTION_STYLESHEET',
+      'resolveV3Artwork',
+      'finishV3Artwork',
+      'blobbiV3Genome',
+      'fallbackV3Genome',
+      'blobbiV3Key',
+      'PROCEDURAL_ALGORITHM_VERSION',
     ]) {
       expect(api, `${internal} must stay internal`).not.toHaveProperty(internal);
     }

@@ -62,7 +62,7 @@ const HOST_FACING_FIELDS = [
 describe('@blobbi-kit/core package manifest', () => {
   it('is the expected package at the expected version', () => {
     expect(manifest.name).toBe('@blobbi-kit/core');
-    expect(manifest.version).toBe('0.7.0');
+    expect(manifest.version).toBe('0.8.0');
   });
 
   describe('core does not depend on Nostrify at all', () => {

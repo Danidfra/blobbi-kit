@@ -20,6 +20,7 @@ const runtimeEntries = [
   '@blobbi-kit/core/blobbi-decay',
   '@blobbi-kit/core/blobbi-segments',
   '@blobbi-kit/core/blobbi-visual-identity',
+  '@blobbi-kit/core/blobbi-v3-identity',
   '@blobbi-kit/core/types/adult',
   '@blobbi-kit/core/types/shop',
   '@blobbi-kit/react',

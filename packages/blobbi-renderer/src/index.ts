@@ -36,6 +36,33 @@ export type {
   BlobbiRenderView,
 } from './blobbi-render-model';
 
+// ── V3: procedural identity ────────────────────────────────────────────────
+// A V3 Blobbi is not picked from artwork: it is generated from its identity
+// (a seed, four colours, its trait kinds). `createBlobbiV3Identity(seed)` is
+// the creation rule's visual half, called once when a Blobbi is born; the
+// result is what its event stores and what `visual.v3` takes back. The
+// engine behind it (`procedural/`) is deliberately NOT exported: genes,
+// morphology and geometry are implementation, frozen per algorithm version.
+export {
+  BLOBBI_V3_ALGORITHM_VERSION,
+  BLOBBI_V3_ANTENNAE,
+  BLOBBI_V3_HORNS,
+  BLOBBI_V3_EARS,
+  BLOBBI_V3_TAILS,
+  createBlobbiV3Identity,
+  normalizeBlobbiV3Visual,
+} from './artwork/v3/identity';
+export type {
+  BlobbiV3Visual,
+  BlobbiV3Identity,
+  BlobbiV3Colors,
+  BlobbiV3Traits,
+  BlobbiV3Antenna,
+  BlobbiV3Horns,
+  BlobbiV3Ears,
+  BlobbiV3Tail,
+} from './artwork/v3/identity';
+
 // ── The canonical box ──────────────────────────────────────────────────────
 export {
   BLOBBI_RENDER_SIZE_PX,
@@ -113,6 +140,7 @@ export type {
   BlobbiEmotion,
   BlobbiExpression,
   BlobbiExpressionParts,
+  BlobbiExpressionBlend,
   BlobbiEyeState,
   BlobbiMouthState,
   BlobbiBrowState,
@@ -128,6 +156,9 @@ export {
   normalizeBlobbiMotion,
 } from './motion-model';
 export type { BlobbiMotion } from './motion-model';
+// The V3 rig's stylesheet, whole: for a host that would rather mount it once
+// than let each moving V3 Blobbi carry the part of it that it needs.
+export { MOTION_STYLESHEET as BLOBBI_V3_MOTION_STYLESHEET } from './procedural/motion';
 export { BLOBBI_EGG_CRACKS, normalizeBlobbiEggCrack, eggCrackLevel } from './egg-model';
 export type { BlobbiEggCrack } from './egg-model';
 

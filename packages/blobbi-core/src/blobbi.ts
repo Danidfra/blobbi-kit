@@ -5,6 +5,14 @@ import type { NostrEvent } from './nostr-protocol';
 import { blobbiLogger } from '@blobbi-kit/core/logger';
 
 import { ADULT_FORMS, type AdultForm, deriveAdultFormFromSeed } from '@blobbi-kit/core/types/adult';
+import {
+  BLOBBI_V3_TAG_NAMES,
+  blobbiV3IdentityTags,
+  parseBlobbiV3Identity,
+  validateBlobbiV3Identity,
+  type BlobbiV3Identity,
+  type ParsedBlobbiV3Identity,
+} from './blobbi-v3-identity';
 
 import { validateAndRepairBlobbiTags } from './blobbi-tag-schema';
 import { applyColorGuardrails, hexToHsl, hslToHex } from './color-guardrails';
@@ -115,6 +123,9 @@ export const BLOBBI_ACTIVITY_STATES: readonly BlobbiState[] = ['active', 'sleepi
  *
  * - `'v1'`: the original generation, sixteen independent adult forms.
  * - `'v2'`: the standardized canonical anatomy with directional artwork.
+ * - `'v3'`: the procedural generation: no authored drawing per Blobbi, each
+ *   one an individual generated from its own identity (its seed, its
+ *   explicit colours and trait kinds; see `blobbi-v3-identity.ts`).
  *
  * This is a property of the Blobbi's IDENTITY, carried in its kind 31124
  * event, never of the application or renderer version: the same event draws
@@ -122,7 +133,7 @@ export const BLOBBI_ACTIVITY_STATES: readonly BlobbiState[] = ['active', 'sleepi
  * marker is `'v1'`; every Blobbi that existed before the marker did is V1
  * without any migration.
  */
-export type BlobbiVisualGeneration = 'v1' | 'v2';
+export type BlobbiVisualGeneration = 'v1' | 'v2' | 'v3';
 
 /** The kind 31124 tag that names a Blobbi's visual generation: `["visual_generation", "v2"]`. */
 export const VISUAL_GENERATION_TAG = 'visual_generation';
@@ -134,7 +145,11 @@ export const DEFAULT_VISUAL_GENERATION: BlobbiVisualGeneration = 'v1';
  * The generation a NEW Blobbi is born with, today. This is the creation rule
  * of the ecosystem, owned here so that no application has to remember a
  * tag: {@link buildEggTags} applies it unless a host asks for another
- * generation explicitly. It is distinct from {@link DEFAULT_VISUAL_GENERATION},
+ * generation explicitly. It is still `'v2'`: V3 exists and is opt-in (a host
+ * passes `{ visualGeneration: 'v3', v3 }`), because making it the default
+ * would start writing V3 events from every application that upgrades the
+ * kit, including ones that cannot draw them yet. Moving this to `'v3'` is an
+ * ecosystem decision, not a refactor. It is distinct from {@link DEFAULT_VISUAL_GENERATION},
  * which is how an event WITHOUT the tag is read: every Blobbi that existed
  * before the marker did stays V1, without any migration, and a stage
  * transition never changes a generation (the tag is persistent identity;
@@ -153,7 +168,7 @@ export function visualGenerationTags(generation: BlobbiVisualGeneration = NEW_BL
   return generation === DEFAULT_VISUAL_GENERATION ? [] : [[VISUAL_GENERATION_TAG, generation]];
 }
 
-const VISUAL_GENERATIONS: ReadonlySet<string> = new Set<BlobbiVisualGeneration>(['v1', 'v2']);
+const VISUAL_GENERATIONS: ReadonlySet<string> = new Set<BlobbiVisualGeneration>(['v1', 'v2', 'v3']);
 
 /**
  * Read the visual generation from a tag list.
@@ -383,6 +398,13 @@ export interface BlobbiCompanion {
    * {@link BlobbiVisualGeneration}.
    */
   visualGeneration: BlobbiVisualGeneration;
+  /**
+   * The V3 identity the event states (seed, algorithm version, explicit
+   * colours and trait kinds), present only when `visualGeneration` is
+   * `'v3'`. Exactly what the tags say; see {@link ParsedBlobbiV3Identity}.
+   * Optional so hosts that build companions by hand keep compiling.
+   */
+  v3Identity?: ParsedBlobbiV3Identity;
   /**
    * NIP-23 style `published_at` (unix seconds): when this Blobbi was first
    * published, preserved across republishes by hosts that carry it. Optional;
@@ -1378,6 +1400,7 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
       ? deriveAdultFormFromSeed(seed)
       : getTagValue(tags, 'adult_type'),
     visualGeneration: parseVisualGeneration(tags),
+    ...(parseVisualGeneration(tags) === 'v3' ? { v3Identity: parseBlobbiV3Identity(tags) } : null),
     publishedAt: parseNumericTag(tags, 'published_at'),
     stateStartedAt: parseNumericTag(tags, 'state_started_at'),
     progressionStartedAt: parseNumericTag(tags, 'progression_started_at') ?? parseNumericTag(tags, 'state_started_at'),
@@ -1457,8 +1480,27 @@ export interface BuildEggTagsOptions {
    * {@link NEW_BLOBBI_VISUAL_GENERATION} (`'v2'`). Pass `'v1'` for an
    * application that deliberately creates original-generation Blobbis; that
    * output carries no `visual_generation` tag, exactly as before this option.
+   * Pass `'v3'` together with {@link BuildEggTagsOptions.v3} for a
+   * procedural Blobbi.
    */
   visualGeneration?: BlobbiVisualGeneration;
+  /**
+   * The V3 identity of the new Blobbi: REQUIRED when `visualGeneration` is
+   * `'v3'`, ignored otherwise. Either the identity itself, or a function of
+   * the new Blobbi's seed that returns it; the second form is how a host
+   * hands over the renderer's creation rule without deriving the seed twice:
+   *
+   * ```ts
+   * import { createBlobbiV3Identity } from '@blobbi-kit/renderer';
+   * buildEggTags(pubkey, petId, createdAt, name, { visualGeneration: 'v3', v3: createBlobbiV3Identity });
+   * ```
+   *
+   * A V3 Blobbi is never born with a partial identity: an identity that is
+   * missing, incomplete, malformed or made for another seed throws, rather
+   * than producing an event whose colours a later renderer would have to
+   * guess.
+   */
+  v3?: BlobbiV3Identity | ((seed: string) => BlobbiV3Identity);
 }
 
 export function buildEggTags(
@@ -1474,6 +1516,9 @@ export function buildEggTags(
   
   // Derive visual traits from seed for explicit storage (tags mirror the seed).
   const { baseColor, secondaryColor, eyeColor, pattern, specialMark, size } = deriveSeedIdentity(seed);
+  const visualGeneration = options.visualGeneration ?? NEW_BLOBBI_VISUAL_GENERATION;
+  // A V3 Blobbi states its identity at birth, explicitly and completely.
+  const v3Tags = visualGeneration === 'v3' ? blobbiV3IdentityTags(resolveNewV3Identity(seed, options.v3)) : [];
   
   return [
     ['d', d],
@@ -1504,8 +1549,24 @@ export function buildEggTags(
     ['special_mark', specialMark],
     ['size', size],
     // Identity from birth: which artwork family draws this Blobbi (see NEW_BLOBBI_VISUAL_GENERATION).
-    ...visualGenerationTags(options.visualGeneration ?? NEW_BLOBBI_VISUAL_GENERATION),
+    ...visualGenerationTags(visualGeneration),
+    // V3 only: the explicit identity (colours, trait kinds, algorithm version). The mirror tags above
+    // stay seed mirrors; they are what a client that predates V3 draws from.
+    ...v3Tags,
   ];
+}
+
+/** The identity a new V3 Blobbi is born with, validated against its seed. Throws when there is none to state. */
+function resolveNewV3Identity(seed: string, source: BuildEggTagsOptions['v3']): BlobbiV3Identity {
+  if (source === undefined) {
+    throw new Error("[blobbi-kit] A V3 Blobbi needs its identity at creation: pass `v3` (for example `createBlobbiV3Identity` from @blobbi-kit/renderer) with `visualGeneration: 'v3'`.");
+  }
+  const result = validateBlobbiV3Identity(typeof source === 'function' ? source(seed) : source);
+  if (!result.valid) throw new Error(`[blobbi-kit] Invalid V3 identity: ${result.errors.join('; ')}.`);
+  if (result.identity.seed !== seed) {
+    throw new Error('[blobbi-kit] The V3 identity was made for another seed than the new Blobbi\'s.');
+  }
+  return result.identity;
 }
 
 // ─── Managed Tag Sets (Separated by Kind) ─────────────────────────────────────
@@ -1541,6 +1602,8 @@ export const MANAGED_BLOBBI_STATE_TAG_NAMES = new Set([
   'adult_type',
   // Visual generation (identity; never derived from the seed)
   'visual_generation',
+  // V3 identity (explicit colours and trait kinds; identity, never mirrored from the seed)
+  ...BLOBBI_V3_TAG_NAMES,
   // Extension tags (for themes/crossovers)
   'theme', 'crossover_app',
 ]);

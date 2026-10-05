@@ -21,6 +21,7 @@ import {
   type BlobbonautProfile,
 } from '@blobbi-kit/core/blobbi';
 import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
+import { BLOBBI_V3_TAG_NAMES, type BlobbiV3Identity } from '@blobbi-kit/core/blobbi-v3-identity';
 import { serializeEvolutionContent } from '@blobbi-kit/core/missions';
 import { deriveAdultFormFromSeed } from '@blobbi-kit/core/types/adult';
 import { planHatchTransition, useBlobbiHatch } from './useBlobbiHatch';
@@ -37,9 +38,17 @@ function event(tags: string[][], content = ''): NostrEvent {
   return { id: 'e'.repeat(64), pubkey: PUBKEY, created_at: CREATED_AT + 60, kind: KIND_BLOBBI_STATE, tags, content, sig: '0'.repeat(128) };
 }
 
+/** A complete V3 identity for a seed, as a renderer's creation rule would state it. */
+const v3IdentityFor = (seed: string): BlobbiV3Identity => ({
+  seed,
+  algorithm: 1,
+  colors: { base: '#3fb7a5', secondary: '#2a6f8f', eye: '#5a2d12', accent: '#e86a5c' },
+  traits: { antenna: 'single', horns: 'top', ears: 'none', tail: 'leaf', spots: true, belly: false, freckles: true },
+});
+
 /** An incubating egg of the given generation, exactly as a creating host builds it. */
 function egg(generation: BlobbiVisualGeneration): NostrEvent {
-  const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Shell', { visualGeneration: generation })
+  const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Shell', { visualGeneration: generation, ...(generation === 'v3' ? { v3: v3IdentityFor } : null) })
     .map((t) => (t[0] === 'progression_state' ? ['progression_state', 'incubating'] : t))
     .concat([['progression_started_at', String(CREATED_AT + 60)]]);
   return event(tags, serializeEvolutionContent('', createHatchMissions()));
@@ -152,6 +161,59 @@ describe('evolve preserves the generation', () => {
       const seed = getTagValue(tags, 'seed')!;
       expect(getTagValue(tags, 'adult_type')).toBe(deriveAdultFormFromSeed(seed));
       expect(parseModernBlobbiEvent(event(tags))!.adultType).toBe(deriveAdultFormFromSeed(seed));
+    }
+  });
+});
+
+describe('a V3 Blobbi keeps its whole identity through its life', () => {
+  const identityOf = (tags: string[][]) => parseModernBlobbiEvent(event(tags))!.v3Identity;
+  const v3TagsOf = (tags: string[][]) => tags.filter((t) => BLOBBI_V3_TAG_NAMES.includes(t[0]));
+
+  it('is born with it: the generation and every explicit field, nothing missing', () => {
+    const born = egg('v3');
+    expect(generationOf(born.tags)).toBe('v3');
+    const companion = parseModernBlobbiEvent(born)!;
+    expect(companion.visualGeneration).toBe('v3');
+    expect(companion.v3Identity).toEqual({ ...v3IdentityFor(getTagValue(born.tags, 'seed')!), missing: [] });
+  });
+
+  it('v3 egg -> v3 baby -> v3 adult (plan and hooks): the same identity, each tag exactly once', async () => {
+    const born = egg('v3');
+    const original = identityOf(born.tags);
+
+    const plan = planHatchTransition(canonicalFor(born), NOW);
+    expect(generationOf(plan.event.tags)).toBe('v3');
+    expect(identityOf(plan.event.tags)).toEqual(original);
+    expect(v3TagsOf(plan.event.tags)).toEqual(v3TagsOf(born.tags));
+
+    const companion = parseModernBlobbiEvent(born) as BlobbiCompanion;
+    const publishHatch = publisher();
+    const hatch = renderHook(() => useBlobbiHatch({ companion, profile, pubkey: PUBKEY, publish: publishHatch, ensureCanonicalBeforeAction: vi.fn().mockResolvedValue(canonicalFor(born)), updateCompanionEvent: vi.fn() }), { wrapper });
+    act(() => hatch.result.current.mutate());
+    await waitFor(() => expect(hatch.result.current.isSuccess).toBe(true));
+    const hatched = publishHatch.mock.calls[0][0].tags ?? [];
+    expect(getTagValue(hatched, 'stage')).toBe('baby');
+    expect(identityOf(hatched)).toEqual(original);
+
+    const source = baby('v3');
+    const babyCompanion = parseModernBlobbiEvent(source) as BlobbiCompanion;
+    const publishEvolve = publisher();
+    const evolve = renderHook(() => useBlobbiEvolve({ companion: babyCompanion, profile, pubkey: PUBKEY, publish: publishEvolve, ensureCanonicalBeforeAction: vi.fn().mockResolvedValue(canonicalFor(source)), updateCompanionEvent: vi.fn() }), { wrapper });
+    act(() => evolve.result.current.mutate());
+    await waitFor(() => expect(evolve.result.current.isSuccess).toBe(true));
+    const grown = publishEvolve.mock.calls[0][0].tags ?? [];
+    expect(getTagValue(grown, 'stage')).toBe('adult');
+    expect(generationOf(grown)).toBe('v3');
+    expect(identityOf(grown)).toEqual(original);
+    expect(v3TagsOf(grown)).toEqual(v3TagsOf(born.tags));
+    for (const name of BLOBBI_V3_TAG_NAMES) expect(grown.filter((t) => t[0] === name), name).toHaveLength(1);
+  });
+
+  it('a V1 or V2 Blobbi never gains a V3 tag on any transition', async () => {
+    for (const generation of ['v1', 'v2'] as const) {
+      const plan = planHatchTransition(canonicalFor(egg(generation)), NOW);
+      expect(v3TagsOf(plan.event.tags)).toEqual([]);
+      expect(parseModernBlobbiEvent(event(plan.event.tags, plan.event.content))!.v3Identity).toBeUndefined();
     }
   });
 });
