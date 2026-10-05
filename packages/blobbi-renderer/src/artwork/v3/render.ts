@@ -35,12 +35,14 @@ import {
 import { isNeutral } from '../../expression-model';
 import { blobbiMotionPhase, BLOBBI_MOTION_PHASES } from '../../motion-model';
 import type { ArtworkAnchors, ArtworkColors, ArtworkRequest, ResolvedArtwork } from '../types';
-import { blobbiV3Genome, fallbackV3Genome, normalizeBlobbiV3Visual } from './identity';
+import { blobbiV3Genome, fallbackV3Genome, genericV3Genome, resolveBlobbiV3Visual } from './identity';
 
 /** What the finishing step needs to draw a resolved V3 request. Internal to the artwork layer. */
 export interface ProceduralArtwork {
   /** The identity's genome, or null when the visual carried no identity (then the fallback genome is drawn). */
   genome: BlobbiGenome | null;
+  /** Set when the identity states an algorithm version this package does not implement. */
+  unsupportedAlgorithm?: number;
   state: Partial<BlobbiState>;
   groundShadow: boolean;
   gait: Gait;
@@ -110,8 +112,13 @@ const EGG_ANCHORS: ArtworkAnchors = { centerX: 0.5, headTopY: 0.1, groundY: 0.91
  * `fallbackV3Genome`).
  */
 export function resolveV3Artwork(request: ArtworkRequest): ResolvedArtwork {
-  const identity = normalizeBlobbiV3Visual(request.v3);
-  const genome = identity ? blobbiV3Genome(identity) : null;
+  // Three outcomes (see `resolveBlobbiV3Visual`): an individual; an identity
+  // whose algorithm version this package does not implement, drawn as the
+  // canonical body in the colours and trait kinds it states, nothing derived
+  // from its seed, and FLAGGED; or no identity at all.
+  const resolved = resolveBlobbiV3Visual(request.v3);
+  const unsupportedAlgorithm = resolved.status === 'unsupported-algorithm' ? resolved.algorithm : undefined;
+  const genome = resolved.status === 'individual' ? blobbiV3Genome(resolved.identity) : resolved.status === 'unsupported-algorithm' ? genericV3Genome(resolved.colors, resolved.traits) : null;
   const state = stateFor(request);
   const { view } = viewOf(request.facing);
   const mirrored = request.facing === 'left';
@@ -131,7 +138,8 @@ export function resolveV3Artwork(request: ArtworkRequest): ResolvedArtwork {
       anchors: EGG_ANCHORS,
       markup: '',
       motionStyles: live ? motionStylesheetFor(request.motion ?? 'still', 'rest', 'front') : '',
-      procedural: { genome, state, groundShadow: request.groundShadow === 'artwork', gait: 'rest' },
+      unsupportedAlgorithm,
+      procedural: { genome, state, groundShadow: request.groundShadow === 'artwork', gait: 'rest', unsupportedAlgorithm },
     };
   }
 
@@ -156,7 +164,8 @@ export function resolveV3Artwork(request: ArtworkRequest): ResolvedArtwork {
     markup: '',
     gazeTravel: gazeable ? eyes[0].travel : undefined,
     motionStyles: live ? motionStylesheetFor(request.motion ?? 'still', gait, view) : '',
-    procedural: { genome, state, groundShadow: request.groundShadow === 'artwork', gait },
+    unsupportedAlgorithm,
+    procedural: { genome, state, groundShadow: request.groundShadow === 'artwork', gait, unsupportedAlgorithm },
   };
 }
 
@@ -178,6 +187,10 @@ export function finishV3Artwork(resolved: ResolvedArtwork, colors: ArtworkColors
     // The same phase bucket the wrapper motion gives this instance, so a crowd does not move in step.
     motionOffset: live && instanceId ? blobbiMotionPhase(instanceId) / BLOBBI_MOTION_PHASES : undefined,
   };
-  if (resolved.stage === 'egg') return renderEggSvg(genome, procedural.state, options);
-  return renderGeometryToSvg(buildBlobbiGeometry(deriveMorphology(genome, resolved.stage), procedural.state), options);
+  const svg =
+    resolved.stage === 'egg'
+      ? renderEggSvg(genome, procedural.state, options)
+      : renderGeometryToSvg(buildBlobbiGeometry(deriveMorphology(genome, resolved.stage), procedural.state), options);
+  // The drawing itself says when it is a stand-in, so a string carries the fact as well as a component does.
+  return procedural.unsupportedAlgorithm === undefined ? svg : svg.replace('<svg ', `<svg data-blobbi-unsupported-algorithm="${Math.trunc(Number(procedural.unsupportedAlgorithm)) || 0}" `);
 }

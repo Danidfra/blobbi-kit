@@ -21,7 +21,7 @@ import {
   type BlobbonautProfile,
 } from '@blobbi-kit/core/blobbi';
 import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
-import { BLOBBI_V3_TAG_NAMES, type BlobbiV3Identity } from '@blobbi-kit/core/blobbi-v3-identity';
+import { BLOBBI_V3_ONLY_TAG_NAMES, BLOBBI_V3_TAG_NAMES, type BlobbiV3Identity } from '@blobbi-kit/core/blobbi-v3-identity';
 import { serializeEvolutionContent } from '@blobbi-kit/core/missions';
 import { deriveAdultFormFromSeed } from '@blobbi-kit/core/types/adult';
 import { planHatchTransition, useBlobbiHatch } from './useBlobbiHatch';
@@ -209,10 +209,21 @@ describe('a V3 Blobbi keeps its whole identity through its life', () => {
     for (const name of BLOBBI_V3_TAG_NAMES) expect(grown.filter((t) => t[0] === name), name).toHaveLength(1);
   });
 
-  it('a V1 or V2 Blobbi never gains a V3 tag on any transition', async () => {
+  it('its colours are its own through both transitions: the three colour tags are never rewritten from the seed', async () => {
+    const born = egg('v3');
+    const plan = planHatchTransition(canonicalFor(born), NOW);
+    for (const name of ['base_color', 'secondary_color', 'eye_color', 'accent_color']) expect(getTagValue(plan.event.tags, name), name).toBe(getTagValue(born.tags, name));
+    expect(getTagValue(plan.event.tags, 'base_color')).toBe('#3fb7a5');
+    // The same transition on a V2 Blobbi still writes the seed's mirror there.
+    const v2 = planHatchTransition(canonicalFor(egg('v2')), NOW);
+    expect(getTagValue(v2.event.tags, 'base_color')).not.toBe('#3fb7a5');
+    expect(getTagValue(v2.event.tags, 'base_color')).toBe(getTagValue(egg('v2').tags, 'base_color'));
+  });
+
+  it('a V1 or V2 Blobbi never gains a V3-only tag on any transition', async () => {
     for (const generation of ['v1', 'v2'] as const) {
       const plan = planHatchTransition(canonicalFor(egg(generation)), NOW);
-      expect(v3TagsOf(plan.event.tags)).toEqual([]);
+      expect(plan.event.tags.filter((t) => BLOBBI_V3_ONLY_TAG_NAMES.includes(t[0]))).toEqual([]);
       expect(parseModernBlobbiEvent(event(plan.event.tags, plan.event.content))!.v3Identity).toBeUndefined();
     }
   });

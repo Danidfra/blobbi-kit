@@ -49,12 +49,15 @@ export {
   BLOBBI_V3_HORNS,
   BLOBBI_V3_EARS,
   BLOBBI_V3_TAILS,
+  BLOBBI_V3_SUPPORTED_ALGORITHMS,
   createBlobbiV3Identity,
   normalizeBlobbiV3Visual,
+  resolveBlobbiV3Visual,
 } from './artwork/v3/identity';
 export type {
   BlobbiV3Visual,
   BlobbiV3Identity,
+  BlobbiV3Resolution,
   BlobbiV3Colors,
   BlobbiV3Traits,
   BlobbiV3Antenna,

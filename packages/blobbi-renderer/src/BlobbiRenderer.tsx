@@ -391,10 +391,10 @@ export function BlobbiRenderer({
         gazeEnabled && artwork.gazeable
           ? applyGazeMarkup(svg, artwork.generation, { mirrored: artwork.mirrored, travel: artwork.gazeTravel })
           : svg;
-      return { svg: sanitize ? sanitize(withGaze) : withGaze, supports: artwork.supports, motionStyles: artwork.motionStyles };
+      return { svg: sanitize ? sanitize(withGaze) : withGaze, supports: artwork.supports, motionStyles: artwork.motionStyles, unsupportedAlgorithm: artwork.unsupportedAlgorithm };
     } catch (err) {
       console.error('Failed to load Blobbi SVG:', err);
-      return { svg: '', supports: { expression: false, gaze: false, motion: false }, motionStyles: undefined };
+      return { svg: '', supports: { expression: false, gaze: false, motion: false }, motionStyles: undefined, unsupportedAlgorithm: undefined };
     }
   }, [
     model.stage,
@@ -484,6 +484,7 @@ export function BlobbiRenderer({
       data-blobbi-stage={model.stage}
       data-blobbi-egg-crack={model.stage === 'egg' ? model.eggCrack : undefined}
       data-blobbi-expression-support={artworkSupports.expression ? '' : undefined}
+      data-blobbi-unsupported-algorithm={rendered.unsupportedAlgorithm}
       title={title}
       onClick={onClick}
     >

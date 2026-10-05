@@ -25,12 +25,14 @@ import {
   BLOBBI_EMOTIONS,
   BLOBBI_V3_ALGORITHM_VERSION,
   BLOBBI_V3_MOTION_STYLESHEET,
+  BLOBBI_V3_SUPPORTED_ALGORITHMS,
   BlobbiRenderer,
   createBlobbiV3Identity,
   normalizeBlobbiExpression,
   normalizeBlobbiRenderModel,
   normalizeBlobbiV3Visual,
   renderBlobbiSvg,
+  resolveBlobbiV3Visual,
   type BlobbiFacing,
   type BlobbiV3Identity,
   type BlobbiVisual,
@@ -243,8 +245,112 @@ describe('identity: explicit where stated, the seed\'s where not', () => {
     expect(explicit.colors).toEqual({ base: '#3fb7a5', secondary: IDENTITY.colors.secondary, eye: IDENTITY.colors.eye });
     // Without a base, a lone accent is not an explicit palette.
     expect(normalizeBlobbiV3Visual({ seed: SEED, colors: { accent: '#ff0000' } })!.colors).toEqual(IDENTITY.colors);
-    // An algorithm version this package does not have is drawn with the one it does.
-    expect(normalizeBlobbiV3Visual({ ...IDENTITY, algorithm: 99 })).toEqual(IDENTITY);
+    // A missing algorithm version reads as the first one; that, too, is reported as inferred.
+    expect(normalizeBlobbiV3Visual({ seed: SEED, colors: IDENTITY.colors, traits: IDENTITY.traits })).toEqual(IDENTITY);
+  });
+
+  it('a valid explicit field always wins, and every field taken from the seed instead is named', () => {
+    const complete = resolveBlobbiV3Visual(IDENTITY);
+    expect(complete).toEqual({ status: 'individual', identity: IDENTITY, inferred: [] });
+    // Every explicit field differs from what this seed would give: none is replaced.
+    const other: BlobbiV3Identity = {
+      seed: SEED,
+      algorithm: 1,
+      colors: { base: '#d9534f', secondary: '#7a1f1c', eye: '#123456', accent: '#00ff88' },
+      traits: { antenna: 'double', horns: 'side', ears: 'none', tail: 'curl', spots: !IDENTITY.traits.spots, belly: !IDENTITY.traits.belly, freckles: !IDENTITY.traits.freckles },
+    };
+    expect(resolveBlobbiV3Visual(other)).toEqual({ status: 'individual', identity: other, inferred: [] });
+    // Gaps are filled for drawing, and reported: the input itself is not touched.
+    const partial = Object.freeze({ seed: SEED, colors: Object.freeze({ base: '#d9534f', eye: 'not a colour' }), traits: Object.freeze({ tail: 'curl', horns: 'antlers' }) });
+    const resolved = resolveBlobbiV3Visual(partial);
+    expect(resolved.status).toBe('individual');
+    if (resolved.status !== 'individual') throw new Error('unreachable');
+    expect(resolved.inferred.sort()).toEqual(['algorithm', 'colors.eye', 'colors.secondary', 'traits.antenna', 'traits.belly', 'traits.ears', 'traits.freckles', 'traits.horns', 'traits.spots']);
+    expect(resolved.identity.colors.base).toBe('#d9534f');
+    expect(resolved.identity.traits.tail).toBe('curl');
+    expect(partial).toEqual({ seed: SEED, colors: { base: '#d9534f', eye: 'not a colour' }, traits: { tail: 'curl', horns: 'antlers' } });
+    expect(resolveBlobbiV3Visual({ seed: SEED }).status === 'individual' && resolveBlobbiV3Visual({ seed: SEED })).toMatchObject({ inferred: expect.arrayContaining(['algorithm', 'colors.base', 'traits.tail']) });
+    expect(resolveBlobbiV3Visual(null)).toEqual({ status: 'none' });
+  });
+
+  describe('an algorithm version this package does not implement', () => {
+    const future = { ...IDENTITY, algorithm: 2, colors: { base: '#d9534f', secondary: '#7a1f1c', eye: '#123456' }, traits: { ...IDENTITY.traits, horns: 'top' as const, tail: 'curl' as const } };
+    const drawn = (visual: unknown, more: Partial<Parameters<typeof renderBlobbiSvg>[0]> = {}) => renderBlobbiSvg({ visualGeneration: 'v3', v3: visual as never, stage: 'adult', instanceId: 'u', ...more });
+
+    it('implements exactly version 1, and says so', () => {
+      expect(BLOBBI_V3_SUPPORTED_ALGORITHMS).toEqual([1]);
+      expect(BLOBBI_V3_SUPPORTED_ALGORITHMS).toContain(BLOBBI_V3_ALGORITHM_VERSION);
+    });
+
+    it('is never resolved to an individual: there is no identity, only what was stated', () => {
+      expect(normalizeBlobbiV3Visual(future)).toBeNull();
+      expect(resolveBlobbiV3Visual(future)).toEqual({ status: 'unsupported-algorithm', algorithm: 2, seed: SEED, colors: future.colors, traits: future.traits });
+      for (const algorithm of [2, 0, -1, 1.5, 99]) expect(resolveBlobbiV3Visual({ ...IDENTITY, algorithm }).status, String(algorithm)).toBe('unsupported-algorithm');
+      // Only a stated NUMBER is a version; anything else was not a statement, and reads as absent.
+      for (const algorithm of [undefined, null, '2', {}]) expect(resolveBlobbiV3Visual({ ...IDENTITY, algorithm: algorithm as never }).status).toBe('individual');
+      // Malformed explicit fields are dropped, not replaced from the seed.
+      expect(resolveBlobbiV3Visual({ seed: SEED, algorithm: 2, colors: { base: 'red', eye: '#123456' }, traits: { horns: 'antlers', tail: 'nub', spots: 'yes' } })).toEqual({
+        status: 'unsupported-algorithm',
+        algorithm: 2,
+        seed: SEED,
+        colors: { eye: '#123456' },
+        traits: { tail: 'nub' },
+      });
+    });
+
+    it('is NOT drawn as version 1: nothing is derived from its seed, and the drawing says it is a stand-in', () => {
+      const v2 = drawn(future);
+      const asIfV1 = drawn({ ...future, algorithm: 1 });
+      expect(v2.artwork.generation).toBe('v3');
+      expect(v2.artwork.unsupportedAlgorithm).toBe(2);
+      expect(asIfV1.artwork.unsupportedAlgorithm).toBeUndefined();
+      expect(v2.svg).toContain('data-blobbi-unsupported-algorithm="2"');
+      expect(asIfV1.svg).not.toContain('data-blobbi-unsupported-algorithm');
+      // Not this seed's individual under the rules this package has.
+      expect(v2.svg).not.toBe(asIfV1.svg);
+      // The seed plays no part: another seed with the same explicit identity is the same drawing.
+      expect(drawn({ ...future, seed: 'f'.repeat(64) }).svg).toBe(v2.svg);
+      expect(drawn({ ...future, seed: 'another seed entirely' }, { stage: 'baby' }).svg).toBe(drawn(future, { stage: 'baby' }).svg);
+      expect(drawn({ ...future, seed: 'another seed entirely' }, { stage: 'egg' }).svg).toBe(drawn(future, { stage: 'egg' }).svg);
+      // Under version 1 the same two seeds are two different bodies.
+      expect(drawn({ ...future, algorithm: 1, seed: 'f'.repeat(64) }).svg).not.toBe(asIfV1.svg);
+    });
+
+    it('still shows what the identity explicitly states: its colours and its trait kinds, on the canonical body', () => {
+      const v2 = drawn(future);
+      expect((v2.svg.match(/data-part="horn"/g) ?? []).length).toBe(2);
+      expect(drawn(future, { facing: 'right' }).svg).toContain('data-part="tail"');
+      // The canonical body: the proportions of a visual with no identity at all.
+      const shapes = (svg: string) => svg.replace(/#[0-9a-f]{6}/g, '#').replace(/ data-blobbi-unsupported-algorithm="\d+"/, '');
+      const bare = drawn({ seed: SEED, algorithm: 2 });
+      expect(shapes(bare.svg)).toBe(shapes(renderBlobbiSvg({ visualGeneration: 'v3', stage: 'adult', instanceId: 'u' }).svg));
+      expect(bare.svg).not.toMatch(/data-part="(antenna|horn|ear|tail)"/);
+      // Other stated colours, other paint; the same shapes.
+      const repainted = drawn({ ...future, colors: { base: '#3fb7a5', secondary: '#2a6f8f', eye: '#5a2d12' } });
+      expect(repainted.svg).not.toBe(v2.svg);
+      expect(shapes(repainted.svg)).toBe(shapes(v2.svg));
+      // It remains a working drawing: every stage, facing and state.
+      for (const stage of STAGES) for (const facing of FACINGS) expect(drawn(future, { stage, facing, motion: 'walking', expression: 'happy' }).svg).not.toMatch(/NaN|undefined/);
+    });
+
+    it('is flagged through the render model and on the component, and only then', () => {
+      const model = normalizeBlobbiRenderModel({ visual: { visualGeneration: 'v3', v3: future }, instanceId: 'm' });
+      expect(model.v3Status).toBe('unsupported-algorithm');
+      expect(model.v3).toEqual({ seed: SEED, algorithm: 2, colors: future.colors, traits: future.traits });
+      expect(normalizeBlobbiRenderModel({ visual: { visualGeneration: 'v3', v3: IDENTITY }, instanceId: 'm' }).v3Status).toBe('individual');
+      expect(normalizeBlobbiRenderModel({ visual: { visualGeneration: 'v3' }, instanceId: 'm' }).v3Status).toBe('none');
+      expect(normalizeBlobbiRenderModel({ visual: { visualGeneration: 'v2', v3: future }, instanceId: 'm' }).v3Status).toBe('none');
+      const flagged = render(<BlobbiRenderer visual={{ stage: 'adult', visualGeneration: 'v3', v3: future }} instanceId="ua1" />).container;
+      expect(box(flagged).getAttribute('data-blobbi-unsupported-algorithm')).toBe('2');
+      expect(svgOf(flagged).getAttribute('data-blobbi-unsupported-algorithm')).toBe('2');
+      const fine = render(<BlobbiRenderer visual={{ stage: 'adult', visualGeneration: 'v3', v3: IDENTITY }} instanceId="ua2" />).container;
+      expect(box(fine).hasAttribute('data-blobbi-unsupported-algorithm')).toBe(false);
+      // A change of algorithm version is a change of drawing.
+      const { container, rerender } = render(<BlobbiRenderer visual={{ stage: 'adult', visualGeneration: 'v3', v3: { ...future, algorithm: 1 } }} instanceId="ua3" />);
+      const before = body(container).innerHTML;
+      rerender(<BlobbiRenderer visual={{ stage: 'adult', visualGeneration: 'v3', v3: future }} instanceId="ua3" />);
+      expect(body(container).innerHTML).not.toBe(before);
+    });
   });
 
   it('has nothing to draw an individual from without a seed, and draws the canonical body in the visual\'s colours', () => {

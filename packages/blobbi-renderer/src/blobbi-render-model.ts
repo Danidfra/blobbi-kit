@@ -28,11 +28,13 @@
  *  - unknown/absent `visualGeneration` -> `'v1'`, unknown/absent `facing` ->
  *    `'front'`, so pre-existing consumers and pre-existing Blobbis are
  *    untouched;
- *  - a `'v3'` visual's identity (`visual.v3`) is resolved field by field:
- *    anything missing or malformed is what its seed gives; with no usable
- *    seed at all there is no individual to draw, and the canonical V3 body
- *    is drawn in the visual's plain colours. `v3` is ignored entirely by the
- *    other generations;
+ *  - a `'v3'` visual's identity (`visual.v3`) is resolved field by field: a
+ *    valid stated field always wins, and only a missing or malformed one is
+ *    what its seed gives; with no usable seed at all there is no individual
+ *    to draw, and the canonical V3 body is drawn in the visual's plain
+ *    colours; an identity that states an algorithm version this package does
+ *    not implement is never drawn as another version (`v3Status` says so).
+ *    `v3` is ignored entirely by the other generations;
  *  - an empty/blank `instanceId` falls back to {@link FALLBACK_INSTANCE_ID}
  *    rather than producing an SVG id prefix shared by every such renderer;
  *  - unknown/absent `expression` -> neutral (per part), unknown/absent
@@ -52,7 +54,7 @@ import { normalizeBlobbiSleepIndicator, type BlobbiSleepIndicator } from './svg/
 import { normalizeBlobbiGroundShadow, type BlobbiGroundShadow } from './svg/ground-shadow';
 import { normalizeBlobbiMotion, type BlobbiMotion } from './motion-model';
 import { normalizeBlobbiEggCrack, type BlobbiEggCrack } from './egg-model';
-import { blobbiV3Key, normalizeBlobbiV3Visual, type BlobbiV3Identity, type BlobbiV3Visual } from './artwork/v3/identity';
+import { blobbiV3Key, blobbiV3VisualOf, resolveBlobbiV3Visual, type BlobbiV3Visual } from './artwork/v3/identity';
 
 /**
  * The visual identity of a Blobbi: the plain, serializable input the renderer
@@ -137,8 +139,15 @@ export interface BlobbiRenderModel {
   stage: 'egg' | 'baby' | 'adult';
   /** Resolved artwork generation; `'v1'` when the visual named none. */
   visualGeneration: BlobbiVisualGeneration;
-  /** The resolved V3 identity; null unless the generation is `'v3'` and the visual carried a seed. */
-  v3: BlobbiV3Identity | null;
+  /**
+   * The resolved V3 visual; null unless the generation is `'v3'` and the
+   * visual carried a seed. A complete identity when `v3Status` is
+   * `'individual'`; only the explicitly stated fields when it is
+   * `'unsupported-algorithm'`.
+   */
+  v3: BlobbiV3Visual | null;
+  /** What `v3` resolved to. `'none'` for every other generation. */
+  v3Status: 'individual' | 'unsupported-algorithm' | 'none';
   /** A stable key for `v3` (empty when null): equal identities, equal keys. */
   v3Key: string;
   /** Present only when `stage === 'adult'`. */
@@ -232,12 +241,14 @@ export function normalizeBlobbiRenderModel(
     : DEFAULT_VISUAL_GENERATION;
 
   const isRearFacing = facing === 'back';
-  const v3 = visualGeneration === 'v3' ? normalizeBlobbiV3Visual(visual.v3) : null;
+  const v3Resolution = visualGeneration === 'v3' ? resolveBlobbiV3Visual(visual.v3) : null;
+  const v3 = v3Resolution ? blobbiV3VisualOf(v3Resolution) : null;
 
   return {
     stage,
     visualGeneration,
     v3,
+    v3Status: v3Resolution?.status ?? 'none',
     v3Key: blobbiV3Key(v3),
     adultType: stage === 'adult' ? visual.adultType || DEFAULT_ADULT_TYPE : undefined,
     baseColor: sanitizeArtworkColor(visual.baseColor),

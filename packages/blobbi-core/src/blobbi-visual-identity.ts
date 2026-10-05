@@ -70,12 +70,13 @@ export interface BlobbiVisualIdentity {
    *
    * For V3 the seed IS visual identity (every proportion and every trait's
    * shape derive from it), which is the one exception to "transport data is
-   * not identity" above. Fields the event does not state are absent; the
-   * renderer resolves them from the seed.
+   * not identity" above. Fields the event does not state are absent (the
+   * algorithm version included); a renderer may resolve them for drawing,
+   * and reports an algorithm version it cannot draw rather than guessing.
    */
   v3?: {
     seed?: string;
-    algorithm: number;
+    algorithm?: number;
     colors: Partial<BlobbiV3Colors>;
     traits: Partial<BlobbiV3Traits>;
   };
@@ -87,10 +88,8 @@ export interface BlobbiVisualIdentity {
    */
   adultType?: AdultForm;
   /**
-   * Canonical CSS hex color. For a V3 Blobbi that states its colours these
-   * three are ITS colours (body, markings, iris), so a host that tints a card
-   * or an aura from the identity matches the creature it draws; otherwise
-   * they are the seed's.
+   * Canonical CSS hex color. On V1 and V2 the seed's; on V3 the colour the
+   * event states (its explicit identity), read from the same tag.
    */
   baseColor: string;
   /** Canonical CSS hex color. */
@@ -164,11 +163,9 @@ export function getBlobbiVisualIdentity(blobbi: BlobbiVisualIdentitySource): Blo
     // A parsed companion carries it; a minimal source may carry only tags.
     const v3 = v3Identity ?? (allTags ? parseBlobbiV3Identity(allTags) : undefined);
     if (v3) {
-      identity.v3 = { algorithm: v3.algorithm, colors: { ...v3.colors }, traits: { ...v3.traits } };
+      identity.v3 = { colors: { ...v3.colors }, traits: { ...v3.traits } };
+      if (v3.algorithm !== undefined) identity.v3.algorithm = v3.algorithm;
       if (v3.seed !== undefined) identity.v3.seed = v3.seed;
-      if (v3.colors.base) identity.baseColor = v3.colors.base;
-      if (v3.colors.secondary) identity.secondaryColor = v3.colors.secondary;
-      if (v3.colors.eye) identity.eyeColor = v3.colors.eye;
     }
   }
 

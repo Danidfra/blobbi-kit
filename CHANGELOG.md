@@ -31,11 +31,19 @@ carries.
   artwork registry (`artwork/v3/`): identity -> genome -> morphology ->
   geometry -> SVG. It is not exported.
 - **Identity.** New exports `createBlobbiV3Identity(seed)` (the creation
-  rule's visual half: called once, its result stored), `normalizeBlobbiV3Visual`,
-  `BLOBBI_V3_ALGORITHM_VERSION` (`1`) and the trait vocabularies. Colours and
-  trait kinds are explicit; proportions and trait shapes derive from the seed
-  under a FROZEN algorithm version, pinned by `procedural/vectors.json` and,
-  against the prototype's own vectors, by hash.
+  rule's visual half: called once, its result stored), `resolveBlobbiV3Visual`,
+  `normalizeBlobbiV3Visual`, `BLOBBI_V3_ALGORITHM_VERSION` (`1`),
+  `BLOBBI_V3_SUPPORTED_ALGORITHMS` and the trait vocabularies. Colours and
+  trait kinds are explicit and authoritative once stated; proportions and
+  trait shapes derive from the seed under a FROZEN algorithm version, pinned
+  by `procedural/vectors.json` and, against the prototype's own vectors, by
+  hash.
+- **An algorithm version this package does not implement is never drawn as
+  one it does.** `resolveBlobbiV3Visual` reports it as
+  `unsupported-algorithm`; the drawing is then a flagged stand-in (the
+  canonical body in the stated colours and trait kinds, nothing derived from
+  the seed), with `artwork.unsupportedAlgorithm` and a
+  `data-blobbi-unsupported-algorithm` attribute.
 - **State is unchanged vocabulary**: `facing`, `expression`, `isSleeping`,
   `eyeOffset`, `eggCrack`, `groundShadow`, `motion`. New: an expression may
   be a blend of presets (`{ blend: { happy: 0.6 } }`), drawn continuously on
@@ -63,20 +71,30 @@ unknown (`'v1'`). Nothing creates V3 unless a host asks.
 - **`BlobbiVisualGeneration` gains `'v3'`.** `NEW_BLOBBI_VISUAL_GENERATION`
   stays `'v2'`: V3 is opt-in, because the default is what every application
   that upgrades the kit starts writing.
-- **V3 identity tags (provisional)**, in `blobbi-v3-identity.ts`:
-  `v3_algorithm`, `v3_base_color`, `v3_secondary_color`, `v3_eye_color`,
-  `v3_accent_color`, `v3_antenna`, `v3_horns`, `v3_ears`, `v3_tail`,
-  `v3_spots`, `v3_belly`, `v3_freckles`. Explicit, because the existing
-  colour tags are seed mirrors that every republish rewrites. New exports:
-  `BLOBBI_V3_TAGS`, `BLOBBI_V3_TAG_NAMES`, `validateBlobbiV3Identity`,
+- **V3 identity, in generation-independent tags** (`blobbi-v3-identity.ts`):
+  the existing `base_color`, `secondary_color` and `eye_color`, plus
+  `accent_color`, `antenna`, `horns`, `ears`, `tail`, `spots`, `belly`,
+  `freckles` and `visual_algorithm`. The seed decides them at creation; the
+  event is authoritative afterwards. New exports: `VISUAL_ALGORITHM_TAG`,
+  `BLOBBI_V3_TAGS`, `BLOBBI_V3_TAG_NAMES`, `BLOBBI_V3_ONLY_TAG_NAMES`,
+  `BLOBBI_MIRRORED_COLOR_TAG_NAMES`, `validateBlobbiV3Identity`,
   `blobbiV3IdentityTags`, `parseBlobbiV3Identity`, `normalizeBlobbiV3Color`,
   the kind vocabularies and types.
+- **The colour tags are generation-aware.** On V1 and V2 they are seed
+  mirrors, rewritten on every republish and never read, exactly as before.
+  On V3 they are explicit identity: `syncMirrorTagsToSeed` leaves them alone
+  (it neither overwrites nor adds one) and `deriveVisualTraits` reads them.
+  `pattern`, `special_mark`, `size` and `adult_type` stay mirrors on every
+  generation. A client that predates V3 does not make this check and would
+  rewrite a V3 Blobbi's three colours on republish: clients must be updated
+  before they write to V3 Blobbis.
 - **Creation:** `buildEggTags(..., { visualGeneration: 'v3', v3 })`, where
   `v3` is a complete identity or a function of the new seed (the renderer's
   `createBlobbiV3Identity`). A V3 Blobbi is never born with a partial
   identity: it throws instead.
 - **Reading:** `BlobbiCompanion.v3Identity` (what the tags state, plus
-  `missing`) and `BlobbiVisualIdentity.v3`. Core never fills a gap.
+  `missing`) and `BlobbiVisualIdentity.v3`. Core never fills a gap, and
+  reports the algorithm version as stated (absent when the tag is).
 - **Persistence:** the tags are managed, persistent, valid at every stage and
   never invented; they survive care updates, hatch and evolve
   (`blobbi-v3-identity.test.ts`, `lifecycle-generation.test.tsx`).
@@ -84,8 +102,8 @@ unknown (`'v1'`). Nothing creates V3 unless a host asks.
 
 Compatibility decision: V1 and V2 events, and events with no marker, are read
 and republished exactly as before. A client that predates V3 draws a V3
-Blobbi as V1 from its seed mirrors and carries its identity tags through
-untouched.
+Blobbi as V1 from its seed (not from the colour tags), carries the V3-only
+tags through untouched, and rewrites the three colour tags if it republishes.
 
 
 ### `@blobbi-kit/core` and `@blobbi-kit/react` 0.7.0 (a new Blobbi is born V2)

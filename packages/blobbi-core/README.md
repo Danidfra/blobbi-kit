@@ -99,7 +99,7 @@ the result as-is.
 interface BlobbiVisualIdentity {
   stage: 'egg' | 'baby' | 'adult';
   visualGeneration: 'v1' | 'v2' | 'v3';        // absent tag means 'v1'
-  v3?: { seed?, algorithm, colors, traits };   // 'v3' only: see V3 identity, below
+  v3?: { seed?, algorithm?, colors, traits };  // 'v3' only: see V3 identity, below
   adultType?: AdultForm;           // one of ADULT_FORMS; seed-derived for adults
   baseColor: string;               // '#RRGGBB'
   secondaryColor: string;
@@ -126,30 +126,36 @@ interface BlobbiVisualIdentity {
   (accessories, effects) and transport (the event, `d`, the seed). The one
   exception is `v3.seed`: for a procedural Blobbi the seed is what its
   proportions derive from, so it is visual identity.
-- For a V3 Blobbi that states its colours, `baseColor`, `secondaryColor` and
-  `eyeColor` are its own (so a card tinted from the identity matches the
-  creature); the `base_color` tags on its event stay mirrors of the seed.
+- For a V3 Blobbi `baseColor`, `secondaryColor` and `eyeColor` are the
+  colours its event states (explicit identity), not the seed's.
 
 The projection is pure and deterministic, and the result survives
 `JSON.parse(JSON.stringify(...))`.
 
-## V3 identity (provisional)
+## V3 identity
 
-A `visual_generation = v3` Blobbi is drawn procedurally: its proportions and
-trait shapes derive from its `seed`, and its colours and trait kinds are
-**stated explicitly** so they never depend on how a generator is tuned later.
+A `visual_generation = v3` Blobbi is drawn procedurally. Its event states its
+**semantic identity** (colours, trait kinds) explicitly, in plain,
+generation-independent tags; everything else about its looks is derived.
 
 ```
-visual_generation = v3
-seed              = <64 hex>      (the existing tag)
-v3_algorithm      = 1             the procedural algorithm version
-v3_base_color, v3_secondary_color, v3_eye_color = #rrggbb
-v3_accent_color   = #rrggbb       optional: absent means no accent
-v3_antenna        = none | single | double
-v3_horns          = none | forehead | top | side
-v3_ears           = none | round | pointed
-v3_tail           = none | nub | curl | leaf
-v3_spots, v3_belly, v3_freckles = true | false
+visual_generation = v3            the visual system
+visual_algorithm  = 1             the frozen procedural algorithm its micro-geometry derives under
+seed              = <64 hex>      the Blobbi's one seed (the existing tag)
+base_color, secondary_color, eye_color = #rrggbb     EXPLICIT on V3 (seed mirrors on V1 and V2)
+accent_color      = #rrggbb       optional: absent means no accent colour
+antenna           = none | single | double
+horns             = none | forehead | top | side
+ears              = none | round | pointed
+tail              = none | nub | curl | leaf
+spots, belly, freckles = true | false
+```
+
+The seed is used twice, for two different things:
+
+```
+creation:   seed ─► procedural generator ─► semantic identity ─► written to the event, once
+rendering:  the event's semantic identity + micro-geometry derived from the seed + render state ─► SVG
 ```
 
 ```ts
@@ -160,21 +166,35 @@ parseBlobbiEvent(event).v3Identity;        // exactly what the tags state, plus 
 getBlobbiVisualIdentity(companion).v3;     // what a renderer takes
 ```
 
+- **Explicit after creation.** The seed decides the colours and trait kinds
+  once, when the Blobbi is born. From then on the event is authoritative:
+  no care action, hatch, evolution or republish regenerates them, and a
+  retuned colour generator repaints nobody. Micro-geometry (proportions, the
+  exact size, curve and place of each trait) is never stored; it is derived
+  from the seed under `visual_algorithm`.
+- **The three colour tags have two readings, by generation.** On V1 and V2
+  `base_color`, `secondary_color` and `eye_color` are mirrors of the seed:
+  rewritten on every republish and never read when a seed is present, exactly
+  as before. On V3 the same three tags are identity: never rewritten, never
+  added if absent, and they are what `visualTraits` and the projection carry.
+  The switch is `visual_generation`, checked in `syncMirrorTagsToSeed` and
+  `deriveVisualTraits` and nowhere else. `pattern`, `special_mark`, `size`
+  and `adult_type` stay seed mirrors on every generation.
+- **A client that predates V3** does not make that check: if it republishes a
+  V3 Blobbi it rewrites those three colours from the seed (the other identity
+  tags are unknown to it and pass through). Clients must be updated before
+  they write to V3 Blobbis.
 - **Opt-in.** `NEW_BLOBBI_VISUAL_GENERATION` is still `'v2'`. A host asks for
   V3 and must hand over a complete identity; `buildEggTags` throws on a
   missing, partial, malformed or foreign one.
-- **Its own tags, on purpose.** `base_color` and its siblings are rewritten
-  from the seed on every republish, here and in every deployed client, so an
-  explicit colour stored there would not survive. Tags a client does not know
-  pass through every republish untouched, which is what keeps a V3 identity
-  intact when an older client feeds the Blobbi. That client draws it as V1
-  from the seed mirrors, as it does any generation it does not know.
-- **Identity, never invented.** The tags are managed, persistent and valid at
-  every stage: they ride through care updates, hatching and evolution, are
-  recovered from the previous event if dropped, and are never made up.
-- **Provisional.** The tag names and value spellings are a working
-  convention, kept in one module (`blobbi-v3-identity.ts`) so they can be
-  revised before anything is specified publicly.
+- **Stated versus inferred.** `parseBlobbiV3Identity` returns only what the
+  tags state and lists everything else in `missing` (the algorithm version
+  included: a missing one is missing, not assumed). Core never fills a gap
+  and never writes one back. The algorithm version is reported as stated,
+  whatever it is; whether a renderer can draw it is the renderer's to say.
+- **Not reused:** `pattern` (one mutually exclusive, seed-mirrored style of
+  the old egg graphic, not an independent marking), `special_mark` and
+  `size` (a category of the same graphic, not morphology).
 
 ## Tags and compatibility
 
@@ -200,10 +220,11 @@ When you republish through `updateBlobbiTags`, `updateBlobbonautTags` or the
   original shape. This is tested for host extension tags (`equip`, `inv`) and
   for the removed `storage` and `coins` tags, which can be read from
   `allTags` but can no longer be written through these helpers.
-- The seed is authoritative for visual traits. `base_color`,
+- On V1 and V2 the seed is authoritative for visual traits. `base_color`,
   `secondary_color`, `eye_color`, `pattern`, `special_mark`, `size` and the
   adult form are rewritten from the seed on every republish; edits to those
-  tags do not survive.
+  tags do not survive. On V3 the three colour tags are explicit identity and
+  are left alone (see "V3 identity"); the other mirrors behave the same.
 - `validateAndRepairBlobbiTags` (tag schema module) drops deprecated tags,
   filters tags by stage, and can restore required or persistent tags from the
   previous event. It will not invent a `name`, `seed`, `d` or personality tag

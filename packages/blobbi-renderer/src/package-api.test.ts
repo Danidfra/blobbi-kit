@@ -37,8 +37,10 @@ const PUBLIC_API = [
   'BLOBBI_V3_HORNS',
   'BLOBBI_V3_TAILS',
   'BLOBBI_V3_MOTION_STYLESHEET',
+  'BLOBBI_V3_SUPPORTED_ALGORITHMS',
   'createBlobbiV3Identity',
   'normalizeBlobbiV3Visual',
+  'resolveBlobbiV3Visual',
   // The canonical box
   'ACCESSORY_BASE_PERCENT',
   'ACCESSORY_BASE_RATIO',
@@ -184,6 +186,8 @@ describe('the public API is exactly what it claims to be', () => {
       'blobbiV3Genome',
       'fallbackV3Genome',
       'blobbiV3Key',
+      'blobbiV3VisualOf',
+      'genericV3Genome',
       'PROCEDURAL_ALGORITHM_VERSION',
     ]) {
       expect(api, `${internal} must stay internal`).not.toHaveProperty(internal);

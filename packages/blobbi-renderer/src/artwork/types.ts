@@ -190,6 +190,13 @@ export interface ResolvedArtwork {
    * drawing in the kit's own motion animation. Absent for V1 and V2.
    */
   motionStyles?: string;
+  /**
+   * Set when a V3 identity states a procedural algorithm version this
+   * package does not implement. The drawing is then a STAND-IN: the
+   * canonical body in the colours and trait kinds the identity states, with
+   * nothing derived from its seed. It is never drawn as another version.
+   */
+  unsupportedAlgorithm?: number;
   /** What the V3 finishing step draws from. Internal to the artwork layer. */
   procedural?: ProceduralArtwork;
 }

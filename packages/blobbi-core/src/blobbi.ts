@@ -6,8 +6,11 @@ import { blobbiLogger } from '@blobbi-kit/core/logger';
 
 import { ADULT_FORMS, type AdultForm, deriveAdultFormFromSeed } from '@blobbi-kit/core/types/adult';
 import {
-  BLOBBI_V3_TAG_NAMES,
+  BLOBBI_MIRRORED_COLOR_TAG_NAMES,
+  BLOBBI_V3_ONLY_TAG_NAMES,
+  BLOBBI_V3_TAGS,
   blobbiV3IdentityTags,
+  normalizeBlobbiV3Color,
   parseBlobbiV3Identity,
   validateBlobbiV3Identity,
   type BlobbiV3Identity,
@@ -911,7 +914,18 @@ export function deriveVisualTraits(
   // Seed is the canonical source of truth for the entire visual identity.
   // When present, all visual trait tags are mirrors — not consulted for rendering.
   if (hasSeed) {
-    return deriveSeedIdentity(seed);
+    const seeded = deriveSeedIdentity(seed);
+    // The one exception: a V3 Blobbi states its colours, and what it states
+    // is what it is. A colour it does not state (a malformed event) reads as
+    // the seed's here, so this record is always complete; `v3Identity` on the
+    // companion says exactly what was and was not stated.
+    if (parseVisualGeneration(tags) !== 'v3') return seeded;
+    return {
+      ...seeded,
+      baseColor: normalizeBlobbiV3Color(getTagValue(tags, BLOBBI_V3_TAGS.baseColor)) ?? seeded.baseColor,
+      secondaryColor: normalizeBlobbiV3Color(getTagValue(tags, BLOBBI_V3_TAGS.secondaryColor)) ?? seeded.secondaryColor,
+      eyeColor: normalizeBlobbiV3Color(getTagValue(tags, BLOBBI_V3_TAGS.eyeColor)) ?? seeded.eyeColor,
+    };
   }
   
   // No seed (legacy): use explicit tags with defaults as final fallback.
@@ -1517,8 +1531,13 @@ export function buildEggTags(
   // Derive visual traits from seed for explicit storage (tags mirror the seed).
   const { baseColor, secondaryColor, eyeColor, pattern, specialMark, size } = deriveSeedIdentity(seed);
   const visualGeneration = options.visualGeneration ?? NEW_BLOBBI_VISUAL_GENERATION;
-  // A V3 Blobbi states its identity at birth, explicitly and completely.
-  const v3Tags = visualGeneration === 'v3' ? blobbiV3IdentityTags(resolveNewV3Identity(seed, options.v3)) : [];
+  // A V3 Blobbi states its identity at birth, explicitly and completely: this
+  // is the one moment its seed decides its colours and trait kinds.
+  const v3 = visualGeneration === 'v3' ? resolveNewV3Identity(seed, options.v3) : undefined;
+  // The three colour tags every Blobbi carries: the seed's mirrors on V1 and
+  // V2, the stated identity on V3. The rest of a V3 identity follows the generation.
+  const colours = v3 ? { baseColor: v3.colors.base, secondaryColor: v3.colors.secondary, eyeColor: v3.colors.eye } : { baseColor, secondaryColor, eyeColor };
+  const v3Tags = v3 ? blobbiV3IdentityTags(v3).filter(([name]) => !BLOBBI_MIRRORED_COLOR_TAG_NAMES.includes(name)) : [];
   
   return [
     ['d', d],
@@ -1541,17 +1560,16 @@ export function buildEggTags(
     ['energy', DEFAULT_EGG_STATS.energy.toString()],
     ['last_interaction', now],
     ['last_decay_at', now],
-    // Visual traits (derived from seed, explicitly stored for consistency)
-    ['base_color', baseColor],
-    ['secondary_color', secondaryColor],
-    ['eye_color', eyeColor],
+    // Visual traits (derived from seed, explicitly stored for consistency; on V3 the colours are its identity)
+    ['base_color', colours.baseColor],
+    ['secondary_color', colours.secondaryColor],
+    ['eye_color', colours.eyeColor],
     ['pattern', pattern],
     ['special_mark', specialMark],
     ['size', size],
     // Identity from birth: which artwork family draws this Blobbi (see NEW_BLOBBI_VISUAL_GENERATION).
     ...visualGenerationTags(visualGeneration),
-    // V3 only: the explicit identity (colours, trait kinds, algorithm version). The mirror tags above
-    // stay seed mirrors; they are what a client that predates V3 draws from.
+    // V3 only: the rest of the explicit identity (algorithm version, accent colour, trait kinds).
     ...v3Tags,
   ];
 }
@@ -1602,8 +1620,8 @@ export const MANAGED_BLOBBI_STATE_TAG_NAMES = new Set([
   'adult_type',
   // Visual generation (identity; never derived from the seed)
   'visual_generation',
-  // V3 identity (explicit colours and trait kinds; identity, never mirrored from the seed)
-  ...BLOBBI_V3_TAG_NAMES,
+  // V3 identity beyond the colour tags above: algorithm version, accent colour, trait kinds
+  ...BLOBBI_V3_ONLY_TAG_NAMES,
   // Extension tags (for themes/crossovers)
   'theme', 'crossover_app',
 ]);
@@ -1732,16 +1750,23 @@ export function mergeTagsForRepublish(
  *
  * This is called inside mergeBlobbiStateTagsForRepublish so that every
  * republish automatically backfills correct mirror tags.
+ *
+ * GENERATION-AWARE, in one respect only. On a V1 or V2 Blobbi the three
+ * colour tags are mirrors and are rewritten here, exactly as they always
+ * were. On a V3 Blobbi the same three tags are EXPLICIT IDENTITY (stated at
+ * creation, authoritative ever since), so they are not mirrors and this
+ * function does not touch them: it neither overwrites one nor adds a missing
+ * one. Everything else it does (pattern, special_mark, size, adult_type) is
+ * the same for every generation.
  */
 function syncMirrorTagsToSeed(tags: string[][]): string[][] {
   const seed = getTagValue(tags, 'seed');
   if (!seed || seed.length !== 64) return tags;
 
   const canonical = deriveSeedIdentity(seed);
-  const MIRROR_TAG_NAMES = new Set([
-    'base_color', 'secondary_color', 'eye_color',
-    'pattern', 'special_mark', 'size',
-  ]);
+  const coloursAreMirrors = parseVisualGeneration(tags) !== 'v3';
+  const MIRROR_TAG_NAMES = new Set(['pattern', 'special_mark', 'size']);
+  if (coloursAreMirrors) for (const name of BLOBBI_MIRRORED_COLOR_TAG_NAMES) MIRROR_TAG_NAMES.add(name);
 
   const stage = getTagValue(tags, 'stage');
   if (stage === 'adult') {
@@ -1752,10 +1777,14 @@ function syncMirrorTagsToSeed(tags: string[][]): string[][] {
   const filtered = tags.filter((t) => !MIRROR_TAG_NAMES.has(t[0]));
 
   // Append canonical values
+  if (coloursAreMirrors) {
+    filtered.push(
+      ['base_color', canonical.baseColor],
+      ['secondary_color', canonical.secondaryColor],
+      ['eye_color', canonical.eyeColor],
+    );
+  }
   filtered.push(
-    ['base_color', canonical.baseColor],
-    ['secondary_color', canonical.secondaryColor],
-    ['eye_color', canonical.eyeColor],
     ['pattern', canonical.pattern],
     ['special_mark', canonical.specialMark],
     ['size', canonical.size],

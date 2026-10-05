@@ -403,16 +403,24 @@ const v3 = createBlobbiV3Identity(seed);
 | explicit | four colours (`base`, `secondary`, `eye`, optional `accent`) and the kind of each trait (`antenna`, `horns`, `ears`, `tail`, `spots`, `belly`, `freckles`) | stated in the identity; `@blobbi-kit/core` writes them to the event |
 | derived | every proportion and every trait's own shape and place | from `seed`, under `algorithm` |
 
-The explicit layer exists so that a Blobbi is never repainted because the
-colour generator was tuned: `createBlobbiV3Identity(seed)` is called once, at
-creation, and from then on the stored identity is the truth. The derived layer
-is reproducible because the **algorithm version is frozen**
+The seed decides the explicit layer ONCE: `createBlobbiV3Identity(seed)` is
+called at creation, and from then on the stored identity is authoritative, so
+a Blobbi is never repainted because the colour generator was tuned. The
+derived layer is re-derived from the same seed at every render, and is
+reproducible because the **algorithm version is frozen**
 (`BLOBBI_V3_ALGORITHM_VERSION`, currently `1`): gene names, keyed random
 streams, trait odds, ranges and stage plans are pinned by
 `procedural/vectors.json`, and changing any of them for existing Blobbis means
-a new version beside this one, never an edit. A missing or malformed field is
-filled from the seed, field by field; a V3 visual with no seed at all draws the
-canonical body in its plain colours.
+a new version beside this one, never an edit.
+
+`resolveBlobbiV3Visual(visual)` says what a visual resolves to, in three
+outcomes that are never blurred:
+
+| Status | When | What is drawn |
+| --- | --- | --- |
+| `individual` | a seed, and an algorithm version this package implements (an absent one reads as `1`) | the individual. A valid stated field always wins; a missing or malformed one is taken from the seed and named in `inferred` |
+| `unsupported-algorithm` | the identity states any other version | a STAND-IN: the canonical body in the colours and trait kinds the identity states. Nothing is derived from its seed, and it is never drawn as version 1. Flagged as `artwork.unsupportedAlgorithm` and `data-blobbi-unsupported-algorithm` on the drawing and on the component |
+| `none` | no seed | the canonical body in the visual's plain colours |
 
 **What is drawn.** The canonical V3 individual (every gene at zero) IS the
 official artwork: the V2 adult, the V1 baby and the V1 egg, which
@@ -563,7 +571,7 @@ Everything is exported from the package root; there are no deep imports and no
 | Expression | `BLOBBI_EMOTIONS`, `BLOBBI_EMOTION_PRESETS`, `NEUTRAL_EXPRESSION`, `BLOBBI_EYE_STATES`, `BLOBBI_MOUTH_STATES`, `BLOBBI_BROW_STATES`, `BLOBBI_BLUSH_STATES`, `isBlobbiEmotion`, `normalizeBlobbiExpression`; types `BlobbiExpression`, `BlobbiEmotion`, `BlobbiExpressionParts`, `BlobbiEyeState`, `BlobbiMouthState`, `BlobbiBrowState`, `BlobbiBlushState`, `BlobbiExpressionBlend`, `ResolvedBlobbiExpression` |
 | Motion | `BLOBBI_MOTIONS`, `BLOBBI_MOTION_PHASES`, `BLOBBI_MOTION_STYLESHEET`, `normalizeBlobbiMotion`, `blobbiMotionPhase`, `blobbiMotionAttributes`; type `BlobbiMotion` |
 | Stylesheets | `BLOBBI_RENDERER_STYLESHEET`, `BLOBBI_EFFECT_STYLESHEET` |
-| V3 identity | `createBlobbiV3Identity`, `normalizeBlobbiV3Visual`, `BLOBBI_V3_ALGORITHM_VERSION`, `BLOBBI_V3_ANTENNAE`, `BLOBBI_V3_HORNS`, `BLOBBI_V3_EARS`, `BLOBBI_V3_TAILS`, `BLOBBI_V3_MOTION_STYLESHEET`; types `BlobbiV3Visual`, `BlobbiV3Identity`, `BlobbiV3Colors`, `BlobbiV3Traits`, `BlobbiV3Antenna`, `BlobbiV3Horns`, `BlobbiV3Ears`, `BlobbiV3Tail` |
+| V3 identity | `createBlobbiV3Identity`, `resolveBlobbiV3Visual`, `normalizeBlobbiV3Visual`, `BLOBBI_V3_ALGORITHM_VERSION`, `BLOBBI_V3_SUPPORTED_ALGORITHMS`, `BLOBBI_V3_ANTENNAE`, `BLOBBI_V3_HORNS`, `BLOBBI_V3_EARS`, `BLOBBI_V3_TAILS`, `BLOBBI_V3_MOTION_STYLESHEET`; types `BlobbiV3Visual`, `BlobbiV3Identity`, `BlobbiV3Resolution`, `BlobbiV3Colors`, `BlobbiV3Traits`, `BlobbiV3Antenna`, `BlobbiV3Horns`, `BlobbiV3Ears`, `BlobbiV3Tail` |
 | Artwork | `DEFAULT_VISUAL_GENERATION`, `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`, `ADULT_V2_CLOSED_EYE_PARTS`, `ADULT_V2_EXPRESSION_PARTS`; types `BlobbiVisualGeneration`, `BlobbiFacing`, `ArtworkAnchors`, `BlobbiArtworkSupport`, `AdultV2Part` |
 | String API | `renderBlobbiSvg`, `loadBlobbiSvg`, `applyGazeMarkup`, `applyRearView`, `uniquifySvgIds`; types `RenderBlobbiSvgOptions`, `RenderedBlobbiSvg`, `BlobbiView`, `GazeMarkupOptions` |
 
