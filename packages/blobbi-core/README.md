@@ -141,7 +141,7 @@ generation-independent tags; everything else about its looks is derived.
 ```
 visual_generation = v3            the visual system
 visual_algorithm  = 1             the frozen procedural algorithm its micro-geometry derives under
-seed              = <64 hex>      the Blobbi's one seed (the existing tag)
+seed              = <64 hex>      the Blobbi's one seed (the existing tag); for V3, 64 LOWER-CASE hexadecimal digits
 base_color, secondary_color, eye_color = #rrggbb     EXPLICIT on V3 (seed mirrors on V1 and V2)
 accent_color      = #rrggbb       optional: absent means no accent colour
 antenna           = none | single | double
@@ -182,6 +182,16 @@ getBlobbiVisualIdentity(companion).v3;     // what a renderer takes
   retuned colour generator repaints nobody. Micro-geometry (proportions, the
   exact size, curve and place of each trait) is never stored; it is derived
   from the seed under `visual_algorithm`.
+- **The V3 seed has one spelling.** A procedural algorithm hashes the
+  seed's characters, so two spellings of the same bytes would be two
+  Blobbis. `canonicalBlobbiV3Seed(value)` is the rule: 64 hexadecimal digits
+  read as their lower-case form (which is what `deriveBlobbiSeedV1` has
+  always produced), and anything else is not a V3 seed and is never
+  repaired into one. `validateBlobbiV3Identity` and `parseBlobbiV3Identity`
+  return the canonical seed; a `seed` tag that is not one is absent from the
+  parsed identity and named in `missing`. This governs V3 identity only: the
+  tag on the event is never rewritten, and V1 and V2 read it exactly as
+  before.
 - **Five tags have two readings, by generation.** On V1 and V2
   `base_color`, `secondary_color`, `eye_color`, `pattern` and `special_mark`
   are mirrors of the seed: rewritten on every republish and never read when a

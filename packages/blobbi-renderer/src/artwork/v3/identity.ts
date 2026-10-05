@@ -23,7 +23,8 @@
  *
  * The seed is the Blobbi's one seed. It is used at creation (to decide the
  * explicit layer) and at every render (to derive the micro-geometry), and
- * for nothing else; there is no second, V3-specific seed.
+ * for nothing else; there is no second, V3-specific seed. It has ONE
+ * spelling, 64 lower-case hexadecimal digits: see `canonicalBlobbiV3Seed`.
  *
  * AN ALGORITHM VERSION IS NOT A HINT. Micro-geometry derived under another
  * version of the rules is another body. An identity that states a version
@@ -106,7 +107,7 @@ export interface BlobbiV3Traits {
 
 /** A complete V3 identity: every explicit field stated. What creation produces and an event carries. */
 export interface BlobbiV3Identity {
-  /** The seed all micro-geometry is derived from. */
+  /** The seed all micro-geometry is derived from, as 64 lower-case hexadecimal digits. */
   seed: string;
   /** The procedural algorithm version the micro-geometry is derived under. */
   algorithm: number;
@@ -126,8 +127,37 @@ export interface BlobbiV3Visual {
   traits?: Partial<BlobbiV3Traits>;
 }
 
-/** A seed longer than this is cut: every gene hashes the whole seed, and a seed is external data. */
-const MAX_SEED_LENGTH = 256;
+/** How long a V3 seed is: 32 bytes, as hexadecimal digits. */
+export const BLOBBI_V3_SEED_LENGTH = 64;
+const HEX_SEED = /^[0-9a-fA-F]{64}$/;
+
+/**
+ * THE V3 SEED, canonically: 32 bytes written as exactly 64 lower-case
+ * hexadecimal digits (`0-9a-f`). It is what the domain kit has always
+ * derived for a Blobbi, and it is the ONLY input algorithm 1 is defined
+ * over.
+ *
+ * The algorithm hashes the seed's characters, so two spellings of the same
+ * bytes would be two different individuals. There is therefore one:
+ *
+ *  - 64 hexadecimal digits in any letter case are the same seed, and are
+ *    read as their lower-case form;
+ *  - anything else is NOT a V3 seed and is rejected, never repaired: not
+ *    trimmed, not padded, not stripped of a prefix, not hashed into shape.
+ *    A value that needs a guess has no single right answer, and two
+ *    renderers guessing differently would draw two Blobbis.
+ *
+ * Returns the canonical seed, or `undefined` when the value is not one.
+ * Every door into algorithm 1 in this package goes through it
+ * (`createBlobbiV3Identity`, `resolveBlobbiV3Visual`), so no non-canonical
+ * spelling can reach the engine and be drawn as an individual.
+ */
+export function canonicalBlobbiV3Seed(value: unknown): string | undefined {
+  return typeof value === 'string' && HEX_SEED.test(value) ? value.toLowerCase() : undefined;
+}
+
+/** Under a version of the rules this package does not have, a seed is kept as stated but cut to this: it is external data. */
+const MAX_FOREIGN_SEED_LENGTH = 256;
 
 const oneOf = <T extends string>(allowed: readonly T[], value: unknown): T | undefined =>
   typeof value === 'string' && (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
@@ -165,10 +195,17 @@ function identityOf(genome: BlobbiGenome): BlobbiV3Identity {
  * same seed after the colour generator has been retuned is exactly what must
  * not decide an existing Blobbi's colours.
  *
- * Pure and deterministic: the same seed always returns an equal identity.
+ * Pure and deterministic: the same seed always returns an equal identity,
+ * and it states the seed canonically (`canonicalBlobbiV3Seed`).
+ *
+ * @throws TypeError when `seed` is not a V3 seed. Creation is the one
+ * strict door: a Blobbi must never be born from a value that had to be
+ * guessed at. (Reading is total: see `resolveBlobbiV3Visual`.)
  */
 export function createBlobbiV3Identity(seed: string): BlobbiV3Identity {
-  return identityOf(generateGenome(String(seed).slice(0, MAX_SEED_LENGTH)));
+  const canonical = canonicalBlobbiV3Seed(seed);
+  if (canonical === undefined) throw new TypeError('[blobbi-kit] createBlobbiV3Identity: a V3 seed is 64 hexadecimal digits.');
+  return identityOf(generateGenome(canonical));
 }
 
 /**
@@ -183,7 +220,9 @@ export function createBlobbiV3Identity(seed: string): BlobbiV3Identity {
  *    this package does not have. Nothing may be derived from its seed, so
  *    there is no individual to draw; only what it states EXPLICITLY (valid
  *    colours, valid trait kinds) is kept.
- *  - `none`: no seed at all.
+ *  - `none`: no seed at all, or (under a version this package implements)
+ *    something that is not a V3 seed. There is no individual to derive, and
+ *    none is guessed at.
  */
 export type BlobbiV3Resolution =
   | { status: 'individual'; identity: BlobbiV3Identity; inferred: string[] }
@@ -207,12 +246,15 @@ const NONE: BlobbiV3Resolution = Object.freeze({ status: 'none' });
  *    reads as version 1, the first (and is reported as inferred); any other
  *    stated number is `unsupported-algorithm`. It is never drawn as the
  *    version this package happens to have.
+ *  - `seed`: canonicalized (`canonicalBlobbiV3Seed`). Hexadecimal digits in
+ *    another case resolve to the SAME identity as their lower-case form;
+ *    anything that is not a V3 seed resolves to `none`. Under an unsupported
+ *    version nothing is derived from the seed, so it is kept as stated.
  */
 export function resolveBlobbiV3Visual(input: unknown): BlobbiV3Resolution {
   if (!input || typeof input !== 'object') return NONE;
   const raw = input as BlobbiV3Visual;
   if (typeof raw.seed !== 'string' || raw.seed === '') return NONE;
-  const seed = raw.seed.slice(0, MAX_SEED_LENGTH);
   const given = raw.colors && typeof raw.colors === 'object' ? raw.colors : {};
   const t = raw.traits && typeof raw.traits === 'object' ? raw.traits : {};
   const stated = {
@@ -242,8 +284,12 @@ export function resolveBlobbiV3Visual(input: unknown): BlobbiV3Resolution {
     if (stated.pattern) traits.pattern = stated.pattern;
     if (stated.specialMark) traits.specialMark = stated.specialMark;
     for (const key of ['belly', 'freckles'] as const) if (stated[key] !== undefined) traits[key] = stated[key];
-    return { status: 'unsupported-algorithm', algorithm: raw.algorithm, seed, colors, traits };
+    return { status: 'unsupported-algorithm', algorithm: raw.algorithm, seed: raw.seed.slice(0, MAX_FOREIGN_SEED_LENGTH), colors, traits };
   }
+
+  // Algorithm 1 is defined over canonical seeds only: one spelling, so one individual.
+  const seed = canonicalBlobbiV3Seed(raw.seed);
+  if (seed === undefined) return NONE;
 
   const own = identityOf(generateGenome(seed));
   const inferred: string[] = [];

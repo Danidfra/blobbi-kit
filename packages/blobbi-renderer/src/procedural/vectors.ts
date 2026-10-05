@@ -28,6 +28,15 @@
  * Porting notes: a seed is hashed over its UTF-16 code units
  * (`charCodeAt`), not its UTF-8 bytes; a gene's stream is seeded with
  * `seed + "\u0000" + key`; the generator is warmed up with 12 draws.
+ *
+ * A real V3 seed is canonical (64 lower-case hexadecimal digits: see
+ * `canonicalBlobbiV3Seed` in the adapter), so for every real Blobbi code
+ * units and bytes are the same thing. The other vector seeds (the empty
+ * one, plain words, text outside ASCII) pin the ENGINE, which is a function
+ * of any string; none of them can reach it through a public door.
+ *
+ * What the genome becomes (morphology, palette, drawings) is pinned for a
+ * set of reference identities in `artwork/v3/reference/`.
  */
 import { generateColors } from './colors';
 import { deriveEgg, type EggAppearance } from './egg';

@@ -40,7 +40,8 @@ export type {
 // A V3 Blobbi is not picked from artwork: it is generated from its identity
 // (a seed, four colours, its trait kinds). `createBlobbiV3Identity(seed)` is
 // the creation rule's visual half, called once when a Blobbi is born; the
-// result is what its event stores and what `visual.v3` takes back. The
+// result is what its event stores and what `visual.v3` takes back. A V3 seed
+// has one spelling, 64 lower-case hexadecimal digits (`canonicalBlobbiV3Seed`). The
 // engine behind it (`procedural/`) is deliberately NOT exported: genes,
 // morphology and geometry are implementation, frozen per algorithm version.
 export {
@@ -52,6 +53,8 @@ export {
   BLOBBI_V3_PATTERNS,
   BLOBBI_V3_SPECIAL_MARKS,
   BLOBBI_V3_SUPPORTED_ALGORITHMS,
+  BLOBBI_V3_SEED_LENGTH,
+  canonicalBlobbiV3Seed,
   createBlobbiV3Identity,
   normalizeBlobbiV3Visual,
   resolveBlobbiV3Visual,

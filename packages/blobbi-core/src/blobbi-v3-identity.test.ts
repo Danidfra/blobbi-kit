@@ -40,7 +40,9 @@ import {
   BLOBBI_V3_TAGS,
   BLOBBI_V3_TAG_NAMES,
   VISUAL_ALGORITHM_TAG,
+  BLOBBI_V3_SEED_LENGTH,
   blobbiV3IdentityTags,
+  canonicalBlobbiV3Seed,
   normalizeBlobbiV3Color,
   parseBlobbiV3Identity,
   validateBlobbiV3Identity,
@@ -469,6 +471,107 @@ describe('a V3 identity survives everything the kit does to an event', () => {
       const grown = evolve(hatch(care(born(generation))));
       for (const name of BLOBBI_V3_ONLY_TAG_NAMES) expect(getTagValue(grown, name), name).toBeUndefined();
       expect(parseBlobbiEvent(makeEvent(grown))!.visualGeneration).toBe(generation);
+    }
+  });
+});
+
+describe('the V3 seed has one spelling', () => {
+  const UPPER = SEED.toUpperCase();
+  const MIXED = SEED.replace(/[a-f]/g, (c, i: number) => (i % 2 ? c.toUpperCase() : c));
+  /** Things that look like the seed and are not one. Each would need a guess to become it. */
+  const NOT_SEEDS: unknown[] = [
+    '',
+    ` ${SEED}`,
+    `${SEED} `,
+    `${SEED}\n`,
+    `0x${SEED}`,
+    `0x${SEED.slice(2)}`,
+    SEED.slice(1),
+    `${SEED}0`,
+    `${SEED.slice(0, 63)}g`,
+    `${SEED.slice(0, 63)}\u0661`, // an Arabic-Indic digit one
+    `${SEED.slice(0, 63)}\uff11`, // a full-width digit one
+    'x'.repeat(64),
+    'abc123',
+    undefined,
+    null,
+    7,
+    [SEED],
+    { seed: SEED },
+  ];
+
+  it('is what the kit has always derived: 64 lower-case hexadecimal digits', () => {
+    expect(BLOBBI_V3_SEED_LENGTH).toBe(64);
+    expect(SEED).toMatch(/^[0-9a-f]{64}$/);
+    expect(canonicalBlobbiV3Seed(SEED)).toBe(SEED);
+    for (let i = 0; i < 50; i++) {
+      const seed = deriveBlobbiSeedV1(PUBKEY, getCanonicalBlobbiD(PUBKEY, PET_ID), CREATED_AT + i);
+      expect(canonicalBlobbiV3Seed(seed)).toBe(seed);
+    }
+  });
+
+  it('reads hexadecimal digits in any case as the same seed, and nothing else as a seed at all', () => {
+    expect(UPPER).not.toBe(SEED);
+    expect(MIXED).not.toBe(SEED);
+    expect(canonicalBlobbiV3Seed(UPPER)).toBe(SEED);
+    expect(canonicalBlobbiV3Seed(MIXED)).toBe(SEED);
+    for (const value of NOT_SEEDS) expect(canonicalBlobbiV3Seed(value), JSON.stringify(value)).toBeUndefined();
+  });
+
+  it('creation states the canonical seed, and refuses an identity whose seed is not one', () => {
+    const fromUpper = validateBlobbiV3Identity({ ...identityFor(SEED), seed: UPPER });
+    expect(fromUpper).toEqual({ valid: true, identity: identityFor(SEED) });
+    // The same bytes in another case are the same seed, so the same Blobbi may be born from it...
+    const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: { ...identityFor(SEED), seed: MIXED } });
+    expect(tags).toEqual(bornV3());
+    expect(getTagValue(tags, 'seed')).toBe(SEED);
+    // ...and nothing that is not a seed is.
+    for (const value of NOT_SEEDS) {
+      const result = validateBlobbiV3Identity({ ...identityFor(SEED), seed: value });
+      expect(result.valid, JSON.stringify(value)).toBe(false);
+      expect(() => buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: { ...identityFor(SEED), seed: value as string } })).toThrow(/Invalid V3 identity/);
+    }
+    expect(validateBlobbiV3Identity({ ...identityFor(SEED), seed: 'abc123' })).toEqual({ valid: false, errors: ['seed is not 64 hexadecimal digits'] });
+    expect(validateBlobbiV3Identity({ ...identityFor(SEED), seed: '' })).toEqual({ valid: false, errors: ['seed is missing'] });
+  });
+
+  it('an event read in any accepted spelling is the same identity; one that is not a seed has none', () => {
+    const canonical = identityOf(bornV3())!;
+    expect(canonical.seed).toBe(SEED);
+    for (const spelling of [UPPER, MIXED]) {
+      const parsed = identityOf(withTag(bornV3(), 'seed', spelling))!;
+      expect(parsed).toEqual(canonical);
+      expect(getBlobbiVisualIdentity(parseBlobbiEvent(makeEvent(withTag(bornV3(), 'seed', spelling)))!).v3).toEqual(getBlobbiVisualIdentity(parseBlobbiEvent(makeEvent(bornV3()))!).v3);
+    }
+    // 64 characters that are not hexadecimal pass the older generations' length check, and are still no V3 seed.
+    const parsed = parseBlobbiV3Identity(withTag(bornV3(), 'seed', 'x'.repeat(64)));
+    expect(parsed.seed).toBeUndefined();
+    expect(parsed.missing).toEqual(['seed']);
+    for (const value of NOT_SEEDS.filter((v): v is string => typeof v === 'string' && v !== '')) {
+      const read = parseBlobbiV3Identity(withTag(bornV3(), 'seed', value));
+      expect(read.seed, JSON.stringify(value)).toBeUndefined();
+      expect(read.missing).toEqual(['seed']);
+      // What the event states explicitly is still read.
+      expect(read.colors).toEqual(canonical.colors);
+      expect(read.traits).toEqual(canonical.traits);
+    }
+  });
+
+  it('never rewrites the seed tag, and leaves V1 and V2 reading it exactly as before', () => {
+    // A republish of a V3 event keeps the tag as it is written, whatever its case.
+    const upper = withTag(bornV3(), 'seed', UPPER);
+    expect(getTagValue(care(upper), 'seed')).toBe(UPPER);
+    expect(getTagValue(evolve(hatch(upper)), 'seed')).toBe(UPPER);
+    for (const generation of ['v1', 'v2'] as const) {
+      const lower = parseBlobbiEvent(makeEvent(born(generation)))!;
+      const shouted = parseBlobbiEvent(makeEvent(withTag(born(generation), 'seed', UPPER)))!;
+      // The older generations read the digits by value, as they always have: the same traits, the tag untouched.
+      expect(shouted.seed).toBe(UPPER);
+      expect(shouted.visualTraits).toEqual(lower.visualTraits);
+      expect(shouted.v3Identity).toBeUndefined();
+      // And a 64-character seed that is not hexadecimal is still theirs to read, as before.
+      const odd = parseBlobbiEvent(makeEvent(withTag(born(generation), 'seed', 'x'.repeat(64))))!;
+      expect(odd.seed).toBe('x'.repeat(64));
     }
   });
 });

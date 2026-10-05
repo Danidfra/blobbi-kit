@@ -5,9 +5,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { anchorsInSquare, createBlobbiV3Identity, describeBlobbiArtwork, renderBlobbiSvg } from '../index';
+import { hexSeed } from '../procedural/test-helpers';
 
 const FACINGS = ['front', 'back', 'left', 'right'] as const;
-const identities = Array.from({ length: 40 }, (_, i) => createBlobbiV3Identity(`describe-${i}`));
+const identities = Array.from({ length: 40 }, (_, i) => createBlobbiV3Identity(hexSeed(`describe-${i}`)));
 
 describe('describeBlobbiArtwork', () => {
   it('says what the renderer would draw, without drawing: the same anchors `renderBlobbiSvg` reports', () => {

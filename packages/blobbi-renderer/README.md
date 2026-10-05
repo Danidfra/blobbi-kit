@@ -408,10 +408,28 @@ called at creation, and from then on the stored identity is authoritative, so
 a Blobbi is never repainted because the colour generator was tuned. The
 derived layer is re-derived from the same seed at every render, and is
 reproducible because the **algorithm version is frozen**
-(`BLOBBI_V3_ALGORITHM_VERSION`, currently `1`): gene names, keyed random
-streams, trait odds, ranges and stage plans are pinned by
-`procedural/vectors.json`, and changing any of them for existing Blobbis means
-a new version beside this one, never an edit.
+(`BLOBBI_V3_ALGORITHM_VERSION`, currently `1`).
+
+**What a version promises:** the same V3 identity under the same
+`visual_algorithm` is the same Blobbi: the same shapes, in the same places,
+painted the same way. It does NOT promise the same SVG bytes, DOM, CSS or
+pixels. `procedural/version.ts` lists exactly what version 1 freezes (the
+seed's reading, the random streams, the genome, the trait odds, morphology,
+the stage plans, geometry, patterns and marks, paint order and opacities,
+the palette) and what it does not. It is held by `procedural/vectors.json`
+and by `artwork/v3/reference/`: twelve reference Blobbis whose morphology,
+palette and drawings are pinned, the drawings as shapes and paint, never as
+markup. Changing any of it for existing Blobbis means a new version beside
+this one, never an edit.
+
+**The seed has one spelling.** A V3 seed is 32 bytes written as 64
+lower-case hexadecimal digits, which is what `@blobbi-kit/core` derives.
+`canonicalBlobbiV3Seed(value)` returns it, or `undefined`: hexadecimal
+digits in another letter case are the same seed (read as lower-case), and
+anything else is not a seed and is never repaired into one (not trimmed, not
+stripped of `0x`, not hashed into shape). `createBlobbiV3Identity` throws a
+`TypeError` for a value that is not a seed; `resolveBlobbiV3Visual` resolves
+it to `none`. Two spellings of one seed can therefore never be two Blobbis.
 
 `resolveBlobbiV3Visual(visual)` says what a visual resolves to, in three
 outcomes that are never blurred:
@@ -420,7 +438,7 @@ outcomes that are never blurred:
 | --- | --- | --- |
 | `individual` | a seed, and an algorithm version this package implements (an absent one reads as `1`) | the individual. A valid stated field always wins; a missing or malformed one is taken from the seed and named in `inferred` |
 | `unsupported-algorithm` | the identity states any other version | a STAND-IN: the canonical body in the colours and trait kinds the identity states. Nothing is derived from its seed, and it is never drawn as version 1. Flagged as `artwork.unsupportedAlgorithm` and `data-blobbi-unsupported-algorithm` on the drawing and on the component |
-| `none` | no seed | the canonical body in the visual's plain colours |
+| `none` | no seed, or (under version 1) a value that is not a V3 seed | the canonical body in the visual's plain colours |
 
 **What is drawn.** The canonical V3 individual (every gene at zero) IS the
 official artwork: the V2 adult, the V1 baby and the V1 egg, which

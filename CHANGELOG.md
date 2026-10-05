@@ -17,6 +17,55 @@ core/react 0.6.1 are on the registry; everything in this section is not yet:
 renderer 0.5.0 and core/react 0.7.0 (further down), and renderer 0.6.0 and
 core/react 0.8.0 (the V3 entries directly below).
 
+### V3 before release: what `visual_algorithm = 1` means, and one spelling for the seed (renderer 0.6.0, core/react 0.8.0)
+
+Stability work before any V3 Blobbi exists publicly. No drawing changed:
+every existing V3 test, the pinned end-to-end snapshot and
+`procedural/vectors.json` are as they were.
+
+- **The contract is written down.** The same V3 identity under the same
+  `visual_algorithm` is the same Blobbi: the same shapes, in the same places,
+  painted the same way; not necessarily the same SVG bytes, DOM, CSS or
+  pixels. `procedural/version.ts` lists what version 1 freezes (the seed's
+  reading, the random streams, the genome, the trait odds, morphology, the
+  stage plans, geometry, patterns and marks, the art structure, the palette)
+  and what it does not (the SVG, the backend, the pixels, state, the colour
+  generator).
+- **The V3 seed is canonical: 64 lower-case hexadecimal digits.**
+  `canonicalBlobbiV3Seed` (core and renderer) and `BLOBBI_V3_SEED_LENGTH`
+  are new. Hexadecimal digits in another letter case are the same seed, read
+  as lower-case; anything else is not a seed and is never repaired into one.
+  BEHAVIOUR CHANGE for V3 only: `createBlobbiV3Identity` throws a
+  `TypeError` for a value that is not a seed (it used to hash any string),
+  `resolveBlobbiV3Visual` resolves it to `none` (it used to draw an
+  individual from it), `validateBlobbiV3Identity` rejects it, and
+  `parseBlobbiV3Identity` reports it as a missing `seed`. Every seed the kit
+  has ever derived is already canonical, so no existing Blobbi is affected;
+  development tools that invented text seeds must use real ones. The `seed`
+  tag is never rewritten, and V1 and V2 read it exactly as before.
+- **Version 1 is pinned beyond the genome** (`artwork/v3/reference/`).
+  Twelve reference identities, covering every kind of every trait, a mark in
+  every region and a very pale body: their morphology as egg, baby and adult
+  (exact; plus two bodies with every gene at an end of its range), every
+  colour role derived from their four colours (and from seven more colour
+  sets that reach each fallback), and what each paints as egg, baby and
+  adult from the front, the side and behind.
+- **Drawings are compared as paint lists, not markup.** `paint-list.ts`
+  reads a drawing back as its painted shapes in order: each one's box,
+  length, area and stroke width in the frame's units with every transform
+  applied, its paint (fill, stroke, opacities, blur, clip), and where a
+  user-space gradient lies. Positions within 0.02 units, paint exactly. Ids,
+  grouping, attribute order, number spelling and an ellipse written as a
+  path do not reach it (tested by rewriting real drawings); a shape that
+  moves, bends, changes paint or changes place in the paint order does.
+- **The writer's art decisions are stated as tests**
+  (`art-structure.test.ts`): what lies on the skin is clipped to the body
+  and layered wash, belly, stripes, spots, mark; the fixed opacities and
+  which identity colour paints what; the four mark shapes; each stage's
+  face order; what is beyond the body from behind and in profile.
+- **The trait odds are written down as a table** and held against 3000
+  seeds.
+
 ### V3 before release: one pattern, a special mark, ears on the flank (renderer 0.6.0, core/react 0.8.0)
 
 Changes to the unreleased V3 entries below, made before any V3 Blobbi exists

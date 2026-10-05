@@ -40,18 +40,45 @@ of where the engine came from, no longer byte for byte what it is.
 
 ## The rule that matters
 
-Everything that turns a seed into a body is **frozen per algorithm version**:
-gene names and their stream keys, trait odds, ranges, the stage plans, the
-crowding rules. `vectors.json` pins it. Tuning any of it changes what
-existing Blobbis look like, so it is not a tuning pass: it is a new algorithm
-version, added beside this one and selected by the version an identity
-carries. See `version.ts`.
+```
+the same V3 identity + the same visual_algorithm  ─►  the same Blobbi
+```
+
+The same Blobbi, not the same SVG and not the same pixels. `version.ts`
+lists exactly what `visual_algorithm = 1` freezes and what it does not.
+Tuning a frozen thing changes what existing Blobbis look like, so it is not
+a tuning pass: it is a new algorithm version, added beside this one and
+selected by the version an identity carries.
+
+Where version 1 is held:
+
+| What | Where | How it must match |
+| --- | --- | --- |
+| seed hash, streams, genes, rolls, genomes, eggs of fixed seeds | `vectors.json` | exactly |
+| what a seed is given (trait odds, crowding) | `../artwork/v3/reference/reference.test.ts` | the table |
+| morphology: egg, baby, adult of twelve reference Blobbis, and of two bodies with every gene at an end of its range | `../artwork/v3/reference/morphology.json` | exactly |
+| every colour role derived from the four identity colours | `../artwork/v3/reference/palette.json` | exactly in JavaScript |
+| what each reference Blobbi paints: egg, baby, adult; front, side, back | `../artwork/v3/reference/paint.json` | positions within 0.02 units, paint exactly |
+| paint order, clipping, opacities, colour roles, the four mark shapes, in words | `../artwork/v3/reference/art-structure.test.ts` | |
+
+The drawings are compared as PAINT LISTS (`paint-list.ts`): each painted
+shape's place, size and paint, in order, with every transform applied. Ids,
+grouping, attribute order, number formatting, an ellipse written as a path:
+none of it reaches the comparison, so the SVG writer can be rewritten, and
+a shape that moves a tenth of a unit cannot.
+
+The seed is canonical before it reaches this engine: 64 lower-case
+hexadecimal digits (`canonicalBlobbiV3Seed`, in the adapter). The engine
+itself is a function of any string, which its own tests use; no public door
+passes it anything but a canonical seed.
 
 What may change freely: the colour GENERATOR (a Blobbi's colours are explicit
 in its identity, so retuning it repaints nobody), and anything that is state.
 
-To rewrite the vectors on purpose:
+To rewrite the pinned files on purpose (an addition, or a change shown to
+alter no picture; never an existing version 1 entry once such Blobbis exist):
 
 ```
 UPDATE_VECTORS=1 npx vitest run packages/blobbi-renderer/src/procedural/vectors.test.ts
+UPDATE_REFERENCE=1 npx vitest run packages/blobbi-renderer/src/artwork/v3/reference/reference.test.ts
 ```

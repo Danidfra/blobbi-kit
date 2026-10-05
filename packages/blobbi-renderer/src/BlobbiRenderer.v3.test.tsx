@@ -25,8 +25,10 @@ import {
   BLOBBI_EMOTIONS,
   BLOBBI_V3_ALGORITHM_VERSION,
   BLOBBI_V3_MOTION_STYLESHEET,
+  BLOBBI_V3_SEED_LENGTH,
   BLOBBI_V3_SUPPORTED_ALGORITHMS,
   BlobbiRenderer,
+  canonicalBlobbiV3Seed,
   createBlobbiV3Identity,
   normalizeBlobbiExpression,
   normalizeBlobbiRenderModel,
@@ -39,12 +41,14 @@ import {
 } from './index';
 import { blobbiV3Genome, blobbiV3Key } from './artwork/v3/identity';
 import * as engine from './procedural';
+import { hexSeed } from './procedural/test-helpers';
 
 const SEED = '8f2d6c1e9b7a40f3a5d2c8e1b6f4937d0a1c5e7f2b9d4a6c8e0f1a3b5c7d9e2f';
 const IDENTITY = createBlobbiV3Identity(SEED);
 const STAGES = ['egg', 'baby', 'adult'] as const;
 const FACINGS: readonly BlobbiFacing[] = ['front', 'right', 'left', 'back'];
-const seeds = (n: number) => Array.from({ length: n }, (_, i) => `kit-v3-${i}`);
+/** Canonical V3 seeds: the only kind the adapter takes. */
+const seeds = (n: number) => Array.from({ length: n }, (_, i) => hexSeed(`kit-v3-${i}`));
 const v3 = (stage: 'egg' | 'baby' | 'adult', more: Partial<Parameters<typeof renderBlobbiSvg>[0]> = {}) =>
   renderBlobbiSvg({ visualGeneration: 'v3', v3: IDENTITY, stage, instanceId: 't', ...more });
 
@@ -355,7 +359,7 @@ describe('identity: explicit where stated, the seed\'s where not', () => {
   });
 
   it('has nothing to draw an individual from without a seed, and draws the canonical body in the visual\'s colours', () => {
-    for (const bad of [undefined, null, {}, { seed: '' }, { seed: 7 }, 'seed', []]) expect(normalizeBlobbiV3Visual(bad)).toBeNull();
+    for (const bad of [undefined, null, {}, { seed: '' }, { seed: 7 }, { seed: 'not a seed' }, 'seed', []]) expect(normalizeBlobbiV3Visual(bad)).toBeNull();
     const plain = renderBlobbiSvg({ visualGeneration: 'v3', stage: 'adult', instanceId: 'f' });
     expect(plain.artwork.generation).toBe('v3');
     // No traits, the canonical proportions: the same drawing whatever junk identity came with it.
@@ -392,8 +396,91 @@ describe('identity: explicit where stated, the seed\'s where not', () => {
         for (const id of svg.matchAll(/\sid="([^"]*)"/g)) expect(id[1]).toMatch(/^[a-zA-Z0-9_-]+$/);
       }
     }
-    // A seed is external data: a very long one is cut, not hashed whole a hundred times.
-    expect(normalizeBlobbiV3Visual({ seed: 'x'.repeat(100_000) })!.seed.length).toBe(256);
+    // A seed is external data: a very long one is not a V3 seed, so it is never hashed at all...
+    expect(normalizeBlobbiV3Visual({ seed: 'x'.repeat(100_000) })).toBeNull();
+    // ...and under rules this package does not have, where it is only kept, it is cut.
+    const foreign = resolveBlobbiV3Visual({ seed: 'x'.repeat(100_000), algorithm: 2 });
+    expect(foreign.status === 'unsupported-algorithm' && foreign.seed.length).toBe(256);
+  });
+
+  describe('the seed has one spelling', () => {
+    const UPPER = SEED.toUpperCase();
+    const MIXED = SEED.replace(/[a-f]/g, (c, i: number) => (i % 2 ? c.toUpperCase() : c));
+    /** Things that look like the seed and are not one. Each would need a guess to become it. */
+    const NOT_SEEDS: unknown[] = [
+      '',
+      ` ${SEED}`,
+      `${SEED} `,
+      `${SEED}\n`,
+      `0x${SEED}`,
+      `0x${SEED.slice(2)}`,
+      SEED.slice(1),
+      `${SEED}0`,
+      `${SEED.slice(0, 63)}g`,
+      `${SEED.slice(0, 63)}\u0661`,
+      `${SEED.slice(0, 63)}\uff11`,
+      'x'.repeat(64),
+      'abc123',
+      undefined,
+      null,
+      7,
+      [SEED],
+    ];
+    const drawnFrom = (seed: unknown, stage: 'egg' | 'baby' | 'adult', facing: BlobbiFacing = 'front') =>
+      renderBlobbiSvg({ visualGeneration: 'v3', v3: { ...IDENTITY, seed } as never, stage, facing, instanceId: 's' }).svg;
+
+    it('is 64 lower-case hexadecimal digits; other letter case is the same seed, anything else is none', () => {
+      expect(BLOBBI_V3_SEED_LENGTH).toBe(64);
+      expect(canonicalBlobbiV3Seed(SEED)).toBe(SEED);
+      expect(canonicalBlobbiV3Seed(UPPER)).toBe(SEED);
+      expect(canonicalBlobbiV3Seed(MIXED)).toBe(SEED);
+      for (const value of NOT_SEEDS) expect(canonicalBlobbiV3Seed(value), JSON.stringify(value)).toBeUndefined();
+      // Every identity this package creates states its seed canonically.
+      for (const seed of seeds(20)) expect(createBlobbiV3Identity(seed).seed).toBe(seed);
+    });
+
+    it('equivalent spellings are ONE individual: the same identity, the same genome, the same picture', () => {
+      // What the engine would do with the other spelling if it were let through: another body entirely.
+      expect(engine.generateGenome(UPPER).morphology).not.toEqual(engine.generateGenome(SEED).morphology);
+
+      for (const spelling of [UPPER, MIXED]) {
+        expect(createBlobbiV3Identity(spelling)).toEqual(IDENTITY);
+        expect(normalizeBlobbiV3Visual({ seed: spelling })).toEqual(IDENTITY);
+        const resolved = resolveBlobbiV3Visual({ ...IDENTITY, seed: spelling });
+        expect(resolved).toEqual({ status: 'individual', identity: IDENTITY, inferred: [] });
+        expect(blobbiV3Key(normalizeBlobbiV3Visual({ ...IDENTITY, seed: spelling }))).toBe(blobbiV3Key(IDENTITY));
+        expect(blobbiV3Genome(normalizeBlobbiV3Visual({ ...IDENTITY, seed: spelling })!)).toEqual(blobbiV3Genome(IDENTITY));
+        for (const stage of STAGES) for (const facing of FACINGS) expect(drawnFrom(spelling, stage, facing), `${stage} ${facing}`).toBe(drawnFrom(SEED, stage, facing));
+        // Through the component and the render model too.
+        expect(normalizeBlobbiRenderModel({ visual: { stage: 'adult', visualGeneration: 'v3', v3: { ...IDENTITY, seed: spelling } }, instanceId: 's' }).v3).toEqual(IDENTITY);
+      }
+      // A population, not one lucky seed.
+      for (const seed of seeds(30)) {
+        const own = createBlobbiV3Identity(seed);
+        expect(createBlobbiV3Identity(seed.toUpperCase())).toEqual(own);
+        const draw = (v3: BlobbiV3Identity) => renderBlobbiSvg({ visualGeneration: 'v3', v3, stage: 'adult', instanceId: 's' }).svg;
+        expect(draw({ ...own, seed: seed.toUpperCase() })).toBe(draw(own));
+      }
+    });
+
+    it('what is not a seed is never drawn as an individual: creation refuses it, reading has no one to draw', () => {
+      const nobody = renderBlobbiSvg({ visualGeneration: 'v3', stage: 'adult', instanceId: 's' }).svg;
+      for (const value of NOT_SEEDS) {
+        const label = JSON.stringify(value);
+        expect(() => createBlobbiV3Identity(value as string), label).toThrow(TypeError);
+        expect(resolveBlobbiV3Visual({ ...IDENTITY, seed: value }), label).toEqual({ status: 'none' });
+        expect(normalizeBlobbiV3Visual({ ...IDENTITY, seed: value }), label).toBeNull();
+        // The canonical body, the same for every one of them: nothing was derived from the value.
+        expect(drawnFrom(value, 'adult'), label).toBe(nobody);
+      }
+      // Not trimmed into shape, either: the padded seed is not quietly the seed.
+      expect(drawnFrom(` ${SEED}`, 'adult')).not.toBe(drawnFrom(SEED, 'adult'));
+    });
+
+    it('under rules this package does not have, the seed is kept as stated: nothing is derived from it', () => {
+      const foreign = resolveBlobbiV3Visual({ ...IDENTITY, algorithm: 2, seed: UPPER });
+      expect(foreign.status === 'unsupported-algorithm' && foreign.seed).toBe(UPPER);
+    });
   });
 
   it('gives every individual its own picture, and a population more than a few', () => {

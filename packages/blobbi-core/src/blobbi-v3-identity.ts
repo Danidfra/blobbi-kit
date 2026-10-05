@@ -5,7 +5,8 @@
  * ```
  *   visual_generation = v3          the visual system (blobbi.ts)
  *   visual_algorithm  = 1           the frozen procedural algorithm its micro-geometry derives under
- *   seed              = <64 hex>    the Blobbi's one seed (the existing tag; there is no second, V3 seed)
+ *   seed              = <64 hex>    the Blobbi's one seed (the existing tag; there is no second, V3 seed),
+ *                                   32 bytes as 64 lower-case hexadecimal digits (`canonicalBlobbiV3Seed`)
  *   base_color, secondary_color,
  *   eye_color, accent_color         its colours: EXPLICIT
  *   antenna, horns, ears, tail      its anatomy, the kind of each: EXPLICIT
@@ -157,7 +158,7 @@ export interface BlobbiV3Traits {
  * field is stated; there is nothing left for a renderer to decide.
  */
 export interface BlobbiV3Identity {
-  /** The seed the micro-geometry derives from: the Blobbi's `seed` tag. */
+  /** The seed the micro-geometry derives from: the Blobbi's `seed` tag, as 64 lower-case hexadecimal digits. */
   seed: string;
   /** The procedural algorithm version, a positive integer. */
   algorithm: number;
@@ -174,6 +175,7 @@ export interface BlobbiV3Identity {
  * what was not stated, so a host can always tell stated from inferred.
  */
 export interface ParsedBlobbiV3Identity {
+  /** The seed, canonically (`canonicalBlobbiV3Seed`). Absent when the tag is missing or is not a V3 seed. */
   seed?: string;
   /**
    * The algorithm version the event states. Absent when the tag is missing
@@ -185,6 +187,35 @@ export interface ParsedBlobbiV3Identity {
   traits: Partial<BlobbiV3Traits>;
   /** The identity tags that were absent or malformed (`seed` included). Empty for every Blobbi this kit created. */
   missing: string[];
+}
+
+/** How long a V3 seed is: 32 bytes, as hexadecimal digits. */
+export const BLOBBI_V3_SEED_LENGTH = 64;
+const HEX_SEED = /^[0-9a-fA-F]{64}$/;
+
+/**
+ * THE V3 SEED, canonically: 32 bytes written as exactly 64 lower-case
+ * hexadecimal digits (`0-9a-f`), which is what `deriveBlobbiSeedV1` has
+ * always produced.
+ *
+ * A procedural algorithm hashes the seed's CHARACTERS, so two spellings of
+ * the same bytes would be two different individuals. There is therefore one
+ * spelling:
+ *
+ *  - 64 hexadecimal digits in any letter case are the same seed, and read
+ *    as their lower-case form (upper-case digits carry no information; the
+ *    older generations already read them case-insensitively);
+ *  - anything else is NOT a V3 seed and is rejected, never repaired: not
+ *    trimmed, not padded, not stripped of a prefix, not hashed into shape.
+ *    A value that needs guessing has no single right answer, and two
+ *    clients guessing differently would draw two Blobbis.
+ *
+ * Returns the canonical seed, or `undefined` when the value is not one.
+ * This governs V3 identity only: the `seed` tag itself is never rewritten,
+ * and V1 and V2 read it exactly as before.
+ */
+export function canonicalBlobbiV3Seed(value: unknown): string | undefined {
+  return typeof value === 'string' && HEX_SEED.test(value) ? value.toLowerCase() : undefined;
 }
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -204,14 +235,17 @@ export type BlobbiV3Validation = { valid: true; identity: BlobbiV3Identity } | {
 
 /**
  * Check that something is a COMPLETE V3 identity, and return it in canonical
- * form (colours lower-cased, only known fields). Used at creation: an event
- * is never born with a partial identity.
+ * form (the seed and the colours lower-cased, only known fields). Used at
+ * creation: an event is never born with a partial identity, or with a seed
+ * that is not a V3 seed.
  */
 export function validateBlobbiV3Identity(input: unknown): BlobbiV3Validation {
   const errors: string[] = [];
   if (!input || typeof input !== 'object') return { valid: false, errors: ['identity is not an object'] };
   const raw = input as Partial<BlobbiV3Identity>;
+  const seed = canonicalBlobbiV3Seed(raw.seed);
   if (typeof raw.seed !== 'string' || raw.seed === '') errors.push('seed is missing');
+  else if (!seed) errors.push('seed is not 64 hexadecimal digits');
   if (!validAlgorithm(raw.algorithm)) errors.push('algorithm is not a positive integer');
 
   const c: Partial<BlobbiV3Colors> = raw.colors && typeof raw.colors === 'object' ? raw.colors : {};
@@ -247,7 +281,7 @@ export function validateBlobbiV3Identity(input: unknown): BlobbiV3Validation {
   return {
     valid: true,
     identity: {
-      seed: raw.seed!,
+      seed: seed!,
       algorithm: raw.algorithm!,
       colors,
       traits: { antenna: antenna!, horns: horns!, ears: ears!, tail: tail!, pattern: pattern!, specialMark: specialMark!, belly: t.belly!, freckles: t.freckles! },
@@ -290,6 +324,11 @@ const booleanOf = (value: string | undefined): boolean | undefined => (value ===
  * yields a result, and nothing is ever invented. It does not check the
  * generation; a caller reads it for a `visual_generation = v3` event
  * (`parseBlobbiEvent` does, into `BlobbiCompanion.v3Identity`).
+ *
+ * The seed is returned canonically (`canonicalBlobbiV3Seed`): hexadecimal
+ * digits in upper case read as the same seed in lower case, and a `seed`
+ * tag that is not 64 hexadecimal digits is not a V3 seed, so it is absent
+ * here and named in `missing`. The tag on the event is left as it is.
  */
 export function parseBlobbiV3Identity(tags: string[][]): ParsedBlobbiV3Identity {
   const missing: string[] = [];
@@ -299,7 +338,7 @@ export function parseBlobbiV3Identity(tags: string[][]): ParsedBlobbiV3Identity 
     return parsed;
   };
 
-  const seed = valueOf(tags, 'seed');
+  const seed = canonicalBlobbiV3Seed(valueOf(tags, 'seed'));
   if (!seed) missing.push('seed');
   const algorithmTag = valueOf(tags, BLOBBI_V3_TAGS.algorithm);
   const algorithmValue = algorithmTag !== undefined && /^[0-9]{1,4}$/.test(algorithmTag) ? Number(algorithmTag) : undefined;

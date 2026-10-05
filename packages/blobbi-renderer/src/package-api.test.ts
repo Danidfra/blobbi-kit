@@ -40,6 +40,8 @@ const PUBLIC_API = [
   'BLOBBI_V3_SPECIAL_MARKS',
   'BLOBBI_V3_MOTION_STYLESHEET',
   'BLOBBI_V3_SUPPORTED_ALGORITHMS',
+  'BLOBBI_V3_SEED_LENGTH',
+  'canonicalBlobbiV3Seed',
   'createBlobbiV3Identity',
   'normalizeBlobbiV3Visual',
   'resolveBlobbiV3Visual',

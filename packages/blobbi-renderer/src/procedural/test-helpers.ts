@@ -1,5 +1,6 @@
 /** Shared by the engine tests. */
 import { DOCUMENT_TRANSFORM, VIEWBOX } from './renderer';
+import { hashSeed } from './rng';
 
 export function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -10,6 +11,18 @@ export function deepFreeze<T>(value: T): T {
 }
 
 export const seeds = (n: number, prefix = 'seed') => Array.from({ length: n }, (_, i) => `${prefix}-${i}`);
+
+/**
+ * A canonical V3 seed (64 lower-case hexadecimal digits) for a label, for
+ * tests that go through the public adapter, which takes nothing else. The
+ * engine itself is a function of any string, and its own tests keep using
+ * plain labels. A test convenience only: a real Blobbi's seed is the domain
+ * kit's (`deriveBlobbiSeedV1`).
+ */
+export function hexSeed(label: string): string {
+  return [...hashSeed(`${label}\u0001a`), ...hashSeed(`${label}\u0001b`)].map((word) => word.toString(16).padStart(8, '0')).join('');
+}
+export const hexSeeds = (n: number, prefix = 'seed') => seeds(n, prefix).map(hexSeed);
 
 /** Every numeric attribute value and path number in a piece of SVG markup. */
 export function numbersIn(svg: string): number[] {
