@@ -8,9 +8,13 @@
  *   seed              = <64 hex>    the Blobbi's one seed (the existing tag; there is no second, V3 seed)
  *   base_color, secondary_color,
  *   eye_color, accent_color         its colours: EXPLICIT
- *   antenna, horns, ears, tail,
- *   spots, belly, freckles          the kind of each trait: EXPLICIT
+ *   antenna, horns, ears, tail      its anatomy, the kind of each: EXPLICIT
+ *   pattern, special_mark,
+ *   belly, freckles                 its surface: EXPLICIT
  * ```
+ *
+ * A V3 event carries NO `size` and NO `adult_type`: a V3 Blobbi has neither
+ * (its proportions are micro-geometry, and it has one adult body, its own).
  *
  * THE MODEL. The seed is used twice, for two different things:
  *
@@ -35,17 +39,25 @@
  * (`base_color`, `secondary_color`, `eye_color`), and the new ones are plain
  * words (`accent_color`, `antenna`, `horns`, ...).
  *
- * WHAT THAT COSTS, AND WHERE IT IS PAID. On a V1 or V2 Blobbi the three
- * colour tags are MIRRORS OF THE SEED: every republish rewrites them from
- * what the seed derives, and nothing reads them when a seed is present. On
- * a V3 Blobbi the same three tags are explicit identity and must never be
- * rewritten. That difference is one generation check, in the one function
- * that does the rewriting (`syncMirrorTagsToSeed` in blobbi.ts) and the one
- * that reads the traits (`deriveVisualTraits`); V1 and V2 keep their
- * behaviour exactly. A client that predates V3 does not make the check: if
- * it republishes a V3 Blobbi it will overwrite those three colours with the
- * seed's. Clients are expected to be updated to V3; nothing here duplicates
- * the identity to protect it from one that is not.
+ * WHAT THAT COSTS, AND WHERE IT IS PAID. Five of these names are older than
+ * V3: `base_color`, `secondary_color`, `eye_color`, `pattern` and
+ * `special_mark`. On a V1 or V2 Blobbi they are MIRRORS OF THE SEED: every
+ * republish rewrites them from what the seed derives, and nothing reads
+ * them when a seed is present. On a V3 Blobbi the same five tags are
+ * explicit identity and must never be rewritten. That difference is one
+ * generation check, in the one function that does the rewriting
+ * (`syncMirrorTagsToSeed` in blobbi.ts) and the one that reads the traits
+ * (`deriveVisualTraits`); V1 and V2 keep their behaviour exactly. A client
+ * that predates V3 does not make the check: if it republishes a V3 Blobbi
+ * it will overwrite those five with the seed's. Clients are expected to be
+ * updated to V3; nothing here duplicates the identity to protect it from one
+ * that is not.
+ *
+ * ONE VOCABULARY PER TAG. `pattern` says `solid | spotted | striped |
+ * gradient` on every generation (`solid` is "no pattern"); V3 does not
+ * rename them. `special_mark` says `none | star | heart | sparkle` on every
+ * generation; the older `blush` is not a V3 mark (a blush is what a cheek
+ * does, not a marking one individual has), and V3 has `moon` in its place.
  *
  * This module owns the spelling, the parsing and the validation. It does NOT
  * generate an identity: which colours and traits a seed gives is the
@@ -68,7 +80,8 @@ export const BLOBBI_V3_TAGS = {
   horns: 'horns',
   ears: 'ears',
   tail: 'tail',
-  spots: 'spots',
+  pattern: 'pattern',
+  specialMark: 'special_mark',
   belly: 'belly',
   freckles: 'freckles',
 } as const;
@@ -83,11 +96,26 @@ export const BLOBBI_V3_TAG_NAMES: readonly string[] = Object.values(BLOBBI_V3_TA
 export const BLOBBI_MIRRORED_COLOR_TAG_NAMES: readonly string[] = [BLOBBI_V3_TAGS.baseColor, BLOBBI_V3_TAGS.secondaryColor, BLOBBI_V3_TAGS.eyeColor];
 
 /**
- * The identity tags that exist ONLY for a V3 Blobbi (everything but the
- * three colour names older generations also carry): never written on a V1
- * or V2 event, and never invented on any.
+ * EVERY identity tag that is a seed MIRROR on V1 and V2 and EXPLICIT
+ * identity on V3: the three colours, the pattern and the special mark. What
+ * `syncMirrorTagsToSeed` rewrites on the older generations and must leave
+ * alone on V3.
  */
-export const BLOBBI_V3_ONLY_TAG_NAMES: readonly string[] = BLOBBI_V3_TAG_NAMES.filter((name) => !BLOBBI_MIRRORED_COLOR_TAG_NAMES.includes(name));
+export const BLOBBI_MIRRORED_IDENTITY_TAG_NAMES: readonly string[] = [...BLOBBI_MIRRORED_COLOR_TAG_NAMES, BLOBBI_V3_TAGS.pattern, BLOBBI_V3_TAGS.specialMark];
+
+/**
+ * The identity tags that exist ONLY for a V3 Blobbi (everything but the
+ * names older generations also carry): never written on a V1 or V2 event,
+ * and never invented on any.
+ */
+export const BLOBBI_V3_ONLY_TAG_NAMES: readonly string[] = BLOBBI_V3_TAG_NAMES.filter((name) => !BLOBBI_MIRRORED_IDENTITY_TAG_NAMES.includes(name));
+
+/**
+ * Seed-mirror tags of the older generations that a V3 Blobbi does NOT have:
+ * they describe nothing about it, so a V3 event never carries them and a V3
+ * republish drops any it finds.
+ */
+export const BLOBBI_V3_ABSENT_TAG_NAMES: readonly string[] = ['size', 'adult_type'];
 
 export const BLOBBI_V3_ANTENNA_KINDS = ['none', 'single', 'double'] as const;
 export type BlobbiV3AntennaKind = (typeof BLOBBI_V3_ANTENNA_KINDS)[number];
@@ -97,6 +125,12 @@ export const BLOBBI_V3_EAR_KINDS = ['none', 'round', 'pointed'] as const;
 export type BlobbiV3EarKind = (typeof BLOBBI_V3_EAR_KINDS)[number];
 export const BLOBBI_V3_TAIL_KINDS = ['none', 'nub', 'curl', 'leaf'] as const;
 export type BlobbiV3TailKind = (typeof BLOBBI_V3_TAIL_KINDS)[number];
+/** The body's one pattern. The `pattern` tag's own words; `solid` is "no pattern". */
+export const BLOBBI_V3_PATTERN_KINDS = ['solid', 'spotted', 'striped', 'gradient'] as const;
+export type BlobbiV3PatternKind = (typeof BLOBBI_V3_PATTERN_KINDS)[number];
+/** One small permanent marking, or none. */
+export const BLOBBI_V3_SPECIAL_MARK_KINDS = ['none', 'star', 'heart', 'sparkle', 'moon'] as const;
+export type BlobbiV3SpecialMarkKind = (typeof BLOBBI_V3_SPECIAL_MARK_KINDS)[number];
 
 /** The four colours a V3 Blobbi is painted from, as lower-case `#rrggbb`. */
 export interface BlobbiV3Colors {
@@ -112,7 +146,8 @@ export interface BlobbiV3Traits {
   horns: BlobbiV3HornKind;
   ears: BlobbiV3EarKind;
   tail: BlobbiV3TailKind;
-  spots: boolean;
+  pattern: BlobbiV3PatternKind;
+  specialMark: BlobbiV3SpecialMarkKind;
   belly: boolean;
   freckles: boolean;
 }
@@ -198,7 +233,11 @@ export function validateBlobbiV3Identity(input: unknown): BlobbiV3Validation {
   if (!horns) errors.push('traits.horns is not a known kind');
   if (!ears) errors.push('traits.ears is not a known kind');
   if (!tail) errors.push('traits.tail is not a known kind');
-  for (const key of ['spots', 'belly', 'freckles'] as const) {
+  const pattern = kindOf(BLOBBI_V3_PATTERN_KINDS, t.pattern);
+  const specialMark = kindOf(BLOBBI_V3_SPECIAL_MARK_KINDS, t.specialMark);
+  if (!pattern) errors.push('traits.pattern is not a known kind');
+  if (!specialMark) errors.push('traits.specialMark is not a known kind');
+  for (const key of ['belly', 'freckles'] as const) {
     if (typeof t[key] !== 'boolean') errors.push(`traits.${key} is not a boolean`);
   }
 
@@ -211,7 +250,7 @@ export function validateBlobbiV3Identity(input: unknown): BlobbiV3Validation {
       seed: raw.seed!,
       algorithm: raw.algorithm!,
       colors,
-      traits: { antenna: antenna!, horns: horns!, ears: ears!, tail: tail!, spots: t.spots!, belly: t.belly!, freckles: t.freckles! },
+      traits: { antenna: antenna!, horns: horns!, ears: ears!, tail: tail!, pattern: pattern!, specialMark: specialMark!, belly: t.belly!, freckles: t.freckles! },
     },
   };
 }
@@ -235,7 +274,8 @@ export function blobbiV3IdentityTags(identity: BlobbiV3Identity): string[][] {
     [BLOBBI_V3_TAGS.horns, traits.horns],
     [BLOBBI_V3_TAGS.ears, traits.ears],
     [BLOBBI_V3_TAGS.tail, traits.tail],
-    [BLOBBI_V3_TAGS.spots, String(traits.spots)],
+    [BLOBBI_V3_TAGS.pattern, traits.pattern],
+    [BLOBBI_V3_TAGS.specialMark, traits.specialMark],
     [BLOBBI_V3_TAGS.belly, String(traits.belly)],
     [BLOBBI_V3_TAGS.freckles, String(traits.freckles)],
   );
@@ -283,14 +323,16 @@ export function parseBlobbiV3Identity(tags: string[][]): ParsedBlobbiV3Identity 
   const horns = read(BLOBBI_V3_TAGS.horns, (v) => kindOf(BLOBBI_V3_HORN_KINDS, v));
   const ears = read(BLOBBI_V3_TAGS.ears, (v) => kindOf(BLOBBI_V3_EAR_KINDS, v));
   const tail = read(BLOBBI_V3_TAGS.tail, (v) => kindOf(BLOBBI_V3_TAIL_KINDS, v));
-  const spots = read(BLOBBI_V3_TAGS.spots, booleanOf);
+  const pattern = read(BLOBBI_V3_TAGS.pattern, (v) => kindOf(BLOBBI_V3_PATTERN_KINDS, v));
+  const specialMark = read(BLOBBI_V3_TAGS.specialMark, (v) => kindOf(BLOBBI_V3_SPECIAL_MARK_KINDS, v));
   const belly = read(BLOBBI_V3_TAGS.belly, booleanOf);
   const freckles = read(BLOBBI_V3_TAGS.freckles, booleanOf);
   if (antenna) traits.antenna = antenna;
   if (horns) traits.horns = horns;
   if (ears) traits.ears = ears;
   if (tail) traits.tail = tail;
-  if (spots !== undefined) traits.spots = spots;
+  if (pattern) traits.pattern = pattern;
+  if (specialMark) traits.specialMark = specialMark;
   if (belly !== undefined) traits.belly = belly;
   if (freckles !== undefined) traits.freckles = freckles;
 

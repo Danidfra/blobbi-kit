@@ -28,9 +28,15 @@ engine, not a rewrite; the differences are these, and only these:
 | `expressions.ts`, `state.ts`, `views/` | `FaceParts`, `applyFaceParts`, `state.face` | the kit names a face by parts; each part is a shape the key poses are made of |
 | `face.ts` | `EyeGeometry.travel` | the kit's live gaze moves the inner eye through CSS variables |
 
-`vectors.test.ts` holds the port to the prototype by hash: under algorithm
-version 1 this engine produces, byte for byte, the prototype's vectors file
-(but for its label).
+Since the port, and before any version 1 Blobbi existed outside a
+development machine, the SURFACE MODEL was finished here and not in the
+prototype: the prototype's independent `spots` boolean became one `pattern`
+(`solid`, `spotted`, `striped`, `gradient`) plus a special mark (`traits/markings.ts`,
+`plan/types.ts` `SurfacePlan`), and the ears root on the flank in profile.
+Every gene the prototype had is still drawn from the same keyed stream and
+has the same value: `vectors.test.ts` holds that against the prototype's own
+history files (`vectors.pre-*.json`). The prototype repository is the record
+of where the engine came from, no longer byte for byte what it is.
 
 ## The rule that matters
 

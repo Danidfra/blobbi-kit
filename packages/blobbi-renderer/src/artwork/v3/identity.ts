@@ -9,7 +9,8 @@
  *
  * A V3 identity has two layers, and they are kept apart on purpose:
  *
- *  - EXPLICIT (semantic identity): the colours and the kind of each trait.
+ *  - EXPLICIT (semantic identity): the colours, the kind of each trait, the
+ *    body's pattern and its special mark.
  *    The seed DECIDES them once, at creation (`createBlobbiV3Identity`);
  *    from then on what the identity states is authoritative, and a stated
  *    value always wins over anything the seed would give. An existing
@@ -39,6 +40,8 @@
 import {
   EAR_KINDS,
   HORN_KINDS,
+  MARK_KINDS,
+  PATTERN_KINDS,
   PROCEDURAL_ALGORITHM_VERSION,
   TAIL_KINDS,
   canonicalGenome,
@@ -47,6 +50,8 @@ import {
   type BlobbiGenome,
   type EarKind,
   type HornKind,
+  type MarkKind,
+  type PatternKind,
   type TailKind,
 } from '../../procedural';
 
@@ -64,26 +69,37 @@ export const BLOBBI_V3_EARS: readonly EarKind[] = EAR_KINDS;
 export type BlobbiV3Ears = EarKind;
 export const BLOBBI_V3_TAILS: readonly TailKind[] = TAIL_KINDS;
 export type BlobbiV3Tail = TailKind;
+/** The body's one pattern; `solid` is none. */
+export const BLOBBI_V3_PATTERNS: readonly PatternKind[] = PATTERN_KINDS;
+export type BlobbiV3Pattern = PatternKind;
+/** One small permanent marking, or none. */
+export const BLOBBI_V3_SPECIAL_MARKS: readonly MarkKind[] = MARK_KINDS;
+export type BlobbiV3SpecialMark = MarkKind;
 
 /** The four colours a V3 Blobbi is painted from. Every other colour on it is derived from these. */
 export interface BlobbiV3Colors {
   /** The body. */
   base: string;
-  /** Markings (flank spots, the egg's spots). */
+  /** The pattern (spots, stripes, the deepening of a gradient) and the egg's spots. */
   secondary: string;
   /** The iris. */
   eye: string;
-  /** Small details (antenna tips, a curled tail's tip). Absent: this Blobbi has no accent colour. */
+  /** Small details (antenna tips, a curled tail's tip, the special mark). Absent: this Blobbi has no accent colour. */
   accent?: string;
 }
 
-/** Which traits a V3 Blobbi has. Their exact shapes come from the seed. */
+/**
+ * What a V3 Blobbi has, by kind: its anatomy (antenna, horns, ears, tail)
+ * and its surface (pattern, special mark, belly patch, freckles). Every
+ * exact shape, size and place comes from the seed.
+ */
 export interface BlobbiV3Traits {
   antenna: BlobbiV3Antenna;
   horns: BlobbiV3Horns;
   ears: BlobbiV3Ears;
   tail: BlobbiV3Tail;
-  spots: boolean;
+  pattern: BlobbiV3Pattern;
+  specialMark: BlobbiV3SpecialMark;
   belly: boolean;
   freckles: boolean;
 }
@@ -129,7 +145,8 @@ function identityOf(genome: BlobbiGenome): BlobbiV3Identity {
       horns: traits.horns.kind,
       ears: traits.ears.kind,
       tail: traits.tail.kind,
-      spots: traits.spots.enabled,
+      pattern: traits.pattern.kind,
+      specialMark: traits.mark.kind,
       belly: traits.belly.enabled,
       freckles: traits.freckles.enabled,
     },
@@ -207,7 +224,8 @@ export function resolveBlobbiV3Visual(input: unknown): BlobbiV3Resolution {
     horns: oneOf(BLOBBI_V3_HORNS, t.horns),
     ears: oneOf(BLOBBI_V3_EARS, t.ears),
     tail: oneOf(BLOBBI_V3_TAILS, t.tail),
-    spots: flag(t.spots),
+    pattern: oneOf(BLOBBI_V3_PATTERNS, t.pattern),
+    specialMark: oneOf(BLOBBI_V3_SPECIAL_MARKS, t.specialMark),
     belly: flag(t.belly),
     freckles: flag(t.freckles),
   };
@@ -221,7 +239,9 @@ export function resolveBlobbiV3Visual(input: unknown): BlobbiV3Resolution {
     if (stated.horns) traits.horns = stated.horns;
     if (stated.ears) traits.ears = stated.ears;
     if (stated.tail) traits.tail = stated.tail;
-    for (const key of ['spots', 'belly', 'freckles'] as const) if (stated[key] !== undefined) traits[key] = stated[key];
+    if (stated.pattern) traits.pattern = stated.pattern;
+    if (stated.specialMark) traits.specialMark = stated.specialMark;
+    for (const key of ['belly', 'freckles'] as const) if (stated[key] !== undefined) traits[key] = stated[key];
     return { status: 'unsupported-algorithm', algorithm: raw.algorithm, seed, colors, traits };
   }
 
@@ -255,7 +275,8 @@ export function resolveBlobbiV3Visual(input: unknown): BlobbiV3Resolution {
         horns: pick('traits.horns', stated.horns, own.traits.horns),
         ears: pick('traits.ears', stated.ears, own.traits.ears),
         tail: pick('traits.tail', stated.tail, own.traits.tail),
-        spots: pick('traits.spots', stated.spots, own.traits.spots),
+        pattern: pick('traits.pattern', stated.pattern, own.traits.pattern),
+        specialMark: pick('traits.specialMark', stated.specialMark, own.traits.specialMark),
         belly: pick('traits.belly', stated.belly, own.traits.belly),
         freckles: pick('traits.freckles', stated.freckles, own.traits.freckles),
       },
@@ -275,7 +296,8 @@ export function normalizeBlobbiV3Visual(input: unknown): BlobbiV3Identity | null
 
 /** The genome of a complete identity: its explicit fields, and the seed's micro-geometry. */
 export function blobbiV3Genome(identity: BlobbiV3Identity): BlobbiGenome {
-  return generateGenome({ seed: identity.seed, colors: { ...identity.colors }, ...identity.traits });
+  const { specialMark, ...traits } = identity.traits;
+  return generateGenome({ seed: identity.seed, colors: { ...identity.colors }, ...traits, mark: specialMark });
 }
 
 /**
@@ -307,7 +329,8 @@ export function genericV3Genome(colors: Partial<BlobbiV3Colors>, traits: Partial
   if (traits.horns) genome.traits.horns.kind = traits.horns;
   if (traits.ears) genome.traits.ears.kind = traits.ears;
   if (traits.tail) genome.traits.tail.kind = traits.tail;
-  if (traits.spots !== undefined) genome.traits.spots.enabled = traits.spots;
+  if (traits.pattern) genome.traits.pattern.kind = traits.pattern;
+  if (traits.specialMark) genome.traits.mark.kind = traits.specialMark;
   if (traits.belly !== undefined) genome.traits.belly.enabled = traits.belly;
   if (traits.freckles !== undefined) genome.traits.freckles.enabled = traits.freckles;
   return genome;
@@ -326,5 +349,5 @@ export function blobbiV3Key(visual: BlobbiV3Visual | null): string {
   const c = visual.colors ?? {};
   const t = visual.traits ?? {};
   const bit = (value: boolean | undefined) => (value === undefined ? '' : +value);
-  return [visual.seed, visual.algorithm, c.base, c.secondary, c.eye, c.accent ?? '', t.antenna, t.horns, t.ears, t.tail, bit(t.spots), bit(t.belly), bit(t.freckles)].join('|');
+  return [visual.seed, visual.algorithm, c.base, c.secondary, c.eye, c.accent ?? '', t.antenna, t.horns, t.ears, t.tail, t.pattern, t.specialMark, bit(t.belly), bit(t.freckles)].join('|');
 }

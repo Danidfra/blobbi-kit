@@ -24,7 +24,7 @@ type Genes = Record<string, number>;
 
 /** The canonical adult (authored colours) with the stated traits, every trait gene at rest, then the stated genes. */
 function crowned(traits: BlobbiSemanticIdentity, genes: { antenna?: Genes; horns?: Genes; ears?: Genes } = {}): BlobbiGenome {
-  const genome = { ...generateGenome({ seed: 'crown', colors: 'authored', antenna: 'none', horns: 'none', ears: 'none', tail: 'none', spots: false, belly: false, freckles: false, ...traits }), morphology: canonicalGenome().morphology };
+  const genome = { ...generateGenome({ seed: 'crown', colors: 'authored', antenna: 'none', horns: 'none', ears: 'none', tail: 'none', pattern: 'solid', mark: 'none', belly: false, freckles: false, ...traits }), morphology: canonicalGenome().morphology };
   for (const key of ANTENNA_GENES) genome.traits.antenna[key] = 0;
   for (const key of HORN_GENES) genome.traits.horns[key] = 0;
   for (const key of EAR_GENES) genome.traits.ears[key] = 0;

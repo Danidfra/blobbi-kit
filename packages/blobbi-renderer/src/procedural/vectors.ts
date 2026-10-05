@@ -61,6 +61,16 @@ const GENE_KEYS = [
   ...TAIL_GENES.map((g) => `tail.${g}`),
   'spots.0.dx',
   'spots.2.rotation',
+  'spots.back.0.dx',
+  'stripes.sag',
+  'stripes.0.dy',
+  'stripes.3.reach',
+  'gradient.start',
+  'gradient.strength',
+  'mark.u',
+  'mark.v',
+  'mark.size',
+  'mark.rotation',
   'freckles.1.size',
   'belly.size',
   ...EGG_GENES.map((g) => `egg.${g}`),
@@ -68,7 +78,7 @@ const GENE_KEYS = [
   'egg.spots.5.rotation',
 ];
 
-const ROLL_KEYS = ['egg.spotCount', 'egg.speckles.0.u', 'egg.speckles.13.size', 'antenna.kind', 'antenna.side', 'horns.kind', 'ears.kind', 'tail.kind', 'spots.enabled', 'spots.side', 'spots.count', 'belly.enabled', 'freckles.enabled'];
+const ROLL_KEYS = ['egg.spotCount', 'egg.speckles.0.u', 'egg.speckles.13.size', 'antenna.kind', 'antenna.side', 'horns.kind', 'ears.kind', 'tail.kind', 'spots.enabled', 'spots.side', 'spots.count', 'belly.enabled', 'freckles.enabled', 'pattern.kind', 'spots.back.count', 'stripes.count', 'mark.kind', 'mark.side', 'mark.region'];
 
 export interface SeedVector {
   seed: string;

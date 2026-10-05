@@ -6,7 +6,8 @@ import { blobbiLogger } from '@blobbi-kit/core/logger';
 
 import { ADULT_FORMS, type AdultForm, deriveAdultFormFromSeed } from '@blobbi-kit/core/types/adult';
 import {
-  BLOBBI_MIRRORED_COLOR_TAG_NAMES,
+  BLOBBI_MIRRORED_IDENTITY_TAG_NAMES,
+  BLOBBI_V3_ABSENT_TAG_NAMES,
   BLOBBI_V3_ONLY_TAG_NAMES,
   BLOBBI_V3_TAGS,
   blobbiV3IdentityTags,
@@ -920,11 +921,17 @@ export function deriveVisualTraits(
     // the seed's here, so this record is always complete; `v3Identity` on the
     // companion says exactly what was and was not stated.
     if (parseVisualGeneration(tags) !== 'v3') return seeded;
+    // Its pattern and special mark are stated too. This record keeps the
+    // older generations' vocabulary and shape (a V3 mark it has no word for
+    // reads as `none`, and `size` is still the seed's, though a V3 event
+    // carries none): the V3 identity proper is `v3Identity`.
     return {
       ...seeded,
       baseColor: normalizeBlobbiV3Color(getTagValue(tags, BLOBBI_V3_TAGS.baseColor)) ?? seeded.baseColor,
       secondaryColor: normalizeBlobbiV3Color(getTagValue(tags, BLOBBI_V3_TAGS.secondaryColor)) ?? seeded.secondaryColor,
       eyeColor: normalizeBlobbiV3Color(getTagValue(tags, BLOBBI_V3_TAGS.eyeColor)) ?? seeded.eyeColor,
+      pattern: normalizePatternTag(getTagValue(tags, BLOBBI_V3_TAGS.pattern)) ?? seeded.pattern,
+      specialMark: getTagValue(tags, BLOBBI_V3_TAGS.specialMark) === undefined ? seeded.specialMark : (normalizeSpecialMarkTag(getTagValue(tags, BLOBBI_V3_TAGS.specialMark)) ?? 'none'),
     };
   }
   
@@ -1410,9 +1417,12 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
     careStreakLastDay: getTagValue(tags, 'care_streak_last_day'),
     incubationTime: parseNumericTag(tags, 'incubation_time'),
     startIncubation: parseNumericTag(tags, 'start_incubation'),
-    adultType: stage === 'adult' && seed && seed.length === 64
-      ? deriveAdultFormFromSeed(seed)
-      : getTagValue(tags, 'adult_type'),
+    // A V3 Blobbi has no adult form: it has one adult body, its own.
+    adultType: parseVisualGeneration(tags) === 'v3'
+      ? undefined
+      : stage === 'adult' && seed && seed.length === 64
+        ? deriveAdultFormFromSeed(seed)
+        : getTagValue(tags, 'adult_type'),
     visualGeneration: parseVisualGeneration(tags),
     ...(parseVisualGeneration(tags) === 'v3' ? { v3Identity: parseBlobbiV3Identity(tags) } : null),
     publishedAt: parseNumericTag(tags, 'published_at'),
@@ -1537,7 +1547,12 @@ export function buildEggTags(
   // The three colour tags every Blobbi carries: the seed's mirrors on V1 and
   // V2, the stated identity on V3. The rest of a V3 identity follows the generation.
   const colours = v3 ? { baseColor: v3.colors.base, secondaryColor: v3.colors.secondary, eyeColor: v3.colors.eye } : { baseColor, secondaryColor, eyeColor };
-  const v3Tags = v3 ? blobbiV3IdentityTags(v3).filter(([name]) => !BLOBBI_MIRRORED_COLOR_TAG_NAMES.includes(name)) : [];
+  // The surface tags are shared names too: mirrors of the seed on V1 and V2,
+  // stated identity on V3. `size` belongs to the older generations only.
+  const surface = v3
+    ? [['pattern', v3.traits.pattern], ['special_mark', v3.traits.specialMark]]
+    : [['pattern', pattern], ['special_mark', specialMark], ['size', size]];
+  const v3Tags = v3 ? blobbiV3IdentityTags(v3).filter(([name]) => !BLOBBI_MIRRORED_IDENTITY_TAG_NAMES.includes(name)) : [];
   
   return [
     ['d', d],
@@ -1564,12 +1579,10 @@ export function buildEggTags(
     ['base_color', colours.baseColor],
     ['secondary_color', colours.secondaryColor],
     ['eye_color', colours.eyeColor],
-    ['pattern', pattern],
-    ['special_mark', specialMark],
-    ['size', size],
+    ...surface,
     // Identity from birth: which artwork family draws this Blobbi (see NEW_BLOBBI_VISUAL_GENERATION).
     ...visualGenerationTags(visualGeneration),
-    // V3 only: the rest of the explicit identity (algorithm version, accent colour, trait kinds).
+    // V3 only: the rest of the explicit identity (algorithm version, accent colour, anatomy, belly, freckles).
     ...v3Tags,
   ];
 }
@@ -1751,22 +1764,27 @@ export function mergeTagsForRepublish(
  * This is called inside mergeBlobbiStateTagsForRepublish so that every
  * republish automatically backfills correct mirror tags.
  *
- * GENERATION-AWARE, in one respect only. On a V1 or V2 Blobbi the three
- * colour tags are mirrors and are rewritten here, exactly as they always
- * were. On a V3 Blobbi the same three tags are EXPLICIT IDENTITY (stated at
- * creation, authoritative ever since), so they are not mirrors and this
- * function does not touch them: it neither overwrites one nor adds a missing
- * one. Everything else it does (pattern, special_mark, size, adult_type) is
- * the same for every generation.
+ * GENERATION-AWARE. On a V1 or V2 Blobbi every one of these tags is a
+ * mirror and is rewritten here, exactly as it always was. A V3 Blobbi has
+ * no mirrors at all:
+ *
+ *  - its three colours, its `pattern` and its `special_mark` are EXPLICIT
+ *    IDENTITY (stated at creation, authoritative ever since). This function
+ *    does not touch them: it neither overwrites one nor adds a missing one.
+ *  - `size` and `adult_type` describe nothing about it. This function never
+ *    adds them, and drops any it finds (an event from before the contract
+ *    settled).
  */
 function syncMirrorTagsToSeed(tags: string[][]): string[][] {
   const seed = getTagValue(tags, 'seed');
   if (!seed || seed.length !== 64) return tags;
 
+  if (parseVisualGeneration(tags) === 'v3') {
+    return tags.some((t) => BLOBBI_V3_ABSENT_TAG_NAMES.includes(t[0])) ? tags.filter((t) => !BLOBBI_V3_ABSENT_TAG_NAMES.includes(t[0])) : tags;
+  }
+
   const canonical = deriveSeedIdentity(seed);
-  const coloursAreMirrors = parseVisualGeneration(tags) !== 'v3';
-  const MIRROR_TAG_NAMES = new Set(['pattern', 'special_mark', 'size']);
-  if (coloursAreMirrors) for (const name of BLOBBI_MIRRORED_COLOR_TAG_NAMES) MIRROR_TAG_NAMES.add(name);
+  const MIRROR_TAG_NAMES = new Set(['base_color', 'secondary_color', 'eye_color', 'pattern', 'special_mark', 'size']);
 
   const stage = getTagValue(tags, 'stage');
   if (stage === 'adult') {
@@ -1777,14 +1795,10 @@ function syncMirrorTagsToSeed(tags: string[][]): string[][] {
   const filtered = tags.filter((t) => !MIRROR_TAG_NAMES.has(t[0]));
 
   // Append canonical values
-  if (coloursAreMirrors) {
-    filtered.push(
-      ['base_color', canonical.baseColor],
-      ['secondary_color', canonical.secondaryColor],
-      ['eye_color', canonical.eyeColor],
-    );
-  }
   filtered.push(
+    ['base_color', canonical.baseColor],
+    ['secondary_color', canonical.secondaryColor],
+    ['eye_color', canonical.eyeColor],
     ['pattern', canonical.pattern],
     ['special_mark', canonical.specialMark],
     ['size', canonical.size],

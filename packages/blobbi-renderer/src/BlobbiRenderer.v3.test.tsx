@@ -180,7 +180,8 @@ describe('the kit draws exactly what the engine draws', () => {
           "ears": "none",
           "freckles": false,
           "horns": "none",
-          "spots": false,
+          "pattern": "gradient",
+          "specialMark": "heart",
           "tail": "none",
         },
       }
@@ -194,13 +195,13 @@ describe('the kit draws exactly what the engine draws', () => {
         ],
         [
           "baby",
-          3123,
-          18,
+          4336,
+          22,
         ],
         [
           "adult",
-          7113,
-          41,
+          8523,
+          45,
         ],
       ]
     `);
@@ -215,7 +216,7 @@ describe('identity: explicit where stated, the seed\'s where not', () => {
       seed: SEED,
       algorithm: 1,
       colors: { base: '#3FB7A5', secondary: '#2a6f8f', eye: '#5a2d12' },
-      traits: { antenna: 'double', horns: 'top', ears: 'none', tail: 'leaf', spots: true, belly: true, freckles: true },
+      traits: { antenna: 'double', horns: 'top', ears: 'none', tail: 'leaf', pattern: 'striped', specialMark: 'star', belly: true, freckles: true },
     };
     const resolved = normalizeBlobbiV3Visual(stated)!;
     expect(resolved.colors).toEqual({ base: '#3fb7a5', secondary: '#2a6f8f', eye: '#5a2d12' });
@@ -257,7 +258,7 @@ describe('identity: explicit where stated, the seed\'s where not', () => {
       seed: SEED,
       algorithm: 1,
       colors: { base: '#d9534f', secondary: '#7a1f1c', eye: '#123456', accent: '#00ff88' },
-      traits: { antenna: 'double', horns: 'side', ears: 'none', tail: 'curl', spots: !IDENTITY.traits.spots, belly: !IDENTITY.traits.belly, freckles: !IDENTITY.traits.freckles },
+      traits: { antenna: 'double', horns: 'side', ears: 'none', tail: 'curl', pattern: IDENTITY.traits.pattern === 'gradient' ? 'striped' : 'gradient', specialMark: IDENTITY.traits.specialMark === 'heart' ? 'moon' : 'heart', belly: !IDENTITY.traits.belly, freckles: !IDENTITY.traits.freckles },
     };
     expect(resolveBlobbiV3Visual(other)).toEqual({ status: 'individual', identity: other, inferred: [] });
     // Gaps are filled for drawing, and reported: the input itself is not touched.
@@ -265,7 +266,7 @@ describe('identity: explicit where stated, the seed\'s where not', () => {
     const resolved = resolveBlobbiV3Visual(partial);
     expect(resolved.status).toBe('individual');
     if (resolved.status !== 'individual') throw new Error('unreachable');
-    expect(resolved.inferred.sort()).toEqual(['algorithm', 'colors.eye', 'colors.secondary', 'traits.antenna', 'traits.belly', 'traits.ears', 'traits.freckles', 'traits.horns', 'traits.spots']);
+    expect(resolved.inferred.sort()).toEqual(['algorithm', 'colors.eye', 'colors.secondary', 'traits.antenna', 'traits.belly', 'traits.ears', 'traits.freckles', 'traits.horns', 'traits.pattern', 'traits.specialMark']);
     expect(resolved.identity.colors.base).toBe('#d9534f');
     expect(resolved.identity.traits.tail).toBe('curl');
     expect(partial).toEqual({ seed: SEED, colors: { base: '#d9534f', eye: 'not a colour' }, traits: { tail: 'curl', horns: 'antlers' } });
@@ -289,7 +290,7 @@ describe('identity: explicit where stated, the seed\'s where not', () => {
       // Only a stated NUMBER is a version; anything else was not a statement, and reads as absent.
       for (const algorithm of [undefined, null, '2', {}]) expect(resolveBlobbiV3Visual({ ...IDENTITY, algorithm: algorithm as never }).status).toBe('individual');
       // Malformed explicit fields are dropped, not replaced from the seed.
-      expect(resolveBlobbiV3Visual({ seed: SEED, algorithm: 2, colors: { base: 'red', eye: '#123456' }, traits: { horns: 'antlers', tail: 'nub', spots: 'yes' } })).toEqual({
+      expect(resolveBlobbiV3Visual({ seed: SEED, algorithm: 2, colors: { base: 'red', eye: '#123456' }, traits: { horns: 'antlers', tail: 'nub', pattern: 'plaid', specialMark: 'blush', belly: 'yes' } })).toEqual({
         status: 'unsupported-algorithm',
         algorithm: 2,
         seed: SEED,
@@ -364,14 +365,14 @@ describe('identity: explicit where stated, the seed\'s where not', () => {
     expect(tinted.svg).not.toBe(plain.svg);
   });
 
-  const ALLOWED_ELEMENTS = ['svg', 'defs', 'g', 'path', 'ellipse', 'circle', 'linearGradient', 'radialGradient', 'stop', 'clipPath', 'filter', 'feGaussianBlur', 'style'];
+  const ALLOWED_ELEMENTS = ['svg', 'defs', 'g', 'path', 'ellipse', 'circle', 'linearGradient', 'radialGradient', 'stop', 'clipPath', 'filter', 'feGaussianBlur', 'style', 'rect'];
 
   it('cannot be made to write anything but numbers and hex colours into the markup', () => {
     const hostile = '"><script>alert(1)</script><svg onload="x';
     const visuals: unknown[] = [
       { seed: hostile },
       { seed: SEED, colors: { base: hostile, secondary: 'url(#x)', eye: 'red', accent: hostile } },
-      { seed: SEED, traits: { antenna: hostile, horns: hostile, ears: hostile, tail: hostile, spots: hostile, belly: 1, freckles: null } },
+      { seed: SEED, traits: { antenna: hostile, horns: hostile, ears: hostile, tail: hostile, pattern: hostile, specialMark: hostile, belly: 1, freckles: null } },
       { seed: SEED, algorithm: hostile, colors: hostile, traits: hostile },
     ];
     for (const visual of visuals) {
@@ -551,12 +552,17 @@ describe('state: the kit\'s words drive the engine, and none of it is identity',
     }
     for (const stage of STAGES) {
       for (const facing of FACINGS) {
-        const { anchors } = v3(stage, { facing }).artwork;
+        const { footprint, ...anchors } = v3(stage, { facing }).artwork.anchors;
         for (const value of Object.values(anchors)) {
           expect(value).toBeGreaterThan(0);
           expect(value).toBeLessThan(1);
         }
         expect(anchors.headTopY).toBeLessThan(anchors.groundY);
+        // What it stands on: under it, and narrower than its frame.
+        expect(footprint).toBeDefined();
+        expect(Math.abs(footprint!.centerX - anchors.centerX)).toBeLessThan(0.08);
+        expect(footprint!.width).toBeGreaterThan(0.2);
+        expect(footprint!.width).toBeLessThan(0.75);
       }
     }
   });

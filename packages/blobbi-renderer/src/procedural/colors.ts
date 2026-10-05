@@ -197,6 +197,8 @@ export interface BlobbiPalette {
   cheek: string;
   /** The belly patch (drawn at low opacity). */
   belly: string;
+  /** The special mark: the accent colour where there is one that reads on the body, else a pale tint of the body. */
+  mark: string;
   // The baby's own paint (the official Baby V1): a flatter body, a slate eye, a paler blush.
   babyLight: string;
   babyMid: string;
@@ -232,6 +234,8 @@ export const AUTHORED_PALETTE: Readonly<BlobbiPalette> = Object.freeze({
   hornDark: '#e0a468',
   cheek: '#ff7ab7',
   belly: '#ffffff',
+  // The authored drawing has no accent: a pale lilac, the body's own tint.
+  mark: '#ecdcff',
   // `#8b5cf6` / `#7c3aed` / `#6d28d9`, `#374151` / `#1e293b`, `rgba(255,182,193,…)`.
   babyLight: '#8b5cf6',
   babyMid: '#7c3aed',
@@ -350,6 +354,31 @@ function kitPalette(p: BlobbiPalette, base?: string, secondary?: string, eye?: s
   }
 }
 
+/** How far (OKLab) a mark's colour must stand from the skin it lies on to read as a mark. */
+const MARK_MIN_DISTANCE = 0.14;
+
+/**
+ * THE SPECIAL MARK'S COLOUR, from the colours the identity already has.
+ *
+ *  1. The ACCENT, where the Blobbi has one: it is the colour its small
+ *     details are in (antenna tips, a curled tail's tip), and it is chosen to
+ *     stand against the body.
+ *  2. Without an accent (or with one too near the skin to read): a PALE TINT
+ *     of the body, the opposite of a pattern, which is always darker. So a
+ *     mark and a pattern never merge.
+ *  3. On a body already too pale for that: the pattern colour.
+ *
+ * The skin is judged at both stages (the baby is painted lighter), so one
+ * colour serves the whole life.
+ */
+function markColorFor(p: BlobbiPalette, accent: string | undefined): string {
+  const body = hexToOklch(p.bodyMid);
+  const pale = oklchToHex({ l: Math.min(0.95, body.l + 0.26), c: body.c * 0.38, h: body.h });
+  const apart = (color: string) => Math.min(distance(color, p.bodyMid), distance(color, p.babyMid));
+  const candidates = [...(accent ? [accent] : []), pale, p.marking];
+  return candidates.find((color) => apart(color) >= MARK_MIN_DISTANCE) ?? [...candidates].sort((a, b) => apart(b) - apart(a))[0];
+}
+
 /** Resolve trait colours to a full palette. Invalid colours count as absent. */
 export function derivePalette(colors: BlobbiColors | undefined): BlobbiPalette {
   const base = sanitizeHex(colors?.base);
@@ -359,6 +388,7 @@ export function derivePalette(colors: BlobbiColors | undefined): BlobbiPalette {
   const p: BlobbiPalette = { ...AUTHORED_PALETTE };
   if (colors?.mapping === 'kit') {
     kitPalette(p, base, secondary, eye);
+    p.mark = markColorFor(p, undefined);
     return p;
   }
   if (base) {
@@ -390,6 +420,7 @@ export function derivePalette(colors: BlobbiColors | undefined): BlobbiPalette {
     p.accentLight = oklchToHex({ l: mid.l + 0.07, c: mid.c, h: mid.h });
     p.accentDark = oklchToHex({ l: mid.l - 0.13, c: mid.c, h: mid.h });
   }
+  if (base || secondary || accent) p.mark = markColorFor(p, accent);
   return p;
 }
 

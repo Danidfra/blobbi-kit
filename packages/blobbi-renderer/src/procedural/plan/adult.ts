@@ -226,6 +226,22 @@ export const ADULT_PLAN: StagePlan = {
   scale: 1,
   development: { antenna: 1, horn: 1, ear: 1, tail: 1, marking: 1, belly: true },
   look: { body: 'v2', eye: 'layered', gait: 'legs' },
+  // Measured over a population, through every expression, as fractions of the
+  // body's height: a raised brow reaches 0.20 and the eyes begin at 0.31; the
+  // cheeks end at 0.63 and the widest open mouth at 0.70 (it is 0.27 of the
+  // half-width wide). The brows' inner ends come within 40 units of the
+  // middle, so there is no room BETWEEN them: the forehead is the skin above.
+  // The shoulders are at 0.57 on the edge and the feet show from 0.87.
+  surface: {
+    face: { top: 0.19, bottom: 0.72 },
+    marks: {
+      forehead: { theta: [4, 16], y: [0.12, 0.148], size: 0.8 },
+      chest: { theta: [14, 34], y: [0.775, 0.825] },
+      // In profile the mouth reaches back to 0.65 of the half-depth, down to 0.69: the hip is below that.
+      hip: { theta: [52, 66], y: [0.765, 0.82] },
+      shoulder: { theta: [130, 156], y: [0.27, 0.42] },
+    },
+  },
   front: FRONT,
   side: SIDE,
 };

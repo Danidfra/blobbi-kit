@@ -11,6 +11,7 @@
 import { blobbiLogger } from '@blobbi-kit/core/logger';
 
 import type { BlobbiStage } from './blobbi';
+import { BLOBBI_V3_ABSENT_TAG_NAMES } from './blobbi-v3-identity';
 
 // ─── Tag Source Types ─────────────────────────────────────────────────────────
 
@@ -205,7 +206,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: true,
     format: 'solid | spotted | striped | gradient',
-    notes: 'Derived from seed.',
+    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: EXPLICIT identity (the body\'s one pattern; `solid` is none), decided by the seed at creation and never rewritten afterwards; `regenerable` does not apply to it.',
   },
   {
     tag: 'special_mark',
@@ -216,8 +217,8 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     persistent: true,
     source: 'generated',
     regenerable: true,
-    format: 'none | star | heart | sparkle | blush',
-    notes: 'Derived from seed.',
+    format: 'none | star | heart | sparkle | blush (V1, V2) · none | star | heart | sparkle | moon (V3)',
+    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: EXPLICIT identity (one small permanent marking), decided by the seed at creation and never rewritten afterwards; `regenerable` does not apply to it. `blush` is not a V3 mark: a blush is what a cheek does.',
   },
   {
     tag: 'size',
@@ -229,7 +230,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: true,
     format: 'small | medium | large',
-    notes: 'Derived from seed.',
+    notes: 'V1 and V2: a mirror of the seed. A V3 event does not carry it: a V3 Blobbi\'s proportions are micro-geometry.',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -575,7 +576,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     persistent: true,
     source: 'computed',
     regenerable: false,
-    notes: 'Only present for adults. Determined during evolution based on care history.',
+    notes: 'Only present for adults. Determined during evolution based on care history. A V3 event does not carry it: a V3 Blobbi has one adult body, its own.',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -599,8 +600,10 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
   // PROCEDURAL IDENTITY (Optional; stated on visual_generation = v3 events)
   //
   // Generation-independent names. A V3 Blobbi's colours are the three colour
-  // tags above (explicit identity there, seed mirrors on V1 and V2) plus
-  // accent_color; these are the rest of what it states.
+  // tags above plus accent_color, and its surface the pattern and
+  // special_mark tags above plus belly and freckles (the shared names are
+  // explicit identity there, seed mirrors on V1 and V2); these are the rest
+  // of what it states.
   // ═══════════════════════════════════════════════════════════════════════════
   {
     tag: 'visual_algorithm',
@@ -673,18 +676,6 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     regenerable: false,
     format: "none | nub | curl | leaf",
     notes: 'Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
-  },
-  {
-    tag: 'spots',
-    description: 'Flank spots',
-    category: 'visual',
-    required: false,
-    stages: ['egg', 'baby', 'adult'],
-    persistent: true,
-    source: 'generated',
-    regenerable: false,
-    format: "true | false",
-    notes: 'Not the legacy `pattern` tag: that is one mutually exclusive, seed-mirrored style of the old egg graphic; this is one of several independent markings. Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
   {
     tag: 'belly',
@@ -950,7 +941,6 @@ const NEVER_INVENT_TAGS = new Set([
   'horns',
   'ears',
   'tail',
-  'spots',
   'belly',
   'freckles',
 ]);
@@ -1179,6 +1169,8 @@ export function validateAndRepairBlobbiTags(
   if (previousTags) {
     const persistentTags = getPersistentTagNames();
     const currentTagNames = new Set(repairedTags.map(t => t[0]));
+    // A V3 Blobbi has no size and no adult form: a republish dropped them on purpose.
+    const isV3 = repairedTags.some((t) => t[0] === 'visual_generation' && t[1] === 'v3');
     
     for (const [tagName, tagValue] of previousTagMap.entries()) {
       // Skip if already present in current tags
@@ -1189,6 +1181,9 @@ export function validateAndRepairBlobbiTags(
       
       // Skip task-related tags if cleanup is requested
       if (taskCleanupTags.has(tagName)) continue;
+
+      // Skip the older generations' mirrors a V3 event does not carry
+      if (isV3 && BLOBBI_V3_ABSENT_TAG_NAMES.includes(tagName)) continue;
       
       // Skip tags that are not valid for the final stage
       const schema = getTagSchema(tagName);

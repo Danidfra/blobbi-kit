@@ -1,19 +1,23 @@
 /**
  * V3 IDENTITY ON THE EVENT, in the generation-independent vocabulary.
  *
- * A procedural Blobbi states its semantic identity (colours, trait kinds) in
- * plain tags: `base_color`, `secondary_color`, `eye_color`, `accent_color`,
- * `antenna`, `horns`, `ears`, `tail`, `spots`, `belly`, `freckles`, plus
- * `visual_algorithm`. Three of those names are the ones V1 and V2 Blobbis
- * carry as MIRRORS OF THE SEED. These tests pin both readings of them, side
- * by side: mirrors on V1 and V2, exactly as before; explicit, authoritative
- * identity on V3, through every path the kit republishes an event by.
+ * A procedural Blobbi states its semantic identity in plain tags: its
+ * colours (`base_color`, `secondary_color`, `eye_color`, `accent_color`), its
+ * anatomy (`antenna`, `horns`, `ears`, `tail`) and its surface (`pattern`,
+ * `special_mark`, `belly`, `freckles`), plus `visual_algorithm`. Five of
+ * those names are the ones V1 and V2 Blobbis carry as MIRRORS OF THE SEED
+ * (the three colours, `pattern`, `special_mark`). These tests pin both
+ * readings of them, side by side: mirrors on V1 and V2, exactly as before;
+ * explicit, authoritative identity on V3, through every path the kit
+ * republishes an event by. A V3 event has no `size` and no `adult_type`.
  */
 import { describe, it, expect } from 'vitest';
 import type { NostrEvent } from './nostr-protocol';
 import {
   KIND_BLOBBI_STATE,
   MANAGED_BLOBBI_STATE_TAG_NAMES,
+  BLOBBI_PATTERNS,
+  BLOBBI_SPECIAL_MARKS,
   NEW_BLOBBI_VISUAL_GENERATION,
   VISUAL_GENERATION_TAG,
   buildEggTags,
@@ -28,7 +32,11 @@ import {
 import { getPersistentTagNames, getTagSchema, validateAndRepairBlobbiTags } from './blobbi-tag-schema';
 import {
   BLOBBI_MIRRORED_COLOR_TAG_NAMES,
+  BLOBBI_MIRRORED_IDENTITY_TAG_NAMES,
+  BLOBBI_V3_ABSENT_TAG_NAMES,
   BLOBBI_V3_ONLY_TAG_NAMES,
+  BLOBBI_V3_PATTERN_KINDS,
+  BLOBBI_V3_SPECIAL_MARK_KINDS,
   BLOBBI_V3_TAGS,
   BLOBBI_V3_TAG_NAMES,
   VISUAL_ALGORITHM_TAG,
@@ -45,13 +53,15 @@ const PET_ID = '3196847fb5';
 const CREATED_AT = 1_700_000_000;
 const SEED = deriveBlobbiSeedV1(PUBKEY, getCanonicalBlobbiD(PUBKEY, PET_ID), CREATED_AT);
 const MIRRORS = deriveSeedIdentity(SEED);
+/** A pattern this seed's mirror is NOT, so a rewrite from the seed would show. (`moon` is no mirror's mark at all.) */
+const STATED_PATTERN = MIRRORS.pattern === 'striped' ? 'gradient' : 'striped';
 
 /** A complete identity, as a renderer's creation rule would return it for a seed. Its colours are NOT the seed mirrors. */
 const identityFor = (seed: string): BlobbiV3Identity => ({
   seed,
   algorithm: 1,
   colors: { base: '#3fb7a5', secondary: '#2a6f8f', eye: '#5a2d12', accent: '#e86a5c' },
-  traits: { antenna: 'double', horns: 'none', ears: 'pointed', tail: 'curl', spots: true, belly: false, freckles: true },
+  traits: { antenna: 'double', horns: 'none', ears: 'pointed', tail: 'curl', pattern: STATED_PATTERN, specialMark: 'moon', belly: false, freckles: true },
 });
 
 const makeEvent = (tags: string[][]): NostrEvent => ({ id: 'e'.repeat(64), pubkey: PUBKEY, created_at: CREATED_AT, kind: KIND_BLOBBI_STATE, tags, content: '', sig: '0'.repeat(128) });
@@ -77,24 +87,50 @@ describe('the vocabulary', () => {
       horns: 'horns',
       ears: 'ears',
       tail: 'tail',
-      spots: 'spots',
+      pattern: 'pattern',
+      specialMark: 'special_mark',
       belly: 'belly',
       freckles: 'freckles',
     });
     expect(VISUAL_ALGORITHM_TAG).toBe('visual_algorithm');
     expect(BLOBBI_MIRRORED_COLOR_TAG_NAMES).toEqual(['base_color', 'secondary_color', 'eye_color']);
-    expect(BLOBBI_V3_ONLY_TAG_NAMES).toEqual(['visual_algorithm', 'accent_color', 'antenna', 'horns', 'ears', 'tail', 'spots', 'belly', 'freckles']);
+    expect(BLOBBI_MIRRORED_IDENTITY_TAG_NAMES).toEqual(['base_color', 'secondary_color', 'eye_color', 'pattern', 'special_mark']);
+    expect(BLOBBI_V3_ONLY_TAG_NAMES).toEqual(['visual_algorithm', 'accent_color', 'antenna', 'horns', 'ears', 'tail', 'belly', 'freckles']);
+    expect(BLOBBI_V3_ABSENT_TAG_NAMES).toEqual(['size', 'adult_type']);
     for (const tags of [bornV3(), born('v1'), born('v2')]) expect(tags.some((t) => t[0].startsWith('v3_'))).toBe(false);
   });
 
-  it('does not collide with the legacy pattern, mark and size tags, which stay what they were', () => {
-    // `spots` is not `pattern`: that tag is one seed-mirrored style of the old egg graphic, still written and still mirrored.
+  it('has one vocabulary per tag: the pattern words are every generation\'s, and a V3 mark is a marking (no blush; a moon instead)', () => {
+    expect(BLOBBI_V3_PATTERN_KINDS).toEqual(['solid', 'spotted', 'striped', 'gradient']);
+    expect([...BLOBBI_V3_PATTERN_KINDS]).toEqual([...BLOBBI_PATTERNS]);
+    expect(BLOBBI_V3_SPECIAL_MARK_KINDS).toEqual(['none', 'star', 'heart', 'sparkle', 'moon']);
+    // The older generations' list is untouched (a seed indexes into it), blush and all.
+    expect([...BLOBBI_SPECIAL_MARKS]).toEqual(['none', 'star', 'heart', 'sparkle', 'blush']);
+  });
+
+  it('has no `spots` tag: a V3 Blobbi has one pattern, not independent markings', () => {
     const v3 = bornV3();
-    expect(getTagValue(v3, 'pattern')).toBe(MIRRORS.pattern);
-    expect(getTagValue(v3, 'special_mark')).toBe(MIRRORS.specialMark);
-    expect(getTagValue(v3, 'size')).toBe(MIRRORS.size);
-    expect(getTagValue(v3, 'spots')).toBe('true');
-    expect(getTagSchema('spots')!.notes).toMatch(/Not the legacy `pattern` tag/);
+    expect(getTagValue(v3, 'spots')).toBeUndefined();
+    expect(getTagSchema('spots')).toBeUndefined();
+    expect(BLOBBI_V3_TAG_NAMES).not.toContain('spots');
+    expect(v3.filter((t) => t[0] === 'pattern')).toEqual([['pattern', STATED_PATTERN]]);
+    expect(v3.filter((t) => t[0] === 'special_mark')).toEqual([['special_mark', 'moon']]);
+  });
+
+  it('a V3 event carries no `size` and no `adult_type`, at birth or ever after; V1 and V2 carry both as before', () => {
+    const v3 = bornV3();
+    for (const tags of [v3, care(v3), hatch(v3), evolve(hatch(v3))]) {
+      expect(getTagValue(tags, 'size')).toBeUndefined();
+      expect(getTagValue(tags, 'adult_type')).toBeUndefined();
+    }
+    expect(parseBlobbiEvent(makeEvent(evolve(hatch(v3))))!.adultType).toBeUndefined();
+    for (const generation of ['v1', 'v2'] as const) {
+      expect(getTagValue(born(generation), 'size')).toBe(MIRRORS.size);
+      const adult = evolve(hatch(born(generation)));
+      expect(getTagValue(adult, 'size')).toBe(MIRRORS.size);
+      expect(getTagValue(adult, 'adult_type')).toBeDefined();
+      expect(parseBlobbiEvent(makeEvent(adult))!.adultType).toBe(getTagValue(adult, 'adult_type'));
+    }
   });
 });
 
@@ -119,6 +155,8 @@ describe('creating a V3 Blobbi', () => {
       ['base_color', '#3fb7a5'],
       ['secondary_color', '#2a6f8f'],
       ['eye_color', '#5a2d12'],
+      ['pattern', STATED_PATTERN],
+      ['special_mark', 'moon'],
       ['visual_generation', 'v3'],
       ['visual_algorithm', '1'],
       ['accent_color', '#e86a5c'],
@@ -126,16 +164,16 @@ describe('creating a V3 Blobbi', () => {
       ['horns', 'none'],
       ['ears', 'pointed'],
       ['tail', 'curl'],
-      ['spots', 'true'],
       ['belly', 'false'],
       ['freckles', 'true'],
     ]);
     // Each identity tag exactly once.
     for (const name of BLOBBI_V3_TAG_NAMES) expect(v3.filter((t) => t[0] === name), name).toHaveLength(1);
-    // Up to the generation tag a V3 egg is a V2 egg in every tag but its three colours.
+    // Up to the generation tag a V3 egg is a V2 egg without its `size`, in every tag but the five it states for itself.
     const head = (tags: string[][]) => tags.slice(0, tags.findIndex((t) => t[0] === VISUAL_GENERATION_TAG));
-    expect(head(v3).map((t) => t[0])).toEqual(head(v2).map((t) => t[0]));
-    expect(head(v3).filter((t) => !BLOBBI_MIRRORED_COLOR_TAG_NAMES.includes(t[0]))).toEqual(head(v2).filter((t) => !BLOBBI_MIRRORED_COLOR_TAG_NAMES.includes(t[0])));
+    expect(head(v3).map((t) => t[0])).toEqual(head(v2).map((t) => t[0]).filter((name) => name !== 'size'));
+    const unstated = (tags: string[][]) => head(tags).filter((t) => !BLOBBI_MIRRORED_IDENTITY_TAG_NAMES.includes(t[0]) && t[0] !== 'size');
+    expect(unstated(v3)).toEqual(unstated(v2));
     // And those three are the identity's, not the seed's.
     expect(colourTags(v3)).toEqual({ base_color: '#3fb7a5', secondary_color: '#2a6f8f', eye_color: '#5a2d12' });
     expect(colourTags(v2)).toEqual({ base_color: MIRRORS.baseColor, secondary_color: MIRRORS.secondaryColor, eye_color: MIRRORS.eyeColor });
@@ -224,18 +262,49 @@ describe('the three colour tags: mirrors on V1 and V2, explicit identity on V3',
 
   it('v3: they are what is read: the parsed traits and the projection carry the stated colours', () => {
     const companion = parseBlobbiEvent(makeEvent(bornV3()))!;
-    expect(companion.visualTraits).toEqual({ ...MIRRORS, baseColor: '#3fb7a5', secondaryColor: '#2a6f8f', eyeColor: '#5a2d12' });
+    // (The record keeps the older generations' shape: `moon` is a mark it has no word for, and `size` is not on the event.)
+    expect(companion.visualTraits).toEqual({ ...MIRRORS, baseColor: '#3fb7a5', secondaryColor: '#2a6f8f', eyeColor: '#5a2d12', pattern: STATED_PATTERN, specialMark: 'none' });
+    expect(companion.v3Identity!.traits).toMatchObject({ pattern: STATED_PATTERN, specialMark: 'moon' });
     const identity = getBlobbiVisualIdentity(companion);
     expect([identity.baseColor, identity.secondaryColor, identity.eyeColor]).toEqual(['#3fb7a5', '#2a6f8f', '#5a2d12']);
   });
 
-  it('v3: the mirror sync still does everything else it did, and never adds a colour the event does not state', () => {
+  it('v3: its pattern and special mark are never recalculated either: a care update, a hatch and an evolution keep them exactly', () => {
     const tags = bornV3();
-    // The legacy mirrors (pattern, mark, size; adult_type on an adult) are still the seed's on V3.
-    const grown = evolve(hatch(withTag(withTag(tags, 'pattern', 'bogus'), 'size', 'bogus')));
-    expect(getTagValue(grown, 'pattern')).toBe(MIRRORS.pattern);
-    expect(getTagValue(grown, 'size')).toBe(MIRRORS.size);
-    expect(getTagValue(grown, 'adult_type')).toBeDefined();
+    // What it states is not what its seed mirrors, so a rewrite from the seed would show.
+    expect(STATED_PATTERN).not.toBe(MIRRORS.pattern);
+    expect(MIRRORS.specialMark).not.toBe('moon');
+    for (const republish of [care, hatch, (t: string[][]) => evolve(hatch(t)), (t: string[][]) => care(care(evolve(hatch(care(t)))))]) {
+      const after = republish(tags);
+      expect(after.filter((t) => t[0] === 'pattern')).toEqual([['pattern', STATED_PATTERN]]);
+      expect(after.filter((t) => t[0] === 'special_mark')).toEqual([['special_mark', 'moon']]);
+      expect(identityOf(after)).toEqual(identityOf(tags));
+    }
+    // Whatever the event states is the Blobbi's: a changed one stays changed, and a value no V3 has is left as it is, reported, never "repaired" from the seed.
+    for (const pattern of BLOBBI_V3_PATTERN_KINDS) expect(getTagValue(evolve(hatch(care(withTag(tags, 'pattern', pattern)))), 'pattern')).toBe(pattern);
+    for (const mark of BLOBBI_V3_SPECIAL_MARK_KINDS) expect(getTagValue(evolve(hatch(care(withTag(tags, 'special_mark', mark)))), 'special_mark')).toBe(mark);
+    const odd = care(withTag(tags, 'pattern', 'plaid'));
+    expect(getTagValue(odd, 'pattern')).toBe('plaid');
+    expect(identityOf(odd)!.missing).toEqual(['pattern']);
+    expect(identityOf(odd)!.traits.pattern).toBeUndefined();
+  });
+
+  it('v3: the mirror sync adds nothing: no colour, pattern or mark the event does not state, and it drops the size and adult form an older event carried', () => {
+    const tags = bornV3();
+    // An event from before the contract settled: it carried the older generations' mirrors.
+    const old = [...tags, ['size', 'large'], ['adult_type', 'catti'], ['spots', 'true']];
+    const cleaned = care(old);
+    expect(getTagValue(cleaned, 'size')).toBeUndefined();
+    expect(getTagValue(cleaned, 'adult_type')).toBeUndefined();
+    expect(getTagValue(evolve(hatch(old)), 'adult_type')).toBeUndefined();
+    // (`spots` means nothing any more: it rides along as any unknown tag does, and nothing reads it.)
+    expect(identityOf(cleaned)).toEqual(identityOf(tags));
+    for (const name of ['pattern', 'special_mark'] as const) {
+      const never = tags.filter((t) => t[0] !== name);
+      expect(getTagValue(care(never), name)).toBeUndefined();
+      expect(getTagValue(evolve(hatch(never)), name)).toBeUndefined();
+      expect(identityOf(care(never))!.missing).toEqual([name]);
+    }
     // An event that never stated a colour does not get the seed's written into it by a republish.
     const never = tags.filter((t) => t[0] !== 'eye_color');
     expect(getTagValue(updateBlobbiTags(never, { hunger: '50' }), 'eye_color')).toBeUndefined();
@@ -281,13 +350,13 @@ describe('reading a V3 identity', () => {
   it('exposes what was stated and what was not: a missing or malformed field is absent and named, never filled in', () => {
     const tags = bornV3()
       .filter((t) => t[0] !== 'tail' && t[0] !== 'visual_algorithm')
-      .map((t) => (t[0] === 'eye_color' ? ['eye_color', 'javascript:alert(1)'] : t[0] === 'spots' ? ['spots', 'yes'] : t[0] === 'accent_color' ? ['accent_color', '#12'] : t));
+      .map((t) => (t[0] === 'eye_color' ? ['eye_color', 'javascript:alert(1)'] : t[0] === 'belly' ? ['belly', 'yes'] : t[0] === 'special_mark' ? ['special_mark', 'blush'] : t[0] === 'accent_color' ? ['accent_color', '#12'] : t));
     const parsed = parseBlobbiV3Identity(tags);
-    expect(parsed.missing.sort()).toEqual(['accent_color', 'eye_color', 'spots', 'tail', 'visual_algorithm']);
+    expect(parsed.missing.sort()).toEqual(['accent_color', 'belly', 'eye_color', 'special_mark', 'tail', 'visual_algorithm']);
     // The algorithm is not assumed: a missing one is missing.
     expect(parsed.algorithm).toBeUndefined();
     expect(parsed.colors).toEqual({ base: '#3fb7a5', secondary: '#2a6f8f' });
-    expect(parsed.traits).toEqual({ antenna: 'double', horns: 'none', ears: 'pointed', belly: false, freckles: true });
+    expect(parsed.traits).toEqual({ antenna: 'double', horns: 'none', ears: 'pointed', pattern: STATED_PATTERN, freckles: true });
     // Total: nothing at all still parses, and says so.
     expect(parseBlobbiV3Identity([])).toEqual({ colors: {}, traits: {}, missing: ['seed', ...BLOBBI_V3_TAG_NAMES.filter((n) => n !== 'accent_color')] });
     // Parsing mutates nothing.

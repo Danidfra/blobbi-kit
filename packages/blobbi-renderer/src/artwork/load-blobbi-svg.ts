@@ -13,9 +13,9 @@
  */
 import type { BlobbiView } from '../svg';
 import { applyGazeMarkup } from '../svg';
-import { buildBlobbiMarkup } from './registry';
-import type { BlobbiFacing, BlobbiVisualGeneration, ResolvedArtwork } from './types';
-import { DEFAULT_VISUAL_GENERATION } from './types';
+import { buildBlobbiMarkup, resolveBlobbiArtwork } from './registry';
+import type { ArtworkAnchors, BlobbiFacing, BlobbiVisualGeneration, ResolvedArtwork } from './types';
+import { DEFAULT_VISUAL_GENERATION, anchorsInSquare } from './types';
 import { normalizeBlobbiExpression, type BlobbiExpression } from '../expression-model';
 import {
   BLOBBI_MOTION_STYLE_ELEMENT,
@@ -86,6 +86,49 @@ export interface RenderedBlobbiSvg {
   svg: string;
   /** What was drawn: generation, view, mirroring, whether pupils can move. */
   artwork: ResolvedArtwork;
+}
+
+export interface DescribedBlobbiArtwork {
+  generation: BlobbiVisualGeneration;
+  stage: 'egg' | 'baby' | 'adult';
+  view: ResolvedArtwork['view'];
+  mirrored: boolean;
+  /** The drawing's own `viewBox` size. */
+  viewBox: { width: number; height: number };
+  /** Notable points as fractions of the viewBox. */
+  anchors: ArtworkAnchors;
+  /** The same points as fractions of the square the component fits the drawing into. */
+  boxAnchors: ArtworkAnchors;
+}
+
+/**
+ * What WOULD be drawn for these options, without drawing it: the stage and
+ * view, and where the drawing's notable points are (its head, its eye line,
+ * the ground under it and the footprint it stands on). For a host that lays
+ * things out around a Blobbi (a shadow, a label, something it carries): the
+ * renderer measures its own drawing, so no host has to.
+ *
+ * Pure and deterministic; reads only identity, stage and facing.
+ */
+export function describeBlobbiArtwork(options: Pick<RenderBlobbiSvgOptions, 'stage' | 'visualGeneration' | 'adultType' | 'facing' | 'v3'>): DescribedBlobbiArtwork {
+  const stage = options.stage === 'adult' || options.stage === 'egg' ? options.stage : 'baby';
+  const artwork = resolveBlobbiArtwork({
+    stage,
+    visualGeneration: options.visualGeneration ?? DEFAULT_VISUAL_GENERATION,
+    adultType: options.adultType,
+    facing: options.facing ?? 'front',
+    eyesClosed: false,
+    v3: options.v3,
+  });
+  return {
+    generation: artwork.generation,
+    stage: artwork.stage,
+    view: artwork.view,
+    mirrored: artwork.mirrored,
+    viewBox: artwork.viewBox,
+    anchors: artwork.anchors,
+    boxAnchors: anchorsInSquare(artwork.anchors, artwork.viewBox),
+  };
 }
 
 /**

@@ -400,7 +400,7 @@ const v3 = createBlobbiV3Identity(seed);
 
 | | What | Where it lives |
 | --- | --- | --- |
-| explicit | four colours (`base`, `secondary`, `eye`, optional `accent`) and the kind of each trait (`antenna`, `horns`, `ears`, `tail`, `spots`, `belly`, `freckles`) | stated in the identity; `@blobbi-kit/core` writes them to the event |
+| explicit | four colours (`base`, `secondary`, `eye`, optional `accent`) and the kind of each trait: anatomy (`antenna`, `horns`, `ears`, `tail`) and surface (`pattern`, `specialMark`, `belly`, `freckles`) | stated in the identity; `@blobbi-kit/core` writes them to the event |
 | derived | every proportion and every trait's own shape and place | from `seed`, under `algorithm` |
 
 The seed decides the explicit layer ONCE: `createBlobbiV3Identity(seed)` is
@@ -427,8 +427,22 @@ official artwork: the V2 adult, the V1 baby and the V1 egg, which
 `BlobbiRenderer.v3.test.tsx` and `procedural/fidelity.test.ts` hold it to by
 rasterizing both. Individuals vary around it within bounded ranges: body and
 face proportions, tuft, limbs, and optional antennae, horns (forehead, top,
-side), ears (round, pointed), a tail (nub, curl, leaf), flank spots, a belly
-patch and freckles, each developed for the life stage (a baby has buds). The
+side), ears (round, pointed), a tail (nub, curl, leaf), ONE body pattern
+(solid, spotted, striped or gradient), a special mark (a star, a heart, a
+sparkle or a moon), a belly patch and freckles, each developed for the life
+stage (a baby has buds).
+
+A pattern and a mark lie ON the skin: each has a place round the body and up
+it, so it is on the same patch from the front, in profile and from behind,
+slides to the silhouette's edge as the body turns and is gone when its patch
+faces away. Spots sit on the rear of a flank and across the back; stripes are
+tapered bands across the back that come round to the front only above the
+brows and below the mouth; a gradient deepens the body toward its base. A
+mark lives in one of four regions measured to be clear of the face through
+every expression (forehead, chest, hip, shoulder), chosen by the seed among
+those the body's own traits leave free. The pattern is painted in
+`secondary`; the mark in `accent` where there is one that reads on the skin,
+otherwise in a pale tint of the body. The
 egg shows the same individual's colours and markings and hides the rest.
 
 **State is the kit's existing vocabulary**, with nothing V3-specific a host

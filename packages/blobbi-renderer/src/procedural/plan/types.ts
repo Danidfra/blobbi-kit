@@ -201,12 +201,52 @@ export interface Development {
   belly: boolean;
 }
 
+/**
+ * A patch of the body's SURFACE, anatomically: degrees round the body from
+ * the middle of the face (0 the face, 90 a flank, 180 the middle of the
+ * back) and fractions of the body's height from the crown. A view's frame
+ * turns such a place into where it is drawn, or says it is turned away.
+ */
+export interface SurfaceRegion {
+  theta: readonly [number, number];
+  y: readonly [number, number];
+  /** How large a mark may be here, relative to its full size: a small patch takes a smaller mark. Default 1. */
+  size?: number;
+}
+
+/**
+ * The places a special mark may live. Each is a patch of skin nothing else
+ * uses: clear of the eyes, brows, cheeks and mouth through EVERY expression
+ * (a raised brow, a wide eye, the widest open mouth), of the arms and feet,
+ * and of where crown traits root. The numbers in each plan are measured on
+ * that stage's own face (`surface.test.ts` holds them to it).
+ *
+ *  - `forehead`  above the brows (higher than a raised one reaches), a little to one side of the middle
+ *  - `chest`     under the mouth, to one side of the middle
+ *  - `hip`       low on a flank, ahead of the arm
+ *  - `shoulder`  high on the back, to one side
+ */
+export const MARK_REGIONS = ['forehead', 'chest', 'hip', 'shoulder'] as const;
+export type MarkRegionName = (typeof MARK_REGIONS)[number];
+
+export interface SurfacePlan {
+  /**
+   * The band of the body's height the face lives in (brows to mouth and
+   * cheeks, with room for every expression). A pattern stays behind the
+   * flanks at these heights.
+   */
+  face: { top: number; bottom: number };
+  marks: Readonly<Record<MarkRegionName, SurfaceRegion>>;
+}
+
 export interface StagePlan {
   stage: LifeStage;
   /** Overall size relative to the adult: scales unit-valued genes and trait dimensions. */
   scale: number;
   development: Development;
   look: StageLook;
+  /** Where things that lie ON the skin may go at this stage. */
+  surface: SurfacePlan;
   front: FrontPlan;
   side: SidePlan;
 }

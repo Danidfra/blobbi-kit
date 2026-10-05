@@ -423,29 +423,46 @@ export function buildHorns(h: HornMorphology, frame: TraitFrame): Appendage[] {
 
 // ─── Ears ────────────────────────────────────────────────────────────────────
 
-/** The ears sit high on the flanks, just behind the middle of the head. */
-const EAR = { theta: 100, profileFore: -0.5 } as const;
+/**
+ * The ears sit high on the flanks, toward the back of the head. That is ONE
+ * place on the body, and every view draws it: on the silhouette's edge from
+ * the front and from behind, and in profile on the flank itself, behind the
+ * tuft and a little down the side of the head, where the near ear's foot is
+ * on the skin in plain view and the far ear's is behind the head. (They used
+ * to be stood on the profile's skyline at a fixed place, whatever the head
+ * under them did; on a head that falls away steeply there, an ear hung out
+ * over the slope with nothing under it.)
+ */
+const EAR = { theta: 122, profileLean: 16 } as const;
 
 export function buildEars(e: EarMorphology, frame: TraitFrame): Appendage[] {
   const out: Appendage[] = [];
   for (const side of [-1, 1] as const) {
     // From the front and from behind an ear stands on the silhouette's edge and
-    // leans out. In profile the two stand one behind the other on the back of
-    // the crown, behind the tuft, tipped back: the far one shows a little ahead.
+    // leans out. In profile the same mount is a point ON the flank: the near
+    // ear grows from the side of the head, tipped a little back, and its lean
+    // toward the viewer shortens it; the far ear grows from the same place on
+    // the other side, and only what rises above the head shows.
     const profile = frame.view === 'side';
-    const mount = profile ? frame.crown(side * 0.84, EAR.profileFore, true) : frame.mount(side * EAR.theta, e.position);
+    const mount = frame.mount(side * EAR.theta, e.position);
     const tilt = rad(e.tilt);
-    const dir = profile ? unit(pt(-Math.sin(rad(18)), -Math.cos(rad(18)))) : unit(pt(mount.out.x * Math.sin(tilt), -Math.cos(tilt)));
+    const lean = rad(EAR.profileLean);
+    const dir = profile ? unit(pt(-Math.sin(lean), -Math.cos(lean))) : unit(pt(mount.out.x * Math.sin(tilt), -Math.cos(tilt)));
     const outward = profile ? pt(-1, 0) : pt(mount.out.x, 0);
-    const sink = SINK * 0.9 * frame.scale;
-    const base = along(mount.at, dir, -sink);
+    // In profile the ear's foot is on the skin, in view: it needs no length hidden inside the body.
+    const sink = (profile ? SINK * 0.35 : SINK * 0.9) * frame.scale;
+    const shorten = profile ? lerp(1, Math.cos(tilt), 0.35) : 1;
+    // The far side of the head shows a little ahead of the near side, as the far limbs do.
+    const root = profile && mount.far ? pt(mount.at.x + 12 * frame.scale, mount.at.y) : mount.at;
+    const base = along(root, dir, -sink);
     // An ear shows its inside from the front and, on the near side, in profile; from behind, its back.
     const showsInside = frame.view !== 'back' && !mount.far;
     const prims: Prim[] = [];
     let tip: Pt;
     let control: Pt;
+    if (profile && !mount.far) prims.push(rootShade('ear-root-shade', root, mount, e.size * 0.42));
     if (e.kind === 'round') {
-      const height = e.size * 1.02 + sink;
+      const height = e.size * 1.02 * shorten + sink;
       tip = along(base, dir, height);
       control = along(base, dir, height / 2);
       const c = along(base, dir, height * 0.56);
@@ -457,7 +474,7 @@ export function buildEars(e: EarMorphology, frame: TraitFrame): Appendage[] {
       }
     } else {
       // A soft leaf: wide at the base, its tip flopping outward.
-      const height = e.size * 1.28 + sink;
+      const height = e.size * 1.28 * shorten + sink;
       const straight = along(base, dir, height);
       tip = pt(straight.x + outward.x * e.flop * e.size * 0.7, straight.y + e.flop * e.size * 0.42);
       control = along(along(base, dir, height * 0.62), outward, -e.flop * e.size * 0.12);
@@ -471,10 +488,10 @@ export function buildEars(e: EarMorphology, frame: TraitFrame): Appendage[] {
     }
     out.push({
       part: 'ear',
-      // In profile the near ear stands on the viewer's side of the head, in front of the tuft.
+      // In profile the near ear is on the side of the head the view shows, over the body.
       layer: profile && onViewerSide(mount) ? 'crown' : 'behind',
       far: mount.far,
-      pivot: mount.at,
+      pivot: root,
       sway: 'ear',
       side,
       depth: mount.depth,

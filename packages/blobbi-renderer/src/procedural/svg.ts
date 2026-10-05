@@ -13,7 +13,7 @@ import type { ArmGeometry, Box, FootGeometry, TuftGeometry } from './limbs';
 import { motionPose, poseTransform, type BlobbiMotion, type Gait, type RigPart } from './motion';
 import type { StageLook, View } from './plan/types';
 import type { Appendage, PaintRole, Prim } from './traits/appendages';
-import type { MarkingsGeometry } from './traits/markings';
+import type { MarkingsGeometry, SpecialMarkGeometry } from './traits/markings';
 
 export interface RenderOptions {
   /** Namespace for gradient, filter and clip ids. Required when several Blobbis share a page. */
@@ -353,16 +353,67 @@ export function drawAppendages(d: Drawing, appendages: readonly Appendage[], lay
     .join('');
 }
 
-/** The marks that lie on the body: the belly patch, then the flank spots, all clipped to the silhouette. */
+/**
+ * The special mark's shapes, in a unit box (half-size 1, y down). Soft
+ * corners throughout: the star's and the sparkle's points are rounded by a
+ * stroke of their own colour.
+ */
+const STAR = (() => {
+  let d = '';
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? 0.92 : 0.43;
+    const a = ((-90 + i * 36) * Math.PI) / 180;
+    d += `${i === 0 ? 'M' : 'L'} ${fmt(r * Math.cos(a))},${fmt(r * Math.sin(a))} `;
+  }
+  return `${d}Z`;
+})();
+const MARK_SHAPES: Record<SpecialMarkGeometry['kind'], { d: string; round: number }> = {
+  star: { d: STAR, round: 0.16 },
+  heart: { d: 'M 0,0.92 C -0.55,0.48 -1,0.1 -1,-0.36 C -1,-0.72 -0.74,-0.95 -0.46,-0.95 C -0.25,-0.95 -0.08,-0.83 0,-0.64 C 0.08,-0.83 0.25,-0.95 0.46,-0.95 C 0.74,-0.95 1,-0.72 1,-0.36 C 1,0.1 0.55,0.48 0,0.92 Z', round: 0 },
+  sparkle: { d: 'M 0,-1 Q 0.17,-0.17 1,0 Q 0.17,0.17 0,1 Q -0.17,0.17 -1,0 Q -0.17,-0.17 0,-1 Z', round: 0.1 },
+  // A crescent: a disc with a smaller disc taken out of its right side.
+  moon: { d: 'M 0.66,-0.751 A 1 1 0 1 0 0.66,0.751 A 0.78 0.78 0 1 1 0.66,-0.751 Z', round: 0.06 },
+};
+
+/**
+ * Everything that lies on the body, clipped to the silhouette: the pattern
+ * (a gradient, bands or spots), the belly patch, then the special mark over
+ * them.
+ */
 export function drawBodyMarks(d: Drawing, markings: MarkingsGeometry, bodyD: string): string {
-  if (!markings.belly && markings.marks.length === 0) return '';
+  const { belly, marks, stripes, gradient, mark } = markings;
+  if (!belly && marks.length === 0 && stripes.length === 0 && !gradient && !mark) return '';
   const clip = d.clip(`<path d="${bodyD}"/>`);
+  const paint = d.palette.marking;
   let out = '';
-  if (markings.belly) out += `<g clip-path="${clip}">${drawPrim(d, markings.belly)}</g>`;
-  if (markings.marks.length > 0) {
-    out += `<g data-part="side-pattern" opacity="${fmt(markings.markOpacity)}" clip-path="${clip}">`;
-    for (const mark of markings.marks) out += ellipse(mark, `data-part="side-pattern-mark" fill="${d.palette.marking}"`);
+  if (gradient) {
+    d.defs +=
+      `<linearGradient id="${d.id('pattern-gradient')}" gradientUnits="userSpaceOnUse" x1="0" y1="${fmt(gradient.y0)}" x2="0" y2="${fmt(gradient.y1)}">` +
+      `<stop offset="0" stop-color="${paint}" stop-opacity="0"/><stop offset="0.55" stop-color="${paint}" stop-opacity="${fmt(gradient.strength * 0.72)}"/><stop offset="1" stop-color="${paint}" stop-opacity="${fmt(gradient.strength)}"/></linearGradient>`;
+    out += `<g data-part="pattern" data-pattern="gradient" clip-path="${clip}"><rect data-part="pattern-gradient" x="-2000" y="${fmt(gradient.y0)}" width="5000" height="${fmt(gradient.y1 - gradient.y0 + 200)}" fill="${d.url('pattern-gradient')}"/></g>`;
+  }
+  if (belly) out += `<g clip-path="${clip}">${drawPrim(d, belly)}</g>`;
+  if (stripes.length > 0) {
+    out += `<g data-part="pattern" data-pattern="striped" opacity="${fmt(markings.stripeOpacity)}" clip-path="${clip}">`;
+    for (const band of stripes) out += `<path data-part="pattern-stripe" d="${band}" fill="${paint}"/>`;
     out += `</g>`;
+  }
+  if (marks.length > 0) {
+    // The authored part names of the V2 side-pattern are kept: the spotted pattern IS that drawing, grown.
+    out += `<g data-part="side-pattern" data-pattern="spotted" opacity="${fmt(markings.markOpacity)}" clip-path="${clip}">`;
+    for (const spot of marks) out += ellipse(spot, `data-part="side-pattern-mark" fill="${paint}"`);
+    out += `</g>`;
+  }
+  if (mark) {
+    const shape = MARK_SHAPES[mark.kind];
+    const color = d.palette.mark;
+    const stroke = shape.round > 0 ? ` stroke="${color}" stroke-width="${fmt(shape.round)}" stroke-linejoin="round"` : '';
+    // Foreshortened across the screen, after it is turned on the skin and sized.
+    out +=
+      `<g data-part="special-mark" data-mark="${mark.kind}" data-region="${mark.region}" clip-path="${clip}">` +
+      `<path data-part="special-mark-shape" d="${shape.d}" fill="${color}"${stroke} opacity="0.92"` +
+      ` transform="translate(${fmt(mark.cx)} ${fmt(mark.cy)}) scale(${fmt(mark.squash)} 1) rotate(${fmt(mark.rotation)}) scale(${fmt(mark.r)})"/>` +
+      `</g>`;
   }
   return out;
 }

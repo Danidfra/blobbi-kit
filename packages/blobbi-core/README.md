@@ -148,8 +148,18 @@ antenna           = none | single | double
 horns             = none | forehead | top | side
 ears              = none | round | pointed
 tail              = none | nub | curl | leaf
-spots, belly, freckles = true | false
+pattern           = solid | spotted | striped | gradient     the body's ONE pattern; EXPLICIT on V3 (a seed mirror on V1 and V2)
+special_mark      = none | star | heart | sparkle | moon     one small permanent marking; EXPLICIT on V3 (a seed mirror on V1 and V2)
+belly, freckles   = true | false
 ```
+
+A V3 event has no `size` and no `adult_type` (a V3 Blobbi's proportions are
+micro-geometry, and it has one adult body, its own), and no `spots`: a
+Blobbi has one pattern, not a set of independent markings. `pattern` keeps
+the words the tag has always carried (`solid` is "no pattern"). `special_mark`
+does not take the older `blush`: a blush is what a cheek does when the
+expression calls for it, not a marking one individual has; `moon` is in its
+place.
 
 The seed is used twice, for two different things:
 
@@ -172,18 +182,19 @@ getBlobbiVisualIdentity(companion).v3;     // what a renderer takes
   retuned colour generator repaints nobody. Micro-geometry (proportions, the
   exact size, curve and place of each trait) is never stored; it is derived
   from the seed under `visual_algorithm`.
-- **The three colour tags have two readings, by generation.** On V1 and V2
-  `base_color`, `secondary_color` and `eye_color` are mirrors of the seed:
-  rewritten on every republish and never read when a seed is present, exactly
-  as before. On V3 the same three tags are identity: never rewritten, never
-  added if absent, and they are what `visualTraits` and the projection carry.
-  The switch is `visual_generation`, checked in `syncMirrorTagsToSeed` and
-  `deriveVisualTraits` and nowhere else. `pattern`, `special_mark`, `size`
-  and `adult_type` stay seed mirrors on every generation.
+- **Five tags have two readings, by generation.** On V1 and V2
+  `base_color`, `secondary_color`, `eye_color`, `pattern` and `special_mark`
+  are mirrors of the seed: rewritten on every republish and never read when a
+  seed is present, exactly as before. On V3 the same five tags are identity:
+  never rewritten, never added if absent. The switch is `visual_generation`,
+  checked in `syncMirrorTagsToSeed` and `deriveVisualTraits` and nowhere
+  else. A V3 Blobbi has no mirrors at all: `size` and `adult_type` are not
+  written for it, and a republish drops any it finds
+  (`BLOBBI_V3_ABSENT_TAG_NAMES`).
 - **A client that predates V3** does not make that check: if it republishes a
-  V3 Blobbi it rewrites those three colours from the seed (the other identity
-  tags are unknown to it and pass through). Clients must be updated before
-  they write to V3 Blobbis.
+  V3 Blobbi it rewrites those five from the seed and adds `size` (the other
+  identity tags are unknown to it and pass through). Clients must be updated
+  before they write to V3 Blobbis.
 - **Opt-in.** `NEW_BLOBBI_VISUAL_GENERATION` is still `'v2'`. A host asks for
   V3 and must hand over a complete identity; `buildEggTags` throws on a
   missing, partial, malformed or foreign one.

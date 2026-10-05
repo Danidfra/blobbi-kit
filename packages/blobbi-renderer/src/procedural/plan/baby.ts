@@ -131,6 +131,20 @@ export const BABY_PLAN: StagePlan = {
   // short, ears tiny. The tail and the belly patch have not appeared yet.
   development: { antenna: 0.5, horn: 0.34, ear: 0.52, tail: 0, marking: 0.85, belly: false },
   look: { body: 'v1', eye: 'simple', gait: 'hop' },
+  // Measured over a population, through every expression: a baby is mostly
+  // face. Its eyes begin at 0.23 of its height, and its widest open mouth
+  // ends at 0.79 and is 0.6 of the half-width wide. Its body is a droplet,
+  // narrow at both ends, so what is left is a little forehead and the skin
+  // under its chin.
+  surface: {
+    face: { top: 0.215, bottom: 0.81 },
+    marks: {
+      forehead: { theta: [3, 14], y: [0.135, 0.175], size: 0.8 },
+      chest: { theta: [10, 24], y: [0.86, 0.875] },
+      hip: { theta: [56, 70], y: [0.83, 0.86] },
+      shoulder: { theta: [130, 156], y: [0.26, 0.44] },
+    },
+  },
   front: FRONT,
   side: SIDE,
 };

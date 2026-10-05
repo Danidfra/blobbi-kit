@@ -20,6 +20,8 @@ import {
   EGG_BOX,
   VIEWBOX,
   buildBlobbiGeometry,
+  buildEggGeometry,
+  deriveEgg,
   deriveMorphology,
   motionStylesheetFor,
   planFor,
@@ -100,11 +102,18 @@ function anchorsOf(geo: BlobbiGeometry, frame: { x: number; y: number; width: nu
   };
   const eye = geo.face?.eyes[0];
   if (eye) anchors.eyeLineY = round(fy(eye.center.y));
+  // The artwork's own ground shadow says what this individual stands on: under
+  // the feet of an adult, under the floating body of a baby.
+  const shadow = geo.limbs.groundShadow;
+  anchors.footprint = { centerX: round(mirrored ? 1 - fx(shadow.cx) : fx(shadow.cx)), width: round((2 * shadow.rx * DOCUMENT_TRANSFORM.scale) / frame.width) };
   return anchors;
 }
 
-/** The egg's box is the official egg's: the shell fills 10..91 of it. */
-const EGG_ANCHORS: ArtworkAnchors = { centerX: 0.5, headTopY: 0.1, groundY: 0.91 };
+/** The egg's box is the official egg's: the shell fills 10..91 of it, and rests on a base about half its width. */
+function eggAnchors(genome: BlobbiGenome | null): ArtworkAnchors {
+  const shadow = buildEggGeometry(deriveEgg(genome ?? fallbackV3Genome({})), 'none').groundShadow;
+  return { centerX: 0.5, headTopY: 0.1, groundY: 0.91, footprint: { centerX: 0.5, width: Math.round(((2 * shadow.rx) / EGG_BOX.size) * 1000) / 1000 } };
+}
 
 /**
  * Decide what a V3 request draws, and describe it. Total: an identity that
@@ -135,7 +144,7 @@ export function resolveV3Artwork(request: ArtworkRequest): ResolvedArtwork {
       gazeable: false,
       supports: { expression: false, gaze: false, motion: true },
       viewBox: { width: frame.width, height: frame.height },
-      anchors: EGG_ANCHORS,
+      anchors: eggAnchors(genome),
       markup: '',
       motionStyles: live ? motionStylesheetFor(request.motion ?? 'still', 'rest', 'front') : '',
       unsupportedAlgorithm,

@@ -17,6 +17,41 @@ core/react 0.6.1 are on the registry; everything in this section is not yet:
 renderer 0.5.0 and core/react 0.7.0 (further down), and renderer 0.6.0 and
 core/react 0.8.0 (the V3 entries directly below).
 
+### V3 before release: one pattern, a special mark, ears on the flank (renderer 0.6.0, core/react 0.8.0)
+
+Changes to the unreleased V3 entries below, made before any V3 Blobbi exists
+outside a development machine. `visual_algorithm` stays `1`: what version 1
+IS was settled here, and `procedural/vectors.json` was rewritten on purpose.
+
+- **The `spots` tag and trait are gone.** A V3 Blobbi has ONE `pattern`
+  (`solid | spotted | striped | gradient`, the tag's own words) and a
+  `special_mark` (`none | star | heart | sparkle | moon`), both explicit
+  identity: chosen by the seed at creation, authoritative afterwards, never
+  rewritten on a republish. On V1 and V2 the same two tags are seed mirrors,
+  exactly as before. New: `BLOBBI_V3_PATTERN_KINDS`,
+  `BLOBBI_V3_SPECIAL_MARK_KINDS`, `BLOBBI_MIRRORED_IDENTITY_TAG_NAMES`,
+  `BLOBBI_V3_ABSENT_TAG_NAMES` (core); `BLOBBI_V3_PATTERNS`,
+  `BLOBBI_V3_SPECIAL_MARKS` (renderer). `BlobbiV3Traits` is now `antenna`,
+  `horns`, `ears`, `tail`, `pattern`, `specialMark`, `belly`, `freckles`.
+- **A V3 event carries no `size` and no `adult_type`.** `buildEggTags` does
+  not write `size` for V3; the mirror sync and the tag repair never add
+  either and drop any they find; `BlobbiCompanion.adultType` is `undefined`
+  for a V3 Blobbi. V1 and V2 keep both.
+- **Every value is drawn.** Spots (the authored flank pattern, and now a few
+  across the back), stripes (tapered bands across the back that come round to
+  the front above the brows and below the mouth), a gradient (the body
+  deepens toward its base), and four mark shapes placed in one of four
+  anatomical regions measured clear of the face through every expression.
+  `blush` is not a V3 mark: a blush is what a cheek does.
+- **Ears root on the flank in profile**, where the front view has them,
+  instead of standing on the skyline at a fixed place: on a head that falls
+  away steeply an ear used to hang over the slope.
+- **`describeBlobbiArtwork(options)` and `ArtworkAnchors.footprint`**
+  (renderer): where a drawing's head, eye line and ground are, and what it
+  stands on (the middle and width of its ground contact), without drawing it;
+  `boxAnchors` gives the same as fractions of the square the component uses.
+  For hosts that draw their own ground shadow. `anchorsInSquare` is exported.
+
 ### `@blobbi-kit/renderer` 0.6.0 (V3: the procedural generation)
 
 **Additive.** Every V1 fingerprint and every V2 drawing is byte-identical; a

@@ -252,10 +252,10 @@ const unit01 = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Ma
 export function deriveEgg(genome: BlobbiGenome): EggAppearance {
   const g = genome.egg;
   const t = genome.traits;
-  const spotted = t.spots.enabled === true;
+  const spotted = t.pattern?.kind === 'spotted';
 
   // A plain egg has three or four spots; a spotted Blobbi's has five, or six when both its flanks are marked, and larger.
-  const count = spotted ? (t.spots.side === 'both' ? 6 : 5) : g.spotCount === 3 ? 3 : 4;
+  const count = spotted ? (t.pattern.spots.side === 'both' ? 6 : 5) : g.spotCount === 3 ? 3 : 4;
   const boost = spotted ? 1.12 : 1;
   // With three spots, the low one is the one missing.
   const order = count === 3 ? [0, 1, 3] : [0, 1, 2, 3, 4, 5].slice(0, count);

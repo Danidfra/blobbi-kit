@@ -31,7 +31,7 @@ describe('generateGenome', () => {
       for (const name of ANTENNA_GENES) expect(Math.abs(g.traits.antenna[name])).toBeLessThanOrEqual(1);
       expect([0, 1, 2]).toContain(g.traits.antenna.count);
       expect([-1, 1]).toContain(g.traits.antenna.side);
-      for (const mark of g.traits.spots.marks) for (const v of Object.values(mark)) expect(Math.abs(v)).toBeLessThanOrEqual(1);
+      for (const mark of g.traits.pattern.spots.marks) for (const v of Object.values(mark)) expect(Math.abs(v)).toBeLessThanOrEqual(1);
       for (const hex of Object.values(g.colors)) expect(hex).toMatch(/^#[0-9a-f]{6}$/);
     }
   });
@@ -43,15 +43,15 @@ describe('generateGenome', () => {
 
   it('lets explicit semantic identity override the seed without touching micro-geometry', () => {
     const plain = generateGenome('abc');
-    const stated = generateGenome({ seed: 'abc', antenna: 'double', spots: true, freckles: false, colors: { base: '#3FB6A8' } });
+    const stated = generateGenome({ seed: 'abc', antenna: 'double', pattern: 'spotted', freckles: false, colors: { base: '#3FB6A8' } });
     expect(stated.traits.antenna.count).toBe(2);
-    expect(stated.traits.spots.enabled).toBe(true);
+    expect(stated.traits.pattern.kind).toBe('spotted');
     expect(stated.traits.freckles.enabled).toBe(false);
     expect(stated.colors).toEqual({ base: '#3fb6a8' });
     // The shape of the body, and the shape the antenna has, belong to the seed.
     expect(stated.morphology).toEqual(plain.morphology);
     expect({ ...stated.traits.antenna, count: 0 }).toEqual({ ...plain.traits.antenna, count: 0 });
-    expect(stated.traits.spots.marks).toEqual(plain.traits.spots.marks);
+    expect(stated.traits.pattern.spots.marks).toEqual(plain.traits.pattern.spots.marks);
   });
 
   it('rejects colours that are not bare hex', () => {
@@ -66,7 +66,7 @@ describe('generateGenome', () => {
     expect(share((g) => g.traits.antenna.count === 0)).toBeGreaterThan(0.5);
     expect(share((g) => g.traits.antenna.count === 1)).toBeGreaterThan(0.24);
     expect(share((g) => g.traits.antenna.count === 2)).toBeGreaterThan(0.1);
-    expect(share((g) => g.traits.spots.enabled)).toBeLessThan(0.36);
+    expect(share((g) => g.traits.pattern.kind === 'spotted')).toBeLessThan(0.36);
     // The new traits are the exception, not the rule, and the head is never crowded.
     expect(share((g) => g.traits.horns.kind !== 'none')).toBeLessThan(0.25);
     expect(share((g) => g.traits.ears.kind !== 'none')).toBeLessThan(0.16);
@@ -82,7 +82,7 @@ describe('canonicalGenome', () => {
     const g = canonicalGenome();
     for (const name of MORPHOLOGY_GENES) expect(g.morphology[name]).toBe(0);
     expect(g.traits.antenna.count).toBe(0);
-    expect(g.traits.spots.enabled).toBe(false);
+    expect(g.traits.pattern.kind).toBe('solid');
     expect(g.traits.freckles.enabled).toBe(false);
     expect(g.colors).toEqual({});
   });
@@ -101,7 +101,7 @@ describe('canonicalGenome', () => {
 describe('deriveMorphology', () => {
   it('keeps every parameter inside its Blobbi-safe range', () => {
     for (const seed of seeds(500)) {
-      const m = deriveMorphology(generateGenome({ seed, antenna: 'double', spots: true, freckles: true }));
+      const m = deriveMorphology(generateGenome({ seed, antenna: 'double', pattern: 'spotted', freckles: true }));
       for (const name of MORPHOLOGY_GENES) {
         const { base, spread } = MORPHOLOGY_RANGES[name];
         expect(m[name]).toBeGreaterThanOrEqual(base - spread - 1e-9);
@@ -152,7 +152,7 @@ describe('deriveMorphology', () => {
   });
 
   it('never mutates the genome', () => {
-    const g = deepFreeze(generateGenome({ seed: 'frozen', antenna: 'double', spots: true, freckles: true }));
+    const g = deepFreeze(generateGenome({ seed: 'frozen', antenna: 'double', pattern: 'spotted', freckles: true }));
     expect(() => deriveMorphology(g)).not.toThrow();
     expect(deriveMorphology(g)).toEqual(deriveMorphology(g));
   });

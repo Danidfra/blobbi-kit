@@ -145,6 +145,33 @@ export interface ArtworkAnchors {
   eyeLineY?: number;
   /** Ground contact line. */
   groundY: number;
+  /**
+   * What the drawing stands on (or floats above): the middle of its contact
+   * with the ground and how wide that contact is. A host that draws its own
+   * ground shadow puts it here, on `groundY`, instead of guessing from the
+   * frame: an adult stands on two feet, a baby is a small thing in the air,
+   * an egg rests on its base, and each individual is a little wider or
+   * narrower. Present for every V3 drawing; absent where a generation's
+   * artwork has not been measured.
+   */
+  footprint?: { centerX: number; width: number };
+}
+
+/**
+ * The same anchors as fractions of the SQUARE the component draws in (the
+ * drawing is fitted into it whole and centred, as `preserveAspectRatio`
+ * `xMidYMid meet` does), which is the frame a host lays things out against.
+ */
+export function anchorsInSquare(anchors: ArtworkAnchors, viewBox: { width: number; height: number }): ArtworkAnchors {
+  const side = Math.max(viewBox.width, viewBox.height) || 1;
+  const kx = viewBox.width / side;
+  const ky = viewBox.height / side;
+  const x = (v: number) => Math.round((0.5 + (v - 0.5) * kx) * 1000) / 1000;
+  const y = (v: number) => Math.round((0.5 + (v - 0.5) * ky) * 1000) / 1000;
+  const out: ArtworkAnchors = { centerX: x(anchors.centerX), headTopY: y(anchors.headTopY), groundY: y(anchors.groundY) };
+  if (anchors.eyeLineY !== undefined) out.eyeLineY = y(anchors.eyeLineY);
+  if (anchors.footprint) out.footprint = { centerX: x(anchors.footprint.centerX), width: Math.round(anchors.footprint.width * kx * 1000) / 1000 };
+  return out;
 }
 
 /**

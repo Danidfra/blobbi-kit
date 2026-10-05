@@ -104,7 +104,7 @@ describe('every Blobbi has one egg', () => {
   });
 
   it('never mutates the genome', () => {
-    const genome = deepFreeze(generateGenome({ seed: 'frozen-egg', spots: true, freckles: true, belly: true }));
+    const genome = deepFreeze(generateGenome({ seed: 'frozen-egg', pattern: 'spotted', freckles: true, belly: true }));
     expect(() => egg(genome, { eggCrack: 'heavy', motion: 'idle', phase: 0.3 })).not.toThrow();
   });
 
@@ -142,7 +142,7 @@ describe('every Blobbi has one egg', () => {
   it('is sound markup for every seed, crack level and motion, and clamps wild genes', () => {
     const problems: string[] = [];
     for (const seed of seeds(300)) {
-      const genome = generateGenome({ seed, spots: seed.endsWith('1') ? true : undefined, freckles: seed.endsWith('2') ? true : undefined, belly: seed.endsWith('3') ? true : undefined });
+      const genome = generateGenome({ seed, pattern: seed.endsWith('1') ? 'spotted' : undefined, freckles: seed.endsWith('2') ? true : undefined, belly: seed.endsWith('3') ? true : undefined });
       for (const eggCrack of EGG_CRACKS) {
         for (const motion of [{}, { motion: 'idle', phase: 0.3 }, { motion: 'walking' }] as const) {
           for (const problem of problemsIn(renderBlobbiSvg(genome, { stage: 'egg', eggCrack, ...motion }, { groundShadow: true }))) problems.push(`${seed}: ${problem}`);
@@ -151,7 +151,7 @@ describe('every Blobbi has one egg', () => {
     }
     expect(problems).toEqual([]);
     for (const value of [50, -50, Number.NaN, Infinity]) {
-      const wild = generateGenome({ seed: 'wild-egg', spots: true, freckles: true, belly: true });
+      const wild = generateGenome({ seed: 'wild-egg', pattern: 'spotted', freckles: true, belly: true });
       for (const gene of EGG_GENES) wild.egg[gene] = value;
       for (const spot of wild.egg.spots) Object.assign(spot, { dx: value, dy: value, size: value, rotation: value });
       for (const speckle of wild.egg.speckles) Object.assign(speckle, { u: value, v: value, size: value });
@@ -166,7 +166,7 @@ describe('every Blobbi has one egg', () => {
 });
 
 describe('the egg gives clues, not answers', () => {
-  const plain = { antenna: 'none', horns: 'none', ears: 'none', tail: 'none', spots: false, freckles: false, belly: false } as const;
+  const plain = { antenna: 'none', horns: 'none', ears: 'none', tail: 'none', pattern: 'solid', mark: 'none', freckles: false, belly: false } as const;
 
   it('hides horns, ears, tail, antennae, the tuft and every proportion of the Blobbi inside', () => {
     for (const seed of seeds(40)) {
@@ -183,10 +183,10 @@ describe('the egg gives clues, not answers', () => {
   it('shows a spotted Blobbi as a more spotted egg, in its marking colour', () => {
     for (const seed of seeds(40)) {
       const base = deriveEgg(generateGenome({ seed, ...plain }));
-      const spotted = generateGenome({ seed, ...plain, spots: true });
+      const spotted = generateGenome({ seed, ...plain, pattern: 'spotted' });
       const e = deriveEgg(spotted);
       expect(base.spots.length).toBeLessThanOrEqual(4);
-      expect(e.spots.length).toBe(spotted.traits.spots.side === 'both' ? 6 : 5);
+      expect(e.spots.length).toBe(spotted.traits.pattern.spots.side === 'both' ? 6 : 5);
       expect(e.spots[0].rx).toBeGreaterThan(base.spots[0].rx);
       expect(e.palette.spotDark).not.toBe(base.palette.spotDark);
       // The shell itself does not change.
@@ -256,7 +256,7 @@ describe('egg colours', () => {
       const spot = hexToOklch(shell.spotLight);
       const bodyTone = hexToOklch(body.bodyMid);
       // Within the analogous range of the body's hue (markings are neighbours of it).
-      expect(hueGap(spot.h, bodyTone.h)).toBeLessThan(genome.traits.spots.enabled ? 48 : 30);
+      expect(hueGap(spot.h, bodyTone.h)).toBeLessThan(genome.traits.pattern.kind === 'spotted' ? 48 : 30);
       // The accent spot, when there is one, is the Blobbi's own accent hue.
       if (shell.accentLight && genome.colors.accent) expect(hueGap(hexToOklch(shell.accentLight).h, hexToOklch(genome.colors.accent).h)).toBeLessThan(12);
       expect(shell.accentLight === null).toBe(!genome.colors.accent);

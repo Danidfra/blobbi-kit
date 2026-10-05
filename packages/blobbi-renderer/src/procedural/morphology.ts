@@ -26,13 +26,15 @@ import {
   type EarKind,
   type HornGeneName,
   type HornKind,
+  type MarkKind,
   type MorphologyGeneName,
+  type PatternKind,
   type TailGeneName,
   type TailKind,
 } from './genome';
 import { derivePalette, type BlobbiPalette } from './colors';
 import { lerp } from './geometry';
-import { ADULT_PLAN, planFor, type LifeStage } from './plan';
+import { ADULT_PLAN, MARK_REGIONS, planFor, type LifeStage, type MarkRegionName } from './plan';
 import { buildFrontBody, CANONICAL_PARAMS } from './silhouette';
 
 export interface GeneRange {
@@ -190,6 +192,8 @@ export interface TailMorphology {
 
 /** A flat mark on the body: where it is round the body and up it, and its shape. */
 export interface MarkMorphology {
+  /** Whether it is one of the flank's (the authored side-pattern) or one of the back's. */
+  zone: 'flank' | 'back';
   /** Which flank: -1 the viewer's left from the front, 1 the right. */
   side: -1 | 1;
   /** Degrees round the body from the middle of the face (0..180). */
@@ -200,6 +204,44 @@ export interface MarkMorphology {
   dy: number;
   rx: number;
   ry: number;
+  rotation: number;
+}
+
+/** One band of the `striped` pattern, across the back. */
+export interface StripeMorphology {
+  /** Height as a fraction of the body, from the crown. */
+  yFraction: number;
+  /** Thickness at the middle of the back, in units; it tapers to nothing at both ends. */
+  thickness: number;
+  /** How far round the body it reaches from the middle of the back, in degrees, each way. */
+  reach: number;
+}
+
+export interface StripesMorphology {
+  bands: StripeMorphology[];
+  /** How far a band bows toward the viewer, in units. */
+  sag: number;
+}
+
+/** The `gradient` pattern: the body deepens from `start` (a fraction of its height) to its base. */
+export interface GradientMorphology {
+  start: number;
+  /** The pattern colour's opacity at the base (0..1). */
+  strength: number;
+}
+
+/** The special mark: a small shape lying on the skin at one place. */
+export interface SpecialMarkMorphology {
+  kind: Exclude<MarkKind, 'none'>;
+  /** The anatomical region it was placed in. */
+  region: MarkRegionName;
+  /** Which side of the body: -1 the viewer's left from the front, 1 the right. */
+  side: -1 | 1;
+  /** Degrees round the body from the middle of the face (0..180). */
+  theta: number;
+  yFraction: number;
+  /** Half its size, in units. */
+  r: number;
   rotation: number;
 }
 
@@ -223,7 +265,12 @@ export type BlobbiMorphology = Record<MorphologyGeneName, number> & {
   horns: HornMorphology | null;
   ears: EarMorphology | null;
   tail: TailMorphology | null;
+  /** Which pattern the body carries; exactly one of the three below is filled when it is not `solid`. */
+  pattern: PatternKind;
   spots: MarkMorphology[];
+  stripes: StripesMorphology | null;
+  gradient: GradientMorphology | null;
+  mark: SpecialMarkMorphology | null;
   bellyPatch: BellyMorphology | null;
   freckles: FreckleMorphology[];
   palette: BlobbiPalette;
@@ -248,6 +295,34 @@ const CANONICAL_SPOTS = [
   const half = CANONICAL_ADULT.edgeAt(1, y) - CANONICAL_ADULT.axisX;
   return { ...spot, theta: 180 - (Math.asin(spot.dx / half) * 180) / Math.PI };
 });
+
+/**
+ * The spots across the back of a `spotted` Blobbi: where each canonical one
+ * sits (degrees round the body; past 180 is the other side of the spine).
+ */
+const CANONICAL_BACK_SPOTS = [
+  { theta: 163, yFraction: 0.27, rx: 21, ry: 26, rotation: 12 },
+  { theta: 199, yFraction: 0.43, rx: 24, ry: 29, rotation: -14 },
+  { theta: 170, yFraction: 0.59, rx: 18, ry: 22, rotation: 8 },
+] as const;
+
+/** A mark's half-size on the adult, in units. */
+const MARK_RADIUS = 34;
+/** How likely each region is, before the body's own traits rule some out. */
+const MARK_REGION_WEIGHTS: Record<MarkRegionName, number> = { forehead: 0.34, chest: 0.3, hip: 0.2, shoulder: 0.16 };
+
+/**
+ * The regions a mark may use ON THIS BODY. Horns on the forehead or the
+ * crown keep the forehead to themselves; spots and stripes own the back. The chest and the hip are always
+ * free, so there is always somewhere.
+ */
+export function freeMarkRegions(horns: HornKind, pattern: PatternKind): MarkRegionName[] {
+  return MARK_REGIONS.filter((region) => {
+    if (region === 'forehead') return horns !== 'forehead' && horns !== 'top';
+    if (region === 'shoulder') return pattern === 'solid' || pattern === 'gradient';
+    return true;
+  });
+}
 
 /** Three small dots across the cheek. */
 const CANONICAL_FRECKLES = [
@@ -357,17 +432,26 @@ export function deriveMorphology(genome: BlobbiGenome, stage: LifeStage = 'adult
     };
   }
 
+  // THE PATTERN: one kind, stated by the identity; its geometry is this individual's.
   const markScale = scale * dev.marking;
+  const patternKind: PatternKind = t.pattern?.kind === 'spotted' || t.pattern?.kind === 'striped' || t.pattern?.kind === 'gradient' ? t.pattern.kind : 'solid';
+  const face = plan.surface.face;
+  out.pattern = patternKind;
   out.spots = [];
-  if (t.spots.enabled) {
-    const sides: (-1 | 1)[] = t.spots.side === 'both' ? [1, -1] : t.spots.side === 'left' ? [-1] : [1];
-    const count = t.spots.count === 2 ? 2 : 3;
+  out.stripes = null;
+  out.gradient = null;
+  if (patternKind === 'spotted') {
+    const g = t.pattern.spots;
+    const nudge = (gene: { dx: number; dy: number; size: number; rotation: number } | undefined) => gene ?? { dx: 0, dy: 0, size: 0, rotation: 0 };
+    const sides: (-1 | 1)[] = g.side === 'both' ? [1, -1] : g.side === 'left' ? [-1] : [1];
+    const count = g.count === 2 ? 2 : 3;
     for (const side of sides) {
       for (let i = 0; i < count; i++) {
         const canon = CANONICAL_SPOTS[i];
-        const gene = t.spots.marks[i] ?? { dx: 0, dy: 0, size: 0, rotation: 0 };
+        const gene = nudge(g.marks[i]);
         const size = (1 + 0.12 * clampGene(gene.size)) * markScale;
         out.spots.push({
+          zone: 'flank',
           side,
           // The sideways gene moves a spot round the flank by a few degrees.
           theta: canon.theta - 3.5 * clampGene(gene.dx),
@@ -379,6 +463,78 @@ export function deriveMorphology(genome: BlobbiGenome, stage: LifeStage = 'adult
         });
       }
     }
+    // Across the back, leaning to the marked flank's side of the spine.
+    const lead: -1 | 1 = g.side === 'left' ? -1 : 1;
+    const backCount = g.backCount === 2 ? 2 : 3;
+    for (let i = 0; i < backCount; i++) {
+      const canon = CANONICAL_BACK_SPOTS[i];
+      const gene = nudge(g.back?.[i]);
+      const size = (1 + 0.14 * clampGene(gene.size)) * markScale;
+      const round = canon.theta + 9 * clampGene(gene.dx);
+      out.spots.push({
+        zone: 'back',
+        side: round > 180 ? (lead === 1 ? -1 : 1) : lead,
+        theta: round > 180 ? 360 - round : round,
+        yFraction: canon.yFraction + 0.025 * clampGene(gene.dy),
+        dy: 0,
+        rx: canon.rx * size,
+        ry: canon.ry * size,
+        rotation: canon.rotation + 12 * clampGene(gene.rotation),
+      });
+    }
+  } else if (patternKind === 'striped') {
+    const g = t.pattern.stripes;
+    const count = g.count === 4 ? 4 : 3;
+    const bodyHeight = (plan.front.body.baseY - plan.front.body.top) * out.bodyHeight;
+    // The first band lies above the face and the last below it; the others share the back between them.
+    const first = face.top - 0.075;
+    const last = face.bottom + 0.05;
+    out.stripes = {
+      sag: bodyHeight * 0.034 * (1 + 0.3 * clampGene(g.sag)),
+      bands: Array.from({ length: count }, (_, i) => {
+        const gene = g.bands[i] ?? { dy: 0, width: 0, reach: 0 };
+        const yFraction = lerp(first, last, i / (count - 1)) + 0.012 * clampGene(gene.dy);
+        const thickness = bodyHeight * 0.058 * (1 + 0.2 * clampGene(gene.width)) * lerp(1, dev.marking, 0.5);
+        const half = thickness / bodyHeight / 2 + 0.012;
+        // Above the brows a band comes over the sides of the head, and below
+        // the mouth round to the belly: from the front, tapering wedges that
+        // point at the middle and stop short of it. At the face's own height
+        // a band stays behind the flank, where it is a band on the back and
+        // nothing near an eye.
+        const reach = yFraction + half < face.top ? 148 : yFraction - half > face.bottom ? 150 : 62;
+        return { yFraction, thickness, reach: reach + 8 * clampGene(gene.reach) };
+      }),
+    };
+  } else if (patternKind === 'gradient') {
+    const g = t.pattern.gradient;
+    out.gradient = { start: 0.4 + 0.06 * clampGene(g.start), strength: 0.5 + 0.08 * clampGene(g.strength) };
+  }
+
+  // THE SPECIAL MARK: its kind is stated; the seed picks a free region and a place in it.
+  out.mark = null;
+  const markKind = t.mark?.kind;
+  if (markKind === 'star' || markKind === 'heart' || markKind === 'sparkle' || markKind === 'moon') {
+    const free = freeMarkRegions(t.horns.kind, patternKind);
+    const total = free.reduce((sum, region) => sum + MARK_REGION_WEIGHTS[region], 0);
+    let pick = Math.min(0.999999, Math.max(0, Number.isFinite(t.mark.region) ? t.mark.region : 0)) * total;
+    let region = free[free.length - 1];
+    for (const candidate of free) {
+      if (pick < MARK_REGION_WEIGHTS[candidate]) {
+        region = candidate;
+        break;
+      }
+      pick -= MARK_REGION_WEIGHTS[candidate];
+    }
+    const patch = plan.surface.marks[region];
+    out.mark = {
+      kind: markKind,
+      region,
+      side: t.mark.side === -1 ? -1 : 1,
+      theta: lerp(patch.theta[0], patch.theta[1], (clampGene(t.mark.u) + 1) / 2),
+      yFraction: lerp(patch.y[0], patch.y[1], (clampGene(t.mark.v) + 1) / 2),
+      r: MARK_RADIUS * (1 + 0.12 * clampGene(t.mark.size)) * markScale * (patch.size ?? 1),
+      rotation: 16 * clampGene(t.mark.rotation),
+    };
   }
 
   out.bellyPatch = null;
@@ -423,5 +579,6 @@ export function mirrorMorphology(m: BlobbiMorphology): BlobbiMorphology {
     antennae: m.antennae.map((a) => ({ ...a, side: flip(a.side) })),
     horns: m.horns && { ...m.horns, asymmetrySide: flip(m.horns.asymmetrySide) },
     spots: m.spots.map((s) => ({ ...s, side: flip(s.side) })),
+    mark: m.mark && { ...m.mark, side: flip(m.mark.side) },
   };
 }

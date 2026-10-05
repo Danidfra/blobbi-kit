@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +28,15 @@ const vectors = expected.vectors as unknown as SeedVector[];
  * as they stood before the egg genes and before the crown placement genes.
  * They prove what keyed streams promise, by evidence: adding genes moved no
  * earlier gene of any seed.
+ *
+ * ONE DELIBERATE BREAK, before any version 1 Blobbi existed outside a
+ * development machine: the surface model. The prototype (snapshot `0cc5be5`)
+ * had an independent `spots` boolean; a Blobbi now has ONE `pattern` (solid,
+ * spotted, striped or gradient) and a `special mark`, each chosen by a
+ * stream of its own, and the ears root on the flank in profile. Every gene
+ * the prototype had is still drawn from the same key and has the same value
+ * (the tests below hold that against its own files); what a seed's spots
+ * look like is unchanged, and whether it HAS them is now its pattern.
  */
 const PROTOTYPE_LABEL = 'v3-proto';
 /** A historical genome, relabelled: the prototype's working label is this algorithm version. */
@@ -40,21 +48,26 @@ if (process.env.UPDATE_VECTORS === '1') {
   writeFileSync(file, `${JSON.stringify({ version: PROCEDURAL_ALGORITHM_VERSION, vectors: VECTOR_SEEDS.map(computeVector) }, null, 2)}\n`);
 }
 
-describe('the port is the prototype', () => {
-  it('names its file for the algorithm version it freezes', () => {
+/**
+ * A genome as the prototype shaped it, for comparing against its history:
+ * the pattern's spot genes back where `spots` was (with the prototype's own
+ * `enabled`, which no longer exists: whether a Blobbi is spotted is its
+ * pattern now), and the pattern and mark, which it did not have, left out.
+ */
+function asPrototypeGenome(genome: Record<string, any>, old: Record<string, any>): Record<string, any> {
+  const { pattern, mark, ...traits } = genome.traits;
+  const { backCount, back, ...spots } = pattern.spots;
+  expect(pattern.stripes).toBeDefined();
+  expect(mark).toBeDefined();
+  expect(back).toHaveLength(3);
+  expect([2, 3]).toContain(backCount);
+  return { ...genome, traits: { ...traits, spots: { enabled: old.traits.spots.enabled, ...spots } } };
+}
+
+describe('the vectors file', () => {
+  it('names the algorithm version it freezes', () => {
     expect(expected.version).toBe(PROCEDURAL_ALGORITHM_VERSION);
     expect(PROCEDURAL_ALGORITHM_VERSION).toBe(1);
-  });
-
-  it('produces, byte for byte, the vectors file of the reference prototype (but for its working label)', () => {
-    // sha256 of `src/procedural/vectors.json` in the blobbi-procedural snapshot
-    // (commit 0cc5be5, "feat: complete procedural Blobbi V3 prototype").
-    const PROTOTYPE_VECTORS_SHA256 = 'b3bbe525f7550dc592d23b9d9ea672b3bb0db77c0b2af3e36cd05e39811b09f2';
-    const asPrototype = `${JSON.stringify({ version: PROTOTYPE_LABEL, vectors: VECTOR_SEEDS.map(computeVector) }, null, 2)}\n`.replaceAll(
-      `"version": ${PROCEDURAL_ALGORITHM_VERSION},`,
-      `"version": "${PROTOTYPE_LABEL}",`,
-    );
-    expect(createHash('sha256').update(asPrototype).digest('hex')).toBe(PROTOTYPE_VECTORS_SHA256);
   });
 });
 
@@ -113,7 +126,7 @@ describe('the egg was added without touching the Blobbi', () => {
 
   it('kept every earlier genome exactly: the egg genes are an addition beside it', () => {
     for (const old of before) {
-      const { egg, ...rest } = JSON.parse(JSON.stringify(computeVector(old.seed).genome));
+      const { egg, ...rest } = asPrototypeGenome(JSON.parse(JSON.stringify(computeVector(old.seed).genome)), old.genome as Record<string, any>);
       // The crown placement genes came later still; they too are additions (see below).
       for (const [trait, keys] of Object.entries(CROWN_GENES)) for (const key of keys) delete rest.traits[trait][key];
       expect(rest).toEqual(relabelled(old.genome));
@@ -139,13 +152,16 @@ describe('the crown placement genes were added without touching anything else', 
       for (const [key, value] of Object.entries(old.genes)) expect(now.genes[key], `${old.seed} ${key}`).toBe(value);
       for (const [key, value] of Object.entries(old.rolls)) expect(now.rolls[key], `${old.seed} ${key}`).toBe(value);
       const added = Object.keys(now.genes).filter((key) => !(key in old.genes));
-      expect(added.sort()).toEqual(['antenna.fore', 'ears.position', 'horns.fore', 'horns.position']);
+      // The crown placement genes, and since then the pattern and mark genes: all additions.
+      expect(added.sort()).toEqual(
+        ['antenna.fore', 'ears.position', 'horns.fore', 'horns.position', 'gradient.start', 'gradient.strength', 'mark.rotation', 'mark.size', 'mark.u', 'mark.v', 'spots.back.0.dx', 'stripes.0.dy', 'stripes.3.reach', 'stripes.sag'].sort(),
+      );
     }
   });
 
   it('kept every earlier genome exactly: the new genes are additions inside their traits', () => {
     for (const old of before) {
-      const genome = JSON.parse(JSON.stringify(computeVector(old.seed).genome));
+      const genome = asPrototypeGenome(JSON.parse(JSON.stringify(computeVector(old.seed).genome)), old.genome as Record<string, any>);
       for (const [trait, keys] of Object.entries(CROWN_GENES)) {
         for (const key of keys) {
           expect(Math.abs(genome.traits[trait][key])).toBeLessThanOrEqual(1);
@@ -190,8 +206,9 @@ describe('gene stability as the genome grows', () => {
     }
     const genome = generateGenome('abc123');
     expect(genome.traits.antenna.count).toBe(1);
-    expect(genome.traits.spots.enabled).toBe(true);
-    expect(genome.traits.spots.side).toBe('both');
+    // Its spot genes are where they were; whether it shows them is its pattern now, and its seed chose stripes.
+    expect(genome.traits.pattern.spots.side).toBe('both');
+    expect(genome.traits.pattern.kind).toBe('striped');
     expect(genome.traits.freckles.enabled).toBe(false);
   });
 
@@ -205,6 +222,6 @@ describe('gene stability as the genome grows', () => {
     const horned = generateGenome({ seed: 'abc123', horns: 'top', tail: 'curl', ears: 'round' });
     expect(horned.morphology).toEqual(generateGenome('abc123').morphology);
     expect(horned.traits.antenna).toEqual(generateGenome('abc123').traits.antenna);
-    expect(horned.traits.spots).toEqual(generateGenome('abc123').traits.spots);
+    expect(horned.traits.pattern.spots).toEqual(generateGenome('abc123').traits.pattern.spots);
   });
 });

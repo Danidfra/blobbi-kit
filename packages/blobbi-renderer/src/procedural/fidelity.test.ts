@@ -9,7 +9,8 @@ import { Resvg } from '@resvg/resvg-js';
 import { renderBlobbiSvg as renderKit } from '@blobbi-kit/renderer';
 import { EMOTIONS } from './expressions';
 import { canonicalGenome } from './genome';
-import { renderBlobbiSvg } from './renderer';
+import { deriveMorphology } from './morphology';
+import { buildBlobbiGeometry, renderBlobbiSvg, renderGeometryToSvg } from './renderer';
 import type { BlobbiState } from './state';
 
 function raster(svg: string) {
@@ -150,12 +151,14 @@ describe('fidelity to the current Blobbi', () => {
     // none, so the comparison gives it the same three on the flank it shows.
     const spotted = (side: 'left' | 'right') => {
       const genome = canonicalGenome();
-      genome.traits.spots = { ...genome.traits.spots, enabled: true, side };
+      genome.traits.pattern = { ...genome.traits.pattern, kind: 'spotted', spots: { ...genome.traits.pattern.spots, side, backCount: 2 } };
       return genome;
     };
     const profile = (facing: 'left' | 'right', kit: Parameters<typeof renderKit>[0] = {}, state: Partial<BlobbiState> = {}) => {
       const a = raster(renderKit({ stage: 'adult', visualGeneration: 'v2', facing, ...kit }).svg);
-      const b = raster(renderBlobbiSvg(spotted(facing === 'right' ? 'left' : 'right'), { view: 'side', direction: facing, ...state }));
+      // The kit's drawing has the flank's three marks and nothing on the back: compare those.
+      const geo = buildBlobbiGeometry(deriveMorphology(spotted(facing === 'right' ? 'left' : 'right')), { view: 'side', direction: facing, ...state });
+      const b = raster(renderGeometryToSvg({ ...geo, markings: { ...geo.markings, marks: geo.markings.marks.filter((mark) => mark.zone === 'flank') } }));
       let sum = 0;
       for (let i = 0; i < a.width * a.height; i++) {
         let d = 0;

@@ -14,12 +14,12 @@ import { problemsIn, seeds } from './test-helpers';
 
 const TRAITS: BlobbiSemanticIdentity[] = [
   {},
-  { antenna: 'double', horns: 'side', ears: 'none', tail: 'curl', spots: true, belly: true, freckles: true },
-  { antenna: 'single', horns: 'forehead', ears: 'none', tail: 'leaf', spots: true },
+  { antenna: 'double', horns: 'side', ears: 'none', tail: 'curl', pattern: 'spotted', belly: true, freckles: true },
+  { antenna: 'single', horns: 'forehead', ears: 'none', tail: 'leaf', pattern: 'spotted' },
   { antenna: 'none', horns: 'top', ears: 'none', tail: 'nub', belly: true },
   { antenna: 'double', horns: 'none', ears: 'pointed', tail: 'none', freckles: true },
   // Everything at once, which the seed alone never gives.
-  { antenna: 'double', horns: 'top', ears: 'round', tail: 'curl', spots: true, belly: true, freckles: true },
+  { antenna: 'double', horns: 'top', ears: 'round', tail: 'curl', pattern: 'spotted', belly: true, freckles: true },
   { colors: 'authored', ears: 'round', horns: 'none' },
 ];
 
@@ -65,13 +65,13 @@ describe('stress', () => {
   it('survives every gene at each extreme, in every stage and view', () => {
     const problems: string[] = [];
     for (const value of [1, -1, 50, -50, Number.NaN, Infinity]) {
-      const genome = generateGenome({ seed: 'extreme', antenna: 'double', horns: 'side', ears: 'pointed', tail: 'curl', spots: true, belly: true, freckles: true });
+      const genome = generateGenome({ seed: 'extreme', antenna: 'double', horns: 'side', ears: 'pointed', tail: 'curl', pattern: 'spotted', belly: true, freckles: true });
       const fill = (genes: Record<string, unknown>) => {
         for (const key of Object.keys(genes)) if (typeof genes[key] === 'number' && key !== 'count' && key !== 'side') genes[key] = value;
       };
       fill(genome.morphology);
       for (const trait of [genome.traits.antenna, genome.traits.horns, genome.traits.ears, genome.traits.tail, genome.traits.belly]) fill(trait as unknown as Record<string, unknown>);
-      for (const mark of [...genome.traits.spots.marks, ...genome.traits.freckles.dots]) fill(mark as unknown as Record<string, unknown>);
+      for (const mark of [...genome.traits.pattern.spots.marks, ...genome.traits.freckles.dots]) fill(mark as unknown as Record<string, unknown>);
       for (const pose of POSES) {
         for (const state of STATES.slice(0, 6)) {
           for (const problem of problemsIn(renderBlobbiSvg(genome, { ...pose, ...state }))) problems.push(`${value} ${JSON.stringify(pose)}: ${problem}`);

@@ -91,7 +91,7 @@ describe('renderBlobbiSvg', () => {
     // Violations are collected and asserted once: this checks ~600k numbers.
     const problems: string[] = [];
     for (const seed of seeds(250)) {
-      const genome = generateGenome({ seed, antenna: seed.endsWith('3') ? 'double' : undefined, spots: seed.endsWith('7') ? true : undefined });
+      const genome = generateGenome({ seed, antenna: seed.endsWith('3') ? 'double' : undefined, pattern: seed.endsWith('7') ? 'spotted' : undefined });
       for (const state of STATES) {
         for (const problem of problemsIn(renderBlobbiSvg(genome, state, { debug: true, groundShadow: true }))) problems.push(`${seed}: ${problem}`);
       }
@@ -101,14 +101,14 @@ describe('renderBlobbiSvg', () => {
 
   it('survives extreme and malformed genes by clamping them', () => {
     for (const value of [1, -1, 50, -50, Number.NaN, Infinity]) {
-      const genome = generateGenome({ seed: 'extreme', antenna: 'double', spots: true, freckles: true });
+      const genome = generateGenome({ seed: 'extreme', antenna: 'double', pattern: 'spotted', freckles: true });
       for (const key of Object.keys(genome.morphology) as (keyof typeof genome.morphology)[]) genome.morphology[key] = value;
       for (const key of ANTENNA_GENES) genome.traits.antenna[key] = value;
       const svg = renderBlobbiSvg(genome, { expression: { surprised: 1 } });
       expect(svg).not.toMatch(/NaN|Infinity/);
       // Clamped: a gene of 50 draws exactly what a gene of 1 draws.
       if (value === 50) {
-        const one = generateGenome({ seed: 'extreme', antenna: 'double', spots: true, freckles: true });
+        const one = generateGenome({ seed: 'extreme', antenna: 'double', pattern: 'spotted', freckles: true });
         for (const key of Object.keys(one.morphology) as (keyof typeof one.morphology)[]) one.morphology[key] = 1;
         for (const key of ANTENNA_GENES) one.traits.antenna[key] = 1;
         expect(svg).toBe(renderBlobbiSvg(one, { expression: { surprised: 1 } }));
@@ -127,7 +127,7 @@ describe('renderBlobbiSvg', () => {
   });
 
   it('never mutates the genome, the morphology or the state', () => {
-    const genome = deepFreeze(generateGenome({ seed: 'frozen', antenna: 'double', spots: true, freckles: true }));
+    const genome = deepFreeze(generateGenome({ seed: 'frozen', antenna: 'double', pattern: 'spotted', freckles: true }));
     const morphology = deepFreeze(deriveMorphology(genome));
     const state = deepFreeze<Partial<BlobbiState>>({ expression: { happy: 0.5, surprised: 0.2 }, gaze: { x: 0.3, y: -0.2 }, sleeping: false, motion: 'idle' });
     expect(() => renderBlobbiSvg(genome, state, { debug: true })).not.toThrow();
@@ -135,7 +135,7 @@ describe('renderBlobbiSvg', () => {
   });
 
   it('namespaces every id, so two Blobbis on one page do not share gradients', () => {
-    const svg = renderBlobbiSvg(generateGenome({ seed: 'ids', spots: true, horns: 'top', antenna: 'single' }), { expression: { sleepy: 1 } }, { idPrefix: 'one' });
+    const svg = renderBlobbiSvg(generateGenome({ seed: 'ids', pattern: 'spotted', horns: 'top', antenna: 'single' }), { expression: { sleepy: 1 } }, { idPrefix: 'one' });
     const ids = [...svg.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
     expect(ids.length).toBeGreaterThan(6);
     for (const id of ids) expect(id.startsWith('one-')).toBe(true);
@@ -146,7 +146,7 @@ describe('renderBlobbiSvg', () => {
 
 describe('genome and state stay separate', () => {
   it('state never changes the body: the silhouette, limbs and tuft are identical for every face', () => {
-    const genome = generateGenome({ seed: 'separate', antenna: 'single', spots: true });
+    const genome = generateGenome({ seed: 'separate', antenna: 'single', pattern: 'spotted' });
     const neutral = renderBlobbiSvg(genome);
     for (const state of STATES) {
       const svg = renderBlobbiSvg(genome, state);

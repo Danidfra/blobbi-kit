@@ -36,6 +36,8 @@ const PUBLIC_API = [
   'BLOBBI_V3_EARS',
   'BLOBBI_V3_HORNS',
   'BLOBBI_V3_TAILS',
+  'BLOBBI_V3_PATTERNS',
+  'BLOBBI_V3_SPECIAL_MARKS',
   'BLOBBI_V3_MOTION_STYLESHEET',
   'BLOBBI_V3_SUPPORTED_ALGORITHMS',
   'createBlobbiV3Identity',
@@ -103,6 +105,8 @@ const PUBLIC_API = [
   'ADULT_V2_PARTS',
   'DEFAULT_VISUAL_GENERATION',
   // Rendering without React
+  'describeBlobbiArtwork',
+  'anchorsInSquare',
   'loadBlobbiSvg',
   'renderBlobbiSvg',
   // SVG post-processing (provisional)

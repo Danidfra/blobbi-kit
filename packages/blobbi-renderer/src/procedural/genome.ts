@@ -16,7 +16,8 @@
  * Two layers of identity, kept apart on purpose (see README, "Identity"):
  *
  *  - SEMANTIC identity is what an event would state explicitly: the colours,
- *    which kind of horns, whether there is a tail. It can be passed in
+ *    which kind of horns, whether there is a tail, which pattern, which
+ *    mark. It can be passed in
  *    (`GenerateGenomeInput`); the seed only supplies it when nothing is passed.
  *  - MICRO-GEOMETRY is always derived from the seed: exact horn curvature,
  *    eye spacing, spot positions. Trait genes are generated even when the
@@ -117,12 +118,75 @@ export interface SpotGene {
 
 export type MarkingSide = 'left' | 'right' | 'both';
 
+/**
+ * THE BODY PATTERN: one kind per Blobbi, never a mix. The words are the ones
+ * the `pattern` tag has always carried (`solid` is "no pattern").
+ *
+ *  - `solid`     the plain body
+ *  - `spotted`   soft ovals on the rear of a flank and across the back
+ *  - `striped`   tapered bands across the back, wrapping round above and below the face
+ *  - `gradient`  the body deepens toward its base
+ */
+export const PATTERN_KINDS = ['solid', 'spotted', 'striped', 'gradient'] as const;
+export type PatternKind = (typeof PATTERN_KINDS)[number];
+
+/** Micro-geometry of the `spotted` pattern. */
 export interface SpotsGenes {
-  /** Semantic: whether the flank spots are present. */
-  enabled: boolean;
   side: MarkingSide;
   count: 2 | 3;
   marks: SpotGene[];
+  /** The spots across the back: how many, and each one's nudges. */
+  backCount: 2 | 3;
+  back: SpotGene[];
+}
+
+/** Micro-geometry of the `striped` pattern: three or four bands, each a little its own. */
+export interface StripesGenes {
+  count: 3 | 4;
+  /** How far the bands bow, as rings round a body seen from a little above do. */
+  sag: number;
+  bands: { dy: number; width: number; reach: number }[];
+}
+
+/** Micro-geometry of the `gradient` pattern: where the deepening starts and how deep it gets. */
+export interface GradientGenes {
+  start: number;
+  strength: number;
+}
+
+export interface PatternGenes {
+  /** Semantic: which pattern this Blobbi has. */
+  kind: PatternKind;
+  // Every pattern's micro-geometry is generated whatever the kind, so stating
+  // another kind reveals THIS individual's version of it.
+  spots: SpotsGenes;
+  stripes: StripesGenes;
+  gradient: GradientGenes;
+}
+
+/**
+ * THE SPECIAL MARK: one small permanent marking, like a birthmark.
+ *
+ * `blush`, which older generations list beside these, is not here: a blush
+ * is what a cheek DOES (every Blobbi has cheeks, and an expression reddens
+ * them), so it cannot also be what one individual permanently has. A
+ * crescent takes its place.
+ */
+export const MARK_KINDS = ['none', 'star', 'heart', 'sparkle', 'moon'] as const;
+export type MarkKind = (typeof MARK_KINDS)[number];
+
+export interface MarkGenes {
+  /** Semantic: which mark, if any. */
+  kind: MarkKind;
+  /** Which side of the body it is on. */
+  side: -1 | 1;
+  /** Picks the anatomical region, among those this body leaves free (0..1). */
+  region: number;
+  // Where in the region, how large, how turned: each in [-1, 1].
+  u: number;
+  v: number;
+  size: number;
+  rotation: number;
 }
 
 export interface BellyGenes {
@@ -167,7 +231,8 @@ export interface BlobbiTraits {
   horns: HornGenes;
   ears: EarGenes;
   tail: TailGenes;
-  spots: SpotsGenes;
+  pattern: PatternGenes;
+  mark: MarkGenes;
   belly: BellyGenes;
   freckles: FrecklesGenes;
 }
@@ -192,7 +257,8 @@ export interface BlobbiSemanticIdentity {
   horns?: HornKind;
   ears?: EarKind;
   tail?: TailKind;
-  spots?: boolean;
+  pattern?: PatternKind;
+  mark?: MarkKind;
   belly?: boolean;
   freckles?: boolean;
 }
@@ -202,6 +268,7 @@ export interface GenerateGenomeInput extends BlobbiSemanticIdentity {
 }
 
 const SPOT_SLOTS = 3;
+const STRIPE_SLOTS = 4;
 const FRECKLE_SLOTS = 3;
 const EGG_SPOT_SLOTS = 6;
 const EGG_SPECKLE_SLOTS = 14;
@@ -269,16 +336,48 @@ export function generateGenome(input: string | GenerateGenomeInput): BlobbiGenom
   const tail: TailGenes = { kind: pickKind(TAIL_KINDS, semantic.tail, tailKind), ...genesFor('tail', TAIL_GENES) };
 
   const spotSide = roll('spots.side');
-  const spots: SpotsGenes = {
-    enabled: semantic.spots ?? geneRng(seed, 'spots.enabled').chance(0.3),
-    side: spotSide < 0.45 ? 'right' : spotSide < 0.8 ? 'left' : 'both',
-    count: geneRng(seed, 'spots.count').chance(0.7) ? 3 : 2,
-    marks: Array.from({ length: SPOT_SLOTS }, (_, i) => ({
-      dx: gene(`spots.${i}.dx`),
-      dy: gene(`spots.${i}.dy`),
-      size: gene(`spots.${i}.size`),
-      rotation: gene(`spots.${i}.rotation`),
-    })),
+  const spotGenes = (group: string) =>
+    Array.from({ length: SPOT_SLOTS }, (_, i) => ({
+      dx: gene(`${group}.${i}.dx`),
+      dy: gene(`${group}.${i}.dy`),
+      size: gene(`${group}.${i}.size`),
+      rotation: gene(`${group}.${i}.rotation`),
+    }));
+  // The seed's own choice of pattern: most Blobbis are plain or spotted.
+  const patternRoll = roll('pattern.kind');
+  const patternKind: PatternKind = patternRoll < 0.4 ? 'solid' : patternRoll < 0.66 ? 'spotted' : patternRoll < 0.82 ? 'striped' : 'gradient';
+  const pattern: PatternGenes = {
+    kind: pickKind(PATTERN_KINDS, semantic.pattern, patternKind),
+    spots: {
+      side: spotSide < 0.45 ? 'right' : spotSide < 0.8 ? 'left' : 'both',
+      count: geneRng(seed, 'spots.count').chance(0.7) ? 3 : 2,
+      marks: spotGenes('spots'),
+      backCount: geneRng(seed, 'spots.back.count').chance(0.6) ? 3 : 2,
+      back: spotGenes('spots.back'),
+    },
+    stripes: {
+      count: geneRng(seed, 'stripes.count').chance(0.5) ? 4 : 3,
+      sag: gene('stripes.sag'),
+      bands: Array.from({ length: STRIPE_SLOTS }, (_, i) => ({
+        dy: gene(`stripes.${i}.dy`),
+        width: gene(`stripes.${i}.width`),
+        reach: gene(`stripes.${i}.reach`),
+      })),
+    },
+    gradient: { start: gene('gradient.start'), strength: gene('gradient.strength') },
+  };
+
+  // A special mark is the exception, not the rule.
+  const markRoll = roll('mark.kind');
+  const markKind: MarkKind = markRoll < 0.58 ? 'none' : markRoll < 0.7 ? 'star' : markRoll < 0.81 ? 'heart' : markRoll < 0.91 ? 'sparkle' : 'moon';
+  const mark: MarkGenes = {
+    kind: pickKind(MARK_KINDS, semantic.mark, markKind),
+    side: geneRng(seed, 'mark.side').chance(0.5) ? 1 : -1,
+    region: roll('mark.region'),
+    u: gene('mark.u'),
+    v: gene('mark.v'),
+    size: gene('mark.size'),
+    rotation: gene('mark.rotation'),
   };
 
   const belly: BellyGenes = {
@@ -318,7 +417,7 @@ export function generateGenome(input: string | GenerateGenomeInput): BlobbiGenom
     seed,
     colors,
     morphology,
-    traits: { antenna, horns, ears, tail, spots, belly, freckles },
+    traits: { antenna, horns, ears, tail, pattern, mark, belly, freckles },
     egg,
   };
   if (scheme) genome.scheme = scheme;
@@ -343,12 +442,19 @@ export function canonicalGenome(): BlobbiGenome {
       horns: { kind: 'none', ...zeros(HORN_GENES) },
       ears: { kind: 'none', ...zeros(EAR_GENES) },
       tail: { kind: 'none', ...zeros(TAIL_GENES) },
-      spots: {
-        enabled: false,
-        side: 'right',
-        count: 3,
-        marks: Array.from({ length: SPOT_SLOTS }, () => ({ dx: 0, dy: 0, size: 0, rotation: 0 })),
+      pattern: {
+        kind: 'solid',
+        spots: {
+          side: 'right',
+          count: 3,
+          marks: Array.from({ length: SPOT_SLOTS }, () => ({ dx: 0, dy: 0, size: 0, rotation: 0 })),
+          backCount: 3,
+          back: Array.from({ length: SPOT_SLOTS }, () => ({ dx: 0, dy: 0, size: 0, rotation: 0 })),
+        },
+        stripes: { count: 3, sag: 0, bands: Array.from({ length: STRIPE_SLOTS }, () => ({ dy: 0, width: 0, reach: 0 })) },
+        gradient: { start: 0, strength: 0 },
       },
+      mark: { kind: 'none', side: 1, region: 0, u: 0, v: 0, size: 0, rotation: 0 },
       belly: { enabled: false, size: 0, height: 0 },
       freckles: { enabled: false, dots: Array.from({ length: FRECKLE_SLOTS }, () => ({ dx: 0, dy: 0, size: 0 })) },
     },

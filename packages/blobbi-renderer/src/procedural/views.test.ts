@@ -11,7 +11,7 @@ const geometry = (genome: BlobbiGenome, view: View, stage: LifeStage = 'adult', 
 const parts = (geo: BlobbiGeometry, part: string): Appendage[] => geo.appendages.filter((a) => a.part === part);
 /** A plain individual with exactly the stated traits. */
 const withTraits = (traits: BlobbiSemanticIdentity, seed = 'projection'): BlobbiGenome =>
-  generateGenome({ seed, antenna: 'none', horns: 'none', ears: 'none', tail: 'none', spots: false, belly: false, freckles: false, ...traits });
+  generateGenome({ seed, antenna: 'none', horns: 'none', ears: 'none', tail: 'none', pattern: 'solid', mark: 'none', belly: false, freckles: false, ...traits });
 const everyPose = LIFE_STAGES.flatMap((stage) =>
   VIEWS.flatMap((view) => (view === 'side' ? DIRECTIONS : (['right'] as const)).map((direction) => ({ stage, view, direction }))),
 );
@@ -218,18 +218,22 @@ describe('trait projection', () => {
 
   it('keeps flank spots on their flank: seen from one side only, and mirrored from behind', () => {
     for (const flank of ['left', 'right'] as const) {
-      const genome = withTraits({ spots: true });
-      genome.traits.spots.side = flank;
+      const genome = withTraits({ pattern: 'spotted' });
+      genome.traits.pattern.spots.side = flank;
       const sign = flank === 'right' ? 1 : -1;
       const front = geometry(genome, 'front');
       const back = geometry(genome, 'back');
       if (front.view === 'side' || back.view === 'side') throw new Error('unexpected view');
-      expect(front.markings.marks.length).toBeGreaterThan(0);
-      for (const mark of front.markings.marks) expect((mark.cx - front.body.axisX) * sign).toBeGreaterThan(0);
-      for (const mark of back.markings.marks) expect((mark.cx - back.body.axisX) * sign).toBeLessThan(0);
+      const onFlank = (geo: { markings: { marks: { zone: string; cx: number }[] } }) => geo.markings.marks.filter((mark) => mark.zone === 'flank');
+      expect(onFlank(front).length).toBeGreaterThan(0);
+      for (const mark of onFlank(front)) expect((mark.cx - front.body.axisX) * sign).toBeGreaterThan(0);
+      for (const mark of onFlank(back)) expect((mark.cx - back.body.axisX) * sign).toBeLessThan(0);
       // A right-facing Blobbi shows the flank that is on the viewer's left from the front.
-      expect(geometry(genome, 'side', 'adult', 'right').markings.marks.length > 0).toBe(flank === 'left');
-      expect(geometry(genome, 'side', 'adult', 'left').markings.marks.length > 0).toBe(flank === 'right');
+      expect(onFlank(geometry(genome, 'side', 'adult', 'right')).length > 0).toBe(flank === 'left');
+      expect(onFlank(geometry(genome, 'side', 'adult', 'left')).length > 0).toBe(flank === 'right');
+      // The spots across the back belong to the back: none shows from the front, all of them from behind.
+      expect(front.markings.marks.filter((mark) => mark.zone === 'back')).toEqual([]);
+      expect(back.markings.marks.filter((mark) => mark.zone === 'back')).toHaveLength(genome.traits.pattern.spots.backCount);
     }
   });
 
@@ -287,8 +291,8 @@ describe('left and right', () => {
   });
 
   it('does not mirror anatomy that is on one side: the two profiles of an asymmetric individual differ', () => {
-    const genome = withTraits({ antenna: 'single', spots: true });
-    genome.traits.spots.side = 'left';
+    const genome = withTraits({ antenna: 'single', pattern: 'spotted' });
+    genome.traits.pattern.spots.side = 'left';
     const right = geometry(genome, 'side', 'adult', 'right');
     const left = geometry(genome, 'side', 'adult', 'left');
     expect(right.markings.marks.length).not.toBe(left.markings.marks.length);

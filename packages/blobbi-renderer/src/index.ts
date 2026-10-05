@@ -49,6 +49,8 @@ export {
   BLOBBI_V3_HORNS,
   BLOBBI_V3_EARS,
   BLOBBI_V3_TAILS,
+  BLOBBI_V3_PATTERNS,
+  BLOBBI_V3_SPECIAL_MARKS,
   BLOBBI_V3_SUPPORTED_ALGORITHMS,
   createBlobbiV3Identity,
   normalizeBlobbiV3Visual,
@@ -64,6 +66,8 @@ export type {
   BlobbiV3Horns,
   BlobbiV3Ears,
   BlobbiV3Tail,
+  BlobbiV3Pattern,
+  BlobbiV3SpecialMark,
 } from './artwork/v3/identity';
 
 // ── The canonical box ──────────────────────────────────────────────────────
@@ -199,8 +203,9 @@ export type { AdultV2Part } from './artwork/adult/v2';
 // server-side thumbnails, canvas compositing, a non-React card.
 // `renderBlobbiSvg` is generation-aware; `loadBlobbiSvg` is the historical V1
 // positional API and stays byte-identical.
-export { loadBlobbiSvg, renderBlobbiSvg } from './artwork/load-blobbi-svg';
-export type { RenderBlobbiSvgOptions, RenderedBlobbiSvg } from './artwork/load-blobbi-svg';
+export { describeBlobbiArtwork, loadBlobbiSvg, renderBlobbiSvg } from './artwork/load-blobbi-svg';
+export type { DescribedBlobbiArtwork, RenderBlobbiSvgOptions, RenderedBlobbiSvg } from './artwork/load-blobbi-svg';
+export { anchorsInSquare } from './artwork/types';
 export type { BlobbiView, GazeMarkupOptions } from './svg';
 
 // ── SVG post-processing (provisional) ──────────────────────────────────────

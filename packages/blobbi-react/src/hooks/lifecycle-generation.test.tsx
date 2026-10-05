@@ -43,7 +43,7 @@ const v3IdentityFor = (seed: string): BlobbiV3Identity => ({
   seed,
   algorithm: 1,
   colors: { base: '#3fb7a5', secondary: '#2a6f8f', eye: '#5a2d12', accent: '#e86a5c' },
-  traits: { antenna: 'single', horns: 'top', ears: 'none', tail: 'leaf', spots: true, belly: false, freckles: true },
+  traits: { antenna: 'single', horns: 'top', ears: 'none', tail: 'leaf', pattern: 'striped', specialMark: 'moon', belly: false, freckles: true },
 });
 
 /** An incubating egg of the given generation, exactly as a creating host builds it. */

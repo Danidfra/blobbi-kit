@@ -87,6 +87,14 @@ export interface TraitFrame {
   mount(theta: number, yFraction: number): Mount;
   /** Where a flat mark at that position is drawn, or null when it faces away. */
   surface(theta: number, yFraction: number): SurfacePoint | null;
+  /**
+   * Where a place on the skin is drawn, whichever way it faces: `facing` is
+   * the cosine of the angle between the surface there and the viewer (1
+   * square on, 0 on the silhouette's edge, negative on the far side). What
+   * wraps round the body (a band, a mark) follows this from the back, over
+   * the edge and onto the side this view shows, and stops where it turns away.
+   */
+  around(theta: number, yFraction: number): { x: number; y: number; facing: number };
   /** The depth of a crown position, on the same scale as a mount's. */
   depthAt(lat: number, fore: number): number;
   /** The screen direction of an anatomical one: sideways, up and forward components. */
@@ -155,6 +163,11 @@ export function frontFrame(body: FrontBody, scale: number, away: boolean): Trait
       const s = Math.sin(rad(theta));
       return { at: pt(body.axisX + s * halfAt(y, s >= 0 ? 1 : -1), y), squash: Math.min(1, Math.abs(Math.cos(rad(theta))) + 0.3) };
     },
+    around: (theta, f) => {
+      const y = yAt(f);
+      const s = Math.sin(rad(theta));
+      return { x: body.axisX + s * halfAt(y, s >= 0 ? 1 : -1), y, facing: facesViewer(theta) };
+    },
     project: (lat, up) => pt(lat, -up),
   };
 }
@@ -213,6 +226,11 @@ export function sideFrame(body: SideBody, scale: number, near: -1 | 1, crownHalf
       const y = yAt(f);
       const { mid, half } = span(y);
       return { at: pt(mid + Math.cos(rad(theta)) * half * 0.92, y), squash: Math.min(1, s + 0.35) };
+    },
+    around: (theta, f) => {
+      const y = yAt(f);
+      const { mid, half } = span(y);
+      return { x: mid + Math.cos(rad(theta)) * half, y, facing: Math.sin(rad(theta)) * near };
     },
     project: (_lat, up, fore) => pt(fore, -up),
   };
