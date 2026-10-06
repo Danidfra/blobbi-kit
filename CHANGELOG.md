@@ -11,11 +11,23 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ## Unreleased
 
-The target versions are named so the release notes can be checked against
-the manifests before `npm publish`. `@blobbi-kit/renderer` 0.4.0 and
-core/react 0.6.1 are on the registry; everything in this section is not yet:
-renderer 0.5.0 and core/react 0.7.0 (further down), and renderer 0.6.0 and
-core/react 0.8.0 (the V3 entries directly below).
+On the registry: core/react 0.6.1, renderer 0.4.0. core/react 0.7.0 and
+renderer 0.5.0 were never published separately; their entries ship in this
+release.
+
+**Blobbi V3.** A new visual generation (`visual_generation = v3`) whose
+artwork is generated procedurally and deterministically from an explicit
+identity stated on the event: a canonical seed (64 lower-case hexadecimal
+digits), `visual_algorithm = 1`, four colours and the kind of each trait
+(antenna, horns, ears, tail, pattern, special mark, belly, freckles). The
+same identity under the same algorithm is the same Blobbi in every client,
+as an egg, a baby and an adult, from the front, in profile and from behind,
+with the existing expression and motion inputs. The identity is decided once
+at creation and preserved by every update, hatch and evolution.
+`describeBlobbiArtwork` gives hosts renderer-neutral anchors (head, eye line,
+ground, footprint, mouth). V1 and V2 are unchanged and nothing migrates an
+existing Blobbi to another generation; new Blobbis are V2 unless a host asks
+for V3.
 
 ### V3 before release: a V3 seed is checked as one everywhere; a mouth anchor for hosts (renderer 0.6.0, core/react 0.8.0)
 
@@ -176,11 +188,12 @@ unknown (`'v1'`). Nothing creates V3 unless a host asks.
   stays `'v2'`: V3 is opt-in, because the default is what every application
   that upgrades the kit starts writing.
 - **V3 identity, in generation-independent tags** (`blobbi-v3-identity.ts`):
-  the existing `base_color`, `secondary_color` and `eye_color`, plus
-  `accent_color`, `antenna`, `horns`, `ears`, `tail`, `spots`, `belly`,
-  `freckles` and `visual_algorithm`. The seed decides them at creation; the
-  event is authoritative afterwards. New exports: `VISUAL_ALGORITHM_TAG`,
-  `BLOBBI_V3_TAGS`, `BLOBBI_V3_TAG_NAMES`, `BLOBBI_V3_ONLY_TAG_NAMES`,
+  the existing `base_color`, `secondary_color`, `eye_color`, `pattern` and
+  `special_mark`, plus `accent_color`, `antenna`, `horns`, `ears`, `tail`,
+  `belly`, `freckles` and `visual_algorithm`. The seed decides them at
+  creation; the event is authoritative afterwards. New exports:
+  `VISUAL_ALGORITHM_TAG`, `BLOBBI_V3_TAGS`, `BLOBBI_V3_TAG_NAMES`,
+  `BLOBBI_V3_ONLY_TAG_NAMES`,
   `BLOBBI_MIRRORED_COLOR_TAG_NAMES`, `validateBlobbiV3Identity`,
   `blobbiV3IdentityTags`, `parseBlobbiV3Identity`, `normalizeBlobbiV3Color`,
   the kind vocabularies and types.
@@ -188,10 +201,11 @@ unknown (`'v1'`). Nothing creates V3 unless a host asks.
   mirrors, rewritten on every republish and never read, exactly as before.
   On V3 they are explicit identity: `syncMirrorTagsToSeed` leaves them alone
   (it neither overwrites nor adds one) and `deriveVisualTraits` reads them.
-  `pattern`, `special_mark`, `size` and `adult_type` stay mirrors on every
-  generation. A client that predates V3 does not make this check and would
-  rewrite a V3 Blobbi's three colours on republish: clients must be updated
-  before they write to V3 Blobbis.
+  On V3, `pattern` and `special_mark` are explicit identity too, and a V3
+  event carries no `size` or `adult_type`; on V1 and V2 all four stay
+  mirrors. A client that predates V3 does not make this check and would
+  rewrite a V3 Blobbi's colours, pattern and mark on republish: clients must
+  be updated before they write to V3 Blobbis.
 - **Creation:** `buildEggTags(..., { visualGeneration: 'v3', v3 })`, where
   `v3` is a complete identity or a function of the new seed (the renderer's
   `createBlobbiV3Identity`). A V3 Blobbi is never born with a partial
@@ -207,7 +221,8 @@ unknown (`'v1'`). Nothing creates V3 unless a host asks.
 Compatibility decision: V1 and V2 events, and events with no marker, are read
 and republished exactly as before. A client that predates V3 draws a V3
 Blobbi as V1 from its seed (not from the colour tags), carries the V3-only
-tags through untouched, and rewrites the three colour tags if it republishes.
+tags through untouched, and rewrites its colours, pattern and mark if it
+republishes.
 
 
 ### `@blobbi-kit/core` and `@blobbi-kit/react` 0.7.0 (a new Blobbi is born V2)
@@ -285,6 +300,10 @@ ground shadow), and the V2 drawings gain four leg groups. Every V1 fingerprint
 Ownership, stated once: the renderer draws the creature, its expressions,
 its sleep and how its body moves in place; the world owns position, the
 floor, the bed, the ground shadow and when the creature walks.
+
+## Published
+
+Already on the registry (renderer 0.2.0–0.4.0, core/react 0.6.0–0.6.1).
 
 ### `@blobbi-kit/renderer` 0.4.0 (V1 baby expressions; the sleeping Zzz becomes optional)
 
