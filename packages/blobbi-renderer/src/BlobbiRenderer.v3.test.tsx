@@ -30,6 +30,7 @@ import {
   BlobbiRenderer,
   canonicalBlobbiV3Seed,
   createBlobbiV3Identity,
+  describeBlobbiArtwork,
   normalizeBlobbiExpression,
   normalizeBlobbiRenderModel,
   normalizeBlobbiV3Visual,
@@ -639,7 +640,7 @@ describe('state: the kit\'s words drive the engine, and none of it is identity',
     }
     for (const stage of STAGES) {
       for (const facing of FACINGS) {
-        const { footprint, ...anchors } = v3(stage, { facing }).artwork.anchors;
+        const { footprint, mouth, ...anchors } = v3(stage, { facing }).artwork.anchors;
         for (const value of Object.values(anchors)) {
           expect(value).toBeGreaterThan(0);
           expect(value).toBeLessThan(1);
@@ -650,7 +651,55 @@ describe('state: the kit\'s words drive the engine, and none of it is identity',
         expect(Math.abs(footprint!.centerX - anchors.centerX)).toBeLessThan(0.08);
         expect(footprint!.width).toBeGreaterThan(0.2);
         expect(footprint!.width).toBeLessThan(0.75);
+        // A mouth wherever there is a face, between the eyes and the ground.
+        if (stage === 'egg' || facing === 'back') expect(mouth).toBeUndefined();
+        else {
+          expect(mouth!.y).toBeGreaterThan(anchors.eyeLineY!);
+          expect(mouth!.y).toBeLessThan(anchors.groundY);
+        }
       }
+    }
+  });
+
+  it('reports where THIS individual\'s mouth is drawn, as metadata only: the resting mouth, front and profile, baby and adult', () => {
+    /** The drawn mouth's centre (its two corners' midpoint), as fractions of the SVG's own viewBox. */
+    const drawnMouth = (svg: string) => {
+      const [vx, vy, vw, vh] = /viewBox="([^"]+)"/.exec(svg)![1].split(' ').map(Number);
+      const [a, , , d, e, f] = /<g transform="matrix\(([^)]+)\)"><g data-part="character"/.exec(svg)![1].split(',').map(Number);
+      const path = /data-part="mouth" d="([^"]+)"/.exec(svg)![1];
+      const numbers = path.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+      // `M left C c1 c2 right ...`: the corners are the first point and the fourth.
+      const [lx, ly, , , , , rx, ry] = numbers;
+      return { x: (a * (lx + rx) / 2 + e - vx) / vw, y: (d * (ly + ry) / 2 + f - vy) / vh };
+    };
+    const mouths = new Set<string>();
+    for (const seed of [SEED, ...seeds(24)]) {
+      const identity = createBlobbiV3Identity(seed);
+      for (const stage of ['baby', 'adult'] as const) {
+        const described = describeBlobbiArtwork({ visualGeneration: 'v3', v3: identity, stage, facing: 'front' });
+        const right = describeBlobbiArtwork({ visualGeneration: 'v3', v3: identity, stage, facing: 'right' });
+        const left = describeBlobbiArtwork({ visualGeneration: 'v3', v3: identity, stage, facing: 'left' });
+        for (const [facing, artwork] of [['front', described], ['right', right]] as const) {
+          const drawn = drawnMouth(renderBlobbiSvg({ visualGeneration: 'v3', v3: identity, stage, facing, instanceId: 't' }).svg);
+          expect(artwork.anchors.mouth!.x, `${seed} ${stage} ${facing}`).toBeCloseTo(drawn.x, 2);
+          expect(artwork.anchors.mouth!.y, `${seed} ${stage} ${facing}`).toBeCloseTo(drawn.y, 2);
+        }
+        // The front mouth is about the body's axis; a profile looking the other way is its mirror image.
+        expect(Math.abs(described.anchors.mouth!.x - described.anchors.centerX)).toBeLessThan(0.02);
+        expect(left.anchors.mouth).toEqual({ x: Math.round((1 - right.anchors.mouth!.x) * 1000) / 1000, y: right.anchors.mouth!.y });
+        expect(right.anchors.mouth!.x).toBeGreaterThan(right.anchors.centerX);
+        // The square a host lays out against carries it too.
+        expect(described.boxAnchors.mouth).toBeDefined();
+        mouths.add(`${stage} ${described.boxAnchors.mouth!.y}`);
+      }
+      expect(describeBlobbiArtwork({ visualGeneration: 'v3', v3: identity, stage: 'egg' }).anchors.mouth).toBeUndefined();
+      expect(describeBlobbiArtwork({ visualGeneration: 'v3', v3: identity, stage: 'adult', facing: 'back' }).anchors.mouth).toBeUndefined();
+    }
+    // It follows the individual: proportions differ, so the mouth does.
+    expect(mouths.size).toBeGreaterThan(10);
+    // Older generations have not been measured, and say so.
+    for (const visualGeneration of ['v1', 'v2'] as const) {
+      for (const stage of STAGES) expect(describeBlobbiArtwork({ visualGeneration, stage, adultType: 'catti' }).anchors.mouth).toBeUndefined();
     }
   });
 });

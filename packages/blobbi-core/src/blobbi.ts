@@ -11,6 +11,7 @@ import {
   BLOBBI_V3_ONLY_TAG_NAMES,
   BLOBBI_V3_TAGS,
   blobbiV3IdentityTags,
+  canonicalBlobbiV3Seed,
   normalizeBlobbiV3Color,
   parseBlobbiV3Identity,
   validateBlobbiV3Identity,
@@ -564,9 +565,17 @@ export function deriveBlobbiSeedV1(pubkey: string, d: string, createdAt: number)
  * 
  * @param event - The Blobbi event to get/derive seed from
  * @returns The existing seed or a newly derived one
+ * @throws When the event is V3 and its seed tag is not a V3 seed
  */
 export function getOrDeriveSeed(event: NostrEvent): string {
   const existingSeed = getTagValue(event.tags, 'seed');
+  // A V3 Blobbi's seed is never derived: one that is not a V3 seed
+  // (`canonicalBlobbiV3Seed`) has none, and deriving one would draw another individual.
+  if (parseVisualGeneration(event.tags) === 'v3') {
+    const seed = canonicalBlobbiV3Seed(existingSeed);
+    if (!seed) throw new Error('Cannot derive seed: a V3 Blobbi without a V3 seed has none');
+    return seed;
+  }
   if (existingSeed && existingSeed.length === 64) {
     return existingSeed;
   }
@@ -910,12 +919,14 @@ export function deriveVisualTraits(
   tags: string[][],
   seed: string | undefined
 ): BlobbiVisualTraits {
-  const hasSeed = seed && seed.length === 64;
+  // A V3 seed is an Algorithm 1 seed or no seed (`canonicalBlobbiV3Seed`);
+  // V1 and V2 keep the length check.
+  const validSeed = parseVisualGeneration(tags) === 'v3' ? canonicalBlobbiV3Seed(seed) : seed && seed.length === 64 ? seed : undefined;
   
   // Seed is the canonical source of truth for the entire visual identity.
   // When present, all visual trait tags are mirrors — not consulted for rendering.
-  if (hasSeed) {
-    const seeded = deriveSeedIdentity(seed);
+  if (validSeed) {
+    const seeded = deriveSeedIdentity(validSeed);
     // The one exception: a V3 Blobbi states its colours, and what it states
     // is what it is. A colour it does not state (a malformed event) reads as
     // the seed's here, so this record is always complete; `v3Identity` on the
@@ -1053,7 +1064,7 @@ export function isUnsupportedLegacyBlobbiEvent(event: NostrEvent): boolean {
  * - it carries old-app / old-schema markers (see isUnsupportedLegacyBlobbiEvent)
  *   — this catches old-app events even when the d-tag looks canonical
  * - the d tag is not in canonical format
- * - the seed tag is missing
+ * - the seed tag is missing (on a V3 Blobbi: is not a V3 seed, `canonicalBlobbiV3Seed`)
  * - the name tag is missing and must be derived from d
  * - visual traits exist but seed does not
  *
@@ -1094,7 +1105,14 @@ export function isLegacyBlobbiEvent(event: NostrEvent): boolean {
   if (!seed || seed.length !== 64) {
     return true;
   }
-  
+
+  // A V3 Blobbi's seed is its Algorithm 1 seed: 64 hexadecimal digits
+  // (`canonicalBlobbiV3Seed`). Anything else is no seed at all, so the event
+  // is not a modern V3 Blobbi. V1 and V2 keep the length check above.
+  if (parseVisualGeneration(tags) === 'v3' && !canonicalBlobbiV3Seed(seed)) {
+    return true;
+  }
+
   // Check if name tag is missing
   const name = getTagValue(tags, 'name');
   if (!name) {

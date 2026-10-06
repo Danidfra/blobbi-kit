@@ -155,6 +155,15 @@ export interface ArtworkAnchors {
    * artwork has not been measured.
    */
   footprint?: { centerX: number; width: number };
+  /**
+   * The centre of the mouth at rest, when the view has a face: where a host
+   * brings food, or lets something leave the mouth, instead of guessing from
+   * the frame. Measured on this individual's own resting face (no
+   * expression), so it does not move with a smile or a frown. Present for
+   * every V3 baby and adult drawn with a face (front and profile); absent for
+   * an egg, a back view, and where a generation's artwork has not been measured.
+   */
+  mouth?: { x: number; y: number };
 }
 
 /**
@@ -171,6 +180,7 @@ export function anchorsInSquare(anchors: ArtworkAnchors, viewBox: { width: numbe
   const out: ArtworkAnchors = { centerX: x(anchors.centerX), headTopY: y(anchors.headTopY), groundY: y(anchors.groundY) };
   if (anchors.eyeLineY !== undefined) out.eyeLineY = y(anchors.eyeLineY);
   if (anchors.footprint) out.footprint = { centerX: x(anchors.footprint.centerX), width: Math.round(anchors.footprint.width * kx * 1000) / 1000 };
+  if (anchors.mouth) out.mouth = { x: x(anchors.mouth.x), y: y(anchors.mouth.y) };
   return out;
 }
 

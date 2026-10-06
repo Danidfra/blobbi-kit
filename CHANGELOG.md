@@ -17,6 +17,26 @@ core/react 0.6.1 are on the registry; everything in this section is not yet:
 renderer 0.5.0 and core/react 0.7.0 (further down), and renderer 0.6.0 and
 core/react 0.8.0 (the V3 entries directly below).
 
+### V3 before release: a V3 seed is checked as one everywhere; a mouth anchor for hosts (renderer 0.6.0, core/react 0.8.0)
+
+No drawing changed: every existing V3 test, the pinned references and
+`procedural/vectors.json` are as they were.
+
+- **Core: a V3 event's seed is classified by the V3 rule.** `isLegacyBlobbiEvent`
+  checked only that a `seed` was 64 characters long, so a V3 event whose seed
+  was 64 characters but not hexadecimal classified as `modern` although it has
+  no V3 seed (`v3Identity.missing` named it, and the renderer drew no
+  individual). For `visual_generation = v3` the seed must now be a V3 seed
+  (`canonicalBlobbiV3Seed`, any letter case), or the event is `legacy`, as a
+  missing seed already was. `getOrDeriveSeed` never derives a seed for a V3
+  event (it returns the canonical seed, or throws), and `deriveVisualTraits`
+  reads a V3 seed by the same rule. V1 and V2 keep the length check exactly.
+- **Renderer: `ArtworkAnchors.mouth`.** The centre of the resting mouth,
+  measured on the individual's own face geometry, for every V3 baby and adult
+  drawn with a face (front and profile; mirrored with the profile). Absent for
+  an egg, a back view, and V1/V2 (not measured). In `describeBlobbiArtwork`'s
+  `anchors` and `boxAnchors`. Metadata only: nothing reads it to draw.
+
 ### V3 before release: what `visual_algorithm = 1` means, and one spelling for the seed (renderer 0.6.0, core/react 0.8.0)
 
 Stability work before any V3 Blobbi exists publicly. No drawing changed:

@@ -106,6 +106,12 @@ function anchorsOf(geo: BlobbiGeometry, frame: { x: number; y: number; width: nu
   // the feet of an adult, under the floating body of a baby.
   const shadow = geo.limbs.groundShadow;
   anchors.footprint = { centerX: round(mirrored ? 1 - fx(shadow.cx) : fx(shadow.cx)), width: round((2 * shadow.rx * DOCUMENT_TRANSFORM.scale) / frame.width) };
+  // The mouth is where its corners are: read from the face already built, never from the markup.
+  const mouth = geo.face?.mouth;
+  if (mouth) {
+    const mx = (mouth.left.x + mouth.right.x) / 2;
+    anchors.mouth = { x: round(mirrored ? 1 - fx(mx) : fx(mx)), y: round(fy((mouth.left.y + mouth.right.y) / 2)) };
+  }
   return anchors;
 }
 

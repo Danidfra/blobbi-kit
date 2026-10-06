@@ -21,11 +21,14 @@ import {
   NEW_BLOBBI_VISUAL_GENERATION,
   VISUAL_GENERATION_TAG,
   buildEggTags,
+  classifyBlobbiEvent,
   deriveBlobbiSeedV1,
   deriveSeedIdentity,
   deriveVisualTraits,
   getCanonicalBlobbiD,
+  getOrDeriveSeed,
   getTagValue,
+  isLegacyBlobbiEvent,
   parseBlobbiEvent,
   updateBlobbiTags,
 } from './blobbi';
@@ -554,6 +557,38 @@ describe('the V3 seed has one spelling', () => {
       // What the event states explicitly is still read.
       expect(read.colors).toEqual(canonical.colors);
       expect(read.traits).toEqual(canonical.traits);
+    }
+  });
+
+  it('decides whether a V3 event is modern: a lower- or upper-case seed is, anything else is not (V1 and V2 keep the length check)', () => {
+    const classify = (tags: string[][]) => classifyBlobbiEvent(makeEvent(tags));
+    // A valid seed, in its canonical spelling and in upper case: modern, the same individual.
+    expect(classify(bornV3())).toBe('modern');
+    expect(classify(withTag(bornV3(), 'seed', UPPER))).toBe('modern');
+    expect(parseBlobbiEvent(makeEvent(withTag(bornV3(), 'seed', UPPER)))!.isLegacy).toBe(false);
+    expect(identityOf(withTag(bornV3(), 'seed', UPPER))).toEqual(identityOf(bornV3()));
+    expect(getOrDeriveSeed(makeEvent(withTag(bornV3(), 'seed', UPPER)))).toBe(SEED);
+    // 64 characters that are not hexadecimal, a wrong length, arbitrary text: no V3 seed, so not a modern V3 Blobbi.
+    for (const bad of ['x'.repeat(64), `${SEED.slice(0, 63)}g`, SEED.slice(1), `${SEED}0`, 'a text seed']) {
+      const tags = withTag(bornV3(), 'seed', bad);
+      expect(classify(tags), bad).toBe('legacy');
+      expect(isLegacyBlobbiEvent(makeEvent(tags)), bad).toBe(true);
+      // Never another individual: no V3 seed is read, none is derived, and nothing is hashed from the text.
+      expect(identityOf(tags)!.seed, bad).toBeUndefined();
+      expect(() => getOrDeriveSeed(makeEvent(tags)), bad).toThrow(/V3/);
+      expect(deriveVisualTraits(tags, bad), bad).toEqual(deriveVisualTraits(tags.filter((t) => t[0] !== 'seed'), undefined));
+    }
+    // V1 and V2: exactly as before. Any 64 characters pass, a wrong length does not, and a missing seed is still derived.
+    for (const generation of ['v1', 'v2'] as const) {
+      expect(classify(born(generation))).toBe('modern');
+      expect(classify(withTag(born(generation), 'seed', UPPER))).toBe('modern');
+      expect(classify(withTag(born(generation), 'seed', 'x'.repeat(64)))).toBe('modern');
+      expect(getOrDeriveSeed(makeEvent(withTag(born(generation), 'seed', 'x'.repeat(64))))).toBe('x'.repeat(64));
+      expect(getOrDeriveSeed(makeEvent(withTag(born(generation), 'seed', UPPER)))).toBe(UPPER);
+      expect(deriveVisualTraits(born(generation), 'x'.repeat(64))).toEqual(deriveSeedIdentity('x'.repeat(64)));
+      for (const bad of [SEED.slice(1), 'a text seed']) expect(classify(withTag(born(generation), 'seed', bad)), bad).toBe('legacy');
+      const unseeded = born(generation).filter((t) => t[0] !== 'seed');
+      expect(getOrDeriveSeed(makeEvent(unseeded))).toBe(SEED);
     }
   });
 
