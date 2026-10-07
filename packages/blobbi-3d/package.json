@@ -43,7 +43,7 @@
     }
   },
   "dependencies": {
-    "@blobbi-kit/renderer": "*"
+    "@blobbi-kit/renderer": "^0.6.0"
   },
   "peerDependencies": {
     "@babylonjs/core": ">=8.0.0"
