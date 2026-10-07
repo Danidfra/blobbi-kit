@@ -34,7 +34,7 @@ const RENDERER = '@blobbi-kit/renderer';
 describe('@blobbi-kit/3d package manifest', () => {
   it('is the expected package at the expected version', () => {
     expect(manifest.name).toBe('@blobbi-kit/3d');
-    expect(manifest.version).toBe('0.1.0');
+    expect(manifest.version).toBe('0.1.1');
   });
 
   describe(`depends on a ${RENDERER} that ships the procedural engine`, () => {

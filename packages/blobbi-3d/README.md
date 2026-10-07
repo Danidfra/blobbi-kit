@@ -77,5 +77,5 @@ root attachment, eye and stroke conformity, the horn curve, animator states.
 
 ## Status
 
-0.1.0, Visual V0: adult only, standard materials, no physics. The playground
+0.1.1, Visual V0: adult only, standard materials, no physics. The playground
 that drives it lives in the `blobbi-3d` repository.

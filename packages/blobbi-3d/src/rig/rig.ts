@@ -141,8 +141,9 @@ export function bindRig(root: TransformNode, body: TransformNode, feet: Transfor
       [parts.leftArm, pose.leftArm],
       [parts.rightArm, pose.rightArm],
     ] as const) {
-      // Swing is about the shoulder's lateral axis; raise lifts the arm out to its side.
-      part.pivot.rotation.set(-arm.swing, 0, -sideSign(part.pivot) * arm.raise);
+      // Swing is about the shoulder's lateral axis; raise lifts the arm out to its side: a positive roll
+      // turns a hanging arm toward +x, so an arm on the +x side rolls positive and one on the -x side negative.
+      part.pivot.rotation.set(-arm.swing, 0, sideSign(part.pivot) * arm.raise);
     }
     parts.leftFoot.pivot.position.set(restLeft.x + pose.leftFoot.side, restLeft.y + pose.leftFoot.lift, restLeft.z + pose.leftFoot.forward);
     parts.rightFoot.pivot.position.set(restRight.x + pose.rightFoot.side, restRight.y + pose.rightFoot.lift, restRight.z + pose.rightFoot.forward);

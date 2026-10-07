@@ -10,6 +10,23 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## `@blobbi-kit/3d` 0.1.1 (fix: a raised arm goes out, not in)
+
+- **The rig raised the arms into the body.** `bindRig`'s pose applier
+  rolled each arm pivot by `-sideSign × raise`, which for a hanging arm on
+  either side turns it toward the body's axis: the jump pose (70° → 50°)
+  and the fall pose (45°) put most of both arms inside the torso, run (14°)
+  a little, idle (2°) invisibly. The roll is now `+sideSign × raise`, so a
+  positive raise lifts the arm out to its side as the pose meant. Measured
+  on the arm meshes in the body's frame across the lab's presets: in the
+  jump pose 71–75% of each arm's vertices were inside the skin, up to 16 cm
+  deep; now 4–6%, at most 1.2 cm (the shoulder's own overlap, as at rest).
+  No animation value, geometry or rig shape changed. `rig.test.ts` holds
+  the semantics: a raised arm's tip moves away from the axis and no more of
+  it enters the torso than at rest, a swung arm's tip moves forward, both
+  arms, six seeds. Only `@blobbi-kit/3d` is released; core, react and the
+  renderer are unchanged.
+
 ## `@blobbi-kit/core` 0.8.0, `@blobbi-kit/react` 0.8.0, `@blobbi-kit/renderer` 0.6.0, `@blobbi-kit/3d` 0.1.0
 
 One release of all four packages. Before it the registry held core/react

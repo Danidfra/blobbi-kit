@@ -1,6 +1,6 @@
 {
   "name": "@blobbi-kit/3d",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Procedural 3D Blobbi for Babylon.js: the same V3 identity the SVG renderer draws, as a reusable game character.",
   "type": "module",
   "license": "MIT",
