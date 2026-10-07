@@ -2,18 +2,22 @@
 
 All notable changes to the `blobbi-kit` packages are recorded here. The two
 domain packages (`@blobbi-kit/core`, `@blobbi-kit/react`) are versioned and
-released in lockstep; `@blobbi-kit/renderer` is versioned independently.
+released in lockstep; `@blobbi-kit/renderer` and `@blobbi-kit/3d` are each
+versioned independently.
 
 The project is pre-1.0, so a **minor** bump is used for breaking changes
 (`0.MINOR.PATCH`), per the `0.x` convention.
 
 ---
 
-## Unreleased
+## `@blobbi-kit/core` 0.8.0, `@blobbi-kit/react` 0.8.0, `@blobbi-kit/renderer` 0.6.0, `@blobbi-kit/3d` 0.1.0
 
-On the registry: core/react 0.6.1, renderer 0.4.0. core/react 0.7.0 and
-renderer 0.5.0 were never published separately; their entries ship in this
-release.
+One release of all four packages. Before it the registry held core/react
+0.6.1 and renderer 0.4.0; core/react 0.7.0 and renderer 0.5.0 were never
+published separately, and their entries ship in this release (they are kept
+below under their own headings). `@blobbi-kit/3d` is new and depends on
+`@blobbi-kit/renderer` `^0.6.0`, the first renderer with the `procedural`
+subpath, so the renderer publishes before it.
 
 ### `@blobbi-kit/3d` 0.1.0 (new): the V3 identity as a 3D game character
 
@@ -32,7 +36,8 @@ that must not let visual morphology become a competitive advantage.
 The package re-implements nothing of the identity: genome, colours,
 morphology, expressions and the measured artwork plan are
 `@blobbi-kit/renderer/procedural` (below), so a 3D Blobbi is the same
-individual as its 2D drawing by construction. Peer: `@babylonjs/core`.
+individual as its 2D drawing by construction. Depends on
+`@blobbi-kit/renderer` `^0.6.0`; peer: `@babylonjs/core`.
 
 - **Renderer: the procedural engine has a subpath.** `@blobbi-kit/renderer/procedural`
   exports the V3 engine (`generateGenome`, `deriveMorphology`,
@@ -327,9 +332,10 @@ Ownership, stated once: the renderer draws the creature, its expressions,
 its sleep and how its body moves in place; the world owns position, the
 floor, the bed, the ground shadow and when the creature walks.
 
-## Published
+## Earlier releases
 
-Already on the registry (renderer 0.2.0–0.4.0, core/react 0.6.0–0.6.1).
+Already on the registry before the release above (renderer 0.2.0–0.4.0,
+core/react 0.6.0–0.6.1).
 
 ### `@blobbi-kit/renderer` 0.4.0 (V1 baby expressions; the sleeping Zzz becomes optional)
 

@@ -19,9 +19,9 @@ npm under the `@blobbi-kit` scope.
 | [`@blobbi-kit/3d`](./packages/blobbi-3d) | 0.1.0 | Procedural 3D Blobbi for Babylon.js from the same V3 identity: body, face, traits, rig, animation. Builds on the renderer's `procedural` engine. | `@blobbi-kit/renderer`; peer: `@babylonjs/core` |
 | [`renderer-consumer-fixture`](./packages/blobbi-renderer-consumer) | private | Test-only consumer of the renderer. Proves it renders with no provider, no host CSS and no kit package around it. | |
 
-`core` and `react` are versioned and released together. `renderer` is versioned
-on its own. Each package has its own README with the details; this file is the
-map.
+`core` and `react` are versioned and released together. `renderer` and `3d` are
+each versioned on their own. Each package has its own README with the details;
+this file is the map.
 
 ## What each package owns
 
@@ -193,6 +193,7 @@ the Blobbi is still drawn. An unknown
 npm install @blobbi-kit/core
 npm install @blobbi-kit/react @blobbi-kit/core react @tanstack/react-query @nostrify/react
 npm install @blobbi-kit/renderer react
+npm install @blobbi-kit/3d @babylonjs/core
 ```
 
 Node 22 or newer. All packages are ESM only and ship `.d.ts` files. Deep
