@@ -15,6 +15,32 @@ On the registry: core/react 0.6.1, renderer 0.4.0. core/react 0.7.0 and
 renderer 0.5.0 were never published separately; their entries ship in this
 release.
 
+### `@blobbi-kit/3d` 0.1.0 (new): the V3 identity as a 3D game character
+
+A procedural 3D Blobbi for Babylon.js, from the same V3 identity the SVG
+renderer draws. `createBlobbi3D(identity, scene)` builds the body (a surface
+grown from the kit's front and side silhouettes), a painted skin (gradient,
+shine, pattern, mark, belly, freckles, cheeks), a face whose eyes, lids,
+brows and mouth are patches of the skin with the kit's blended expressions,
+every trait kind as swept geometry with surface-conforming roots, a pivot rig
+and a procedural animator (idle, walk, run, jump, fall, land). The character
+faces +Z, stands 1.05 m, and its handle exposes `setExpression`,
+`setSleeping`, `setGaze`, `blink`, `update` and `dispose`. A normalized
+gameplay profile (`BLOBBI_GAMEPLAY_PROFILE`) is declared beside it for hosts
+that must not let visual morphology become a competitive advantage.
+
+The package re-implements nothing of the identity: genome, colours,
+morphology, expressions and the measured artwork plan are
+`@blobbi-kit/renderer/procedural` (below), so a 3D Blobbi is the same
+individual as its 2D drawing by construction. Peer: `@babylonjs/core`.
+
+- **Renderer: the procedural engine has a subpath.** `@blobbi-kit/renderer/procedural`
+  exports the V3 engine (`generateGenome`, `deriveMorphology`,
+  `derivePalette`, the expression key poses and lids, the adult plan, the
+  silhouette builders, the keyed RNG) for other renderers of the same
+  identity. The package root is unchanged and still exports no gene; the
+  purity tests still hold the engine to importing nothing external.
+
 **Blobbi V3.** A new visual generation (`visual_generation = v3`) whose
 artwork is generated procedurally and deterministically from an explicit
 identity stated on the event: a canonical seed (64 lower-case hexadecimal

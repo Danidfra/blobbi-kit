@@ -1,22 +1,22 @@
 {
-  "name": "@blobbi-kit/renderer",
-  "version": "0.6.0",
-  "description": "Portable, host-independent React renderer for Blobbi characters: plain visual data in, deterministic SVG out.",
+  "name": "@blobbi-kit/3d",
+  "version": "0.1.0",
+  "description": "Procedural 3D Blobbi for Babylon.js: the same V3 identity the SVG renderer draws, as a reusable game character.",
   "type": "module",
   "license": "MIT",
   "keywords": [
     "blobbi",
-    "react",
-    "svg",
-    "renderer",
+    "babylonjs",
+    "3d",
+    "procedural",
     "virtual-pet"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Danidfra/blobbi-kit.git",
-    "directory": "packages/blobbi-renderer"
+    "directory": "packages/blobbi-3d"
   },
-  "homepage": "https://github.com/Danidfra/blobbi-kit/tree/main/packages/blobbi-renderer#readme",
+  "homepage": "https://github.com/Danidfra/blobbi-kit/tree/main/packages/blobbi-3d#readme",
   "bugs": {
     "url": "https://github.com/Danidfra/blobbi-kit/issues"
   },
@@ -26,8 +26,7 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rimraf dist *.tsbuildinfo",
-    "preview": "node scripts/preview.mjs"
+    "clean": "rimraf dist *.tsbuildinfo"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -41,13 +40,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./procedural": {
-      "types": "./dist/procedural/index.d.ts",
-      "import": "./dist/procedural/index.js"
     }
   },
+  "dependencies": {
+    "@blobbi-kit/renderer": "*"
+  },
   "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0"
+    "@babylonjs/core": ">=8.0.0"
   }
 }

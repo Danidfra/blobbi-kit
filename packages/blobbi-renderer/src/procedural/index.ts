@@ -48,18 +48,32 @@ export {
   type TailKind,
 } from './genome';
 export {
+  ANTENNA_BEHIND_HORN,
+  ANTENNA_OUTSIDE_HORN,
   ANTENNA_RANGES,
   EAR_RANGES,
+  HORN_ANCHORS,
   HORN_RANGES,
   MORPHOLOGY_RANGES,
   TAIL_RANGES,
   deriveMorphology,
   freeMarkRegions,
   mirrorMorphology,
+  topHornLat,
   type AntennaMorphology,
+  type BellyMorphology,
   type BlobbiMorphology,
+  type EarMorphology,
+  type FreckleMorphology,
   type GeneRange,
+  type GradientMorphology,
+  type HornMorphology,
+  type MarkMorphology,
   type MorphologyGroup,
+  type SpecialMarkMorphology,
+  type StripeMorphology,
+  type StripesMorphology,
+  type TailMorphology,
 } from './morphology';
 export {
   AUTHORED_PALETTE,
@@ -91,10 +105,13 @@ export {
   lidShape,
   normalizeWeights,
   resolveFacePose,
+  type BrowPose,
   type Emotion,
   type ExpressionWeights,
   type FaceParts,
   type FacePose,
+  type LidShape,
+  type MouthPose,
 } from './expressions';
 export { MOTIONS, NEUTRAL_STATE, normalizeState, type BlobbiMotion, type BlobbiState } from './state';
 export { LIVE_MOTION_ATTRIBUTE, MOTION_DURATION, MOTION_STYLESHEET, RIG_PARTS, motionPose, motionStylesheetFor, type Gait, type RigPart, type RigPose } from './motion';

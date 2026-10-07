@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    /* The renderer barrel reaches its React component; its types need jsx set, as the consumer fixture does. */
+    "jsx": "react-jsx",
+    /* Typecheck against the renderer's SOURCE so `npm run typecheck` needs no
+       prior build; the convention every kit package uses for its kit deps. */
+    "baseUrl": ".",
+    "paths": {
+      "@blobbi-kit/renderer": ["../blobbi-renderer/src/index.ts"],
+      "@blobbi-kit/renderer/procedural": ["../blobbi-renderer/src/procedural/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

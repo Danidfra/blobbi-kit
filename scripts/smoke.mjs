@@ -31,6 +31,8 @@ const runtimeEntries = [
   '@blobbi-kit/react/lib/blobbi-actions',
   '@blobbi-kit/react/adapters/types',
   '@blobbi-kit/renderer',
+  '@blobbi-kit/renderer/procedural',
+  '@blobbi-kit/3d',
 ];
 
 // Type-only deep entries: assert they still load as ESM modules (types are
@@ -242,7 +244,7 @@ async function runtimeExternals(distDir) {
   return found;
 }
 
-for (const dir of ['packages/blobbi-core', 'packages/blobbi-react', 'packages/blobbi-renderer']) {
+for (const dir of ['packages/blobbi-core', 'packages/blobbi-react', 'packages/blobbi-renderer', 'packages/blobbi-3d']) {
   let manifest;
   try {
     manifest = await readJson(`${dir}/package.json`);
@@ -374,7 +376,7 @@ async function declarationFiles(distDir) {
   return found;
 }
 
-for (const dir of ['packages/blobbi-core', 'packages/blobbi-react', 'packages/blobbi-renderer']) {
+for (const dir of ['packages/blobbi-core', 'packages/blobbi-react', 'packages/blobbi-renderer', 'packages/blobbi-3d']) {
   const files = await declarationFiles(`${dir}/dist`);
 
   if (files.length === 0) {
@@ -466,7 +468,7 @@ for (const dir of ['packages/blobbi-core', 'packages/blobbi-react', 'packages/bl
 // The unit tests own this too (packages/*/src/package-manifest.test.ts), but
 // asserting it here as well is cheap and keeps `npm run smoke` a complete
 // standalone gate for the packaging contract.
-for (const dir of ['packages/blobbi-core', 'packages/blobbi-react', 'packages/blobbi-renderer']) {
+for (const dir of ['packages/blobbi-core', 'packages/blobbi-react', 'packages/blobbi-renderer', 'packages/blobbi-3d']) {
   const manifest = await readJson(`${dir}/package.json`).catch(() => null);
   if (!manifest) {
     fail(`cannot read ${dir}/package.json`);

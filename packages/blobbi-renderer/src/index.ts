@@ -42,8 +42,11 @@ export type {
 // the creation rule's visual half, called once when a Blobbi is born; the
 // result is what its event stores and what `visual.v3` takes back. A V3 seed
 // has one spelling, 64 lower-case hexadecimal digits (`canonicalBlobbiV3Seed`). The
-// engine behind it (`procedural/`) is deliberately NOT exported: genes,
+// engine behind it (`procedural/`) is NOT part of this barrel: genes,
 // morphology and geometry are implementation, frozen per algorithm version.
+// Another renderer of the same identity (`@blobbi-kit/3d`) reaches it
+// through the `@blobbi-kit/renderer/procedural` subpath, which is the one
+// canonical implementation of the algorithm; nothing re-implements it.
 export {
   BLOBBI_V3_ALGORITHM_VERSION,
   BLOBBI_V3_ANTENNAE,

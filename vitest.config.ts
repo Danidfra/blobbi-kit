@@ -11,6 +11,8 @@ export default defineConfig({
       { find: /^@blobbi-kit\/react$/, replacement: r('./packages/blobbi-react/src/index.ts') },
       { find: /^@blobbi-kit\/react\/(.*)$/, replacement: r('./packages/blobbi-react/src') + '/$1' },
       { find: /^@blobbi-kit\/renderer$/, replacement: r('./packages/blobbi-renderer/src/index.ts') },
+      { find: /^@blobbi-kit\/renderer\/procedural$/, replacement: r('./packages/blobbi-renderer/src/procedural/index.ts') },
+      { find: /^@blobbi-kit\/3d$/, replacement: r('./packages/blobbi-3d/src/index.ts') },
     ],
   },
   test: {

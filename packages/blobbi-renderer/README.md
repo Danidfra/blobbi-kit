@@ -479,8 +479,12 @@ that prefers to mount it once. `renderBlobbiSvg({ motion, motionPhase })`
 bakes one frame as plain markup. Accessory layers still take the wrapper
 motion, which is not synchronized with the rig.
 
-The engine lives in `src/procedural/` and is **not** part of the public API:
-a host states an identity and a state, never a gene.
+The engine lives in `src/procedural/` and is **not** part of the package
+root: a host states an identity and a state, never a gene. It is reachable
+by ONE other kind of consumer, another renderer of the same identity, through
+the `@blobbi-kit/renderer/procedural` subpath (`@blobbi-kit/3d` builds its
+character from it). That subpath is the canonical implementation of
+algorithm 1; nothing anywhere re-implements it.
 
 ### Adding artwork
 
@@ -590,8 +594,10 @@ it.
 
 ## 14. Public API
 
-Everything is exported from the package root; there are no deep imports and no
-`export *`. The exact surface is asserted by `package-api.test.ts`.
+Everything a host needs is exported from the package root; there is no
+`export *`. The one deep import, `@blobbi-kit/renderer/procedural`, is for
+other renderers of a V3 identity (see V3 above), not for hosts. The exact
+surface is asserted by `package-api.test.ts`.
 
 | Group | Exports |
 | --- | --- |
@@ -607,9 +613,10 @@ Everything is exported from the package root; there are no deep imports and no
 | Artwork | `DEFAULT_VISUAL_GENERATION`, `ADULT_V2_PARTS`, `ADULT_V2_FACE_PARTS`, `ADULT_V2_GAZE_PARTS`, `ADULT_V2_CLOSED_EYE_PARTS`, `ADULT_V2_EXPRESSION_PARTS`; types `BlobbiVisualGeneration`, `BlobbiFacing`, `ArtworkAnchors`, `BlobbiArtworkSupport`, `AdultV2Part` |
 | String API | `renderBlobbiSvg`, `loadBlobbiSvg`, `applyGazeMarkup`, `applyRearView`, `uniquifySvgIds`; types `RenderBlobbiSvgOptions`, `RenderedBlobbiSvg`, `BlobbiView`, `GazeMarkupOptions` |
 
-Deliberately **not** exported: the artwork modules and customizers, the color
-helpers, the SVG id internals, the effect presets, any Tailwind class map, and
-the V3 procedural engine (genome, morphology, geometry, RNG).
+Deliberately **not** exported from the root: the artwork modules and
+customizers, the color helpers, the SVG id internals, the effect presets, any
+Tailwind class map. The V3 procedural engine (genome, morphology, geometry,
+RNG) is exported only through the `procedural` subpath, for other renderers.
 
 ## 15. Build and compatibility
 

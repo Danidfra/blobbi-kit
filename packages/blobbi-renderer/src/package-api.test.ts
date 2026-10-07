@@ -235,15 +235,24 @@ describe('the public API is exactly what it claims to be', () => {
     expect(byName.BlobbiRenderer).toBe(api.BlobbiRenderer);
   });
 
-  it('points its manifest at the built entry points, with a root export only', () => {
+  it('points its manifest at the built entry points: the root, and the procedural engine for other renderers', () => {
     const manifest = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
     expect(manifest.main).toBe('./dist/index.js');
     expect(manifest.types).toBe('./dist/index.d.ts');
-    expect(Object.keys(manifest.exports)).toEqual(['.']);
+    // Two entries, no wildcard: the barrel, and `./procedural`, the one
+    // canonical implementation of the V3 algorithm, which `@blobbi-kit/3d`
+    // builds its character from rather than re-implementing it. Nothing else
+    // inside the package is reachable by path.
+    expect(Object.keys(manifest.exports)).toEqual(['.', './procedural']);
     expect(manifest.exports['.']).toEqual({
       types: './dist/index.d.ts',
       import: './dist/index.js',
     });
+    expect(manifest.exports['./procedural']).toEqual({
+      types: './dist/procedural/index.d.ts',
+      import: './dist/procedural/index.js',
+    });
+    expect(existsSync(join(PACKAGE_ROOT, 'src/procedural/index.ts'))).toBe(true);
     expect(manifest.files).toEqual(['dist', 'LICENSE']);
     expect(manifest.sideEffects).toBe(false);
     expect(existsSync(join(PACKAGE_ROOT, 'src/index.ts'))).toBe(true);
