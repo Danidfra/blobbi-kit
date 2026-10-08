@@ -389,26 +389,32 @@ identity ──► genome ──► morphology ──► geometry ──► SVG
 
 ```tsx
 import { BlobbiRenderer, createBlobbiV3Identity } from '@blobbi-kit/renderer';
+import { getBlobbiVisualIdentity } from '@blobbi-kit/core';
 
-// ONCE, when the Blobbi is created; the result is stored in its event.
-const v3 = createBlobbiV3Identity(seed);
+// The seed is the Blobbi's address, derived by core; the event states no colour and no trait.
+const visual = getBlobbiVisualIdentity(companion);       // { visualGeneration: 'v3', v3: { seed, algorithm: 1 }, ... }
+<BlobbiRenderer visual={visual} instanceId={id} facing="right" motion="walking" expression="happy" />
 
-<BlobbiRenderer visual={{ stage: 'adult', visualGeneration: 'v3', v3 }} instanceId={id} facing="right" motion="walking" expression="happy" />
+// Anything a host needs to know about who it is: its colours, whether it has horns.
+const { colors, traits } = createBlobbiV3Identity(visual.v3.seed);
 ```
 
-**Identity** (`BlobbiV3Visual`, plain data) has two layers:
+**Identity** (`BlobbiV3Visual`, plain data) is the seed, under an algorithm
+version, and everything Algorithm 1 derives from it:
 
-| | What | Where it lives |
+| | What | From |
 | --- | --- | --- |
-| explicit | four colours (`base`, `secondary`, `eye`, optional `accent`) and the kind of each trait: anatomy (`antenna`, `horns`, `ears`, `tail`) and surface (`pattern`, `specialMark`, `belly`, `freckles`) | stated in the identity; `@blobbi-kit/core` writes them to the event |
-| derived | every proportion and every trait's own shape and place | from `seed`, under `algorithm` |
+| semantic | four colours (`base`, `secondary`, `eye`, optional `accent`) and the kind of each trait: anatomy (`antenna`, `horns`, `ears`, `tail`) and surface (`pattern`, `specialMark`, `belly`, `freckles`) | `createBlobbiV3Identity(seed)` |
+| micro-geometry | every proportion and every trait's own shape and place | the seed, at every render |
 
-The seed decides the explicit layer ONCE: `createBlobbiV3Identity(seed)` is
-called at creation, and from then on the stored identity is authoritative, so
-a Blobbi is never repainted because the colour generator was tuned. The
-derived layer is re-derived from the same seed at every render, and is
+A V3 Blobbi's seed is derived from its Nostr address (author pubkey, `d`) by
+`@blobbi-kit/core`, so its whole intrinsic identity is a function of the
+address: no replacement event can restate a colour or a trait. Both layers are
 reproducible because the **algorithm version is frozen**
-(`BLOBBI_V3_ALGORITHM_VERSION`, currently `1`).
+(`BLOBBI_V3_ALGORITHM_VERSION`, currently `1`), the colour generator
+included. A visual that does state colours or trait kinds (a host's preview,
+a fixture) is still drawn as stated: `resolveBlobbiV3Visual` lets a valid
+stated field win; the kit simply never states one for a real Blobbi.
 
 **What a version promises:** the same V3 identity under the same
 `visual_algorithm` is the same Blobbi: the same shapes, in the same places,
@@ -416,7 +422,7 @@ painted the same way. It does NOT promise the same SVG bytes, DOM, CSS or
 pixels. `procedural/version.ts` lists exactly what version 1 freezes (the
 seed's reading, the random streams, the genome, the trait odds, morphology,
 the stage plans, geometry, patterns and marks, paint order and opacities,
-the palette) and what it does not. It is held by `procedural/vectors.json`
+the palette, the colour generator) and what it does not. It is held by `procedural/vectors.json`
 and by `artwork/v3/reference/`: twelve reference Blobbis whose morphology,
 palette and drawings are pinned, the drawings as shapes and paint, never as
 markup. Changing any of it for existing Blobbis means a new version beside

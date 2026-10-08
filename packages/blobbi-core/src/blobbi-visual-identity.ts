@@ -41,7 +41,7 @@ import type {
   BlobbiVisualGeneration,
 } from './blobbi';
 import { getTagValue, parseVisualGeneration } from './blobbi';
-import { parseBlobbiV3Identity, type BlobbiV3Colors, type BlobbiV3Traits } from './blobbi-v3-identity';
+import { parseBlobbiV3Identity } from './blobbi-v3-identity';
 import { isValidAdultForm, type AdultForm } from './types/adult';
 
 /**
@@ -65,22 +65,20 @@ export interface BlobbiVisualIdentity {
   visualGeneration: BlobbiVisualGeneration;
   /**
    * The V3 identity, present only for a `'v3'` Blobbi: what a procedural
-   * renderer generates this individual from. Structurally the renderer's
+   * renderer draws this individual from. Structurally the renderer's
    * `BlobbiV3Visual`, so the whole projection is still handed over as-is.
    *
-   * For V3 the seed IS visual identity (every proportion and every trait's
-   * shape derive from it), which is the one exception to "transport data is
-   * not identity" above. It is derived from the Blobbi's address (author
-   * pubkey and `d`) by core, so the renderer receives the resolved seed and
-   * never needs to know about events. Fields the event does not state are absent (the
-   * algorithm version included); a renderer may resolve them for drawing,
-   * and reports an algorithm version it cannot draw rather than guessing.
+   * Only the seed and the algorithm version: everything a V3 Blobbi looks
+   * like (colours, anatomy, pattern, mark, proportions) is Algorithm 1's
+   * function of the seed, which the renderer computes
+   * (`createBlobbiV3Identity`). The seed is derived by core from the
+   * Blobbi's address (author pubkey and `d`), the one exception to
+   * "transport data is not identity" above. An absent field is absent; a
+   * renderer reports an algorithm version it cannot draw rather than guessing.
    */
   v3?: {
     seed?: string;
     algorithm?: number;
-    colors: Partial<BlobbiV3Colors>;
-    traits: Partial<BlobbiV3Traits>;
   };
   /**
    * Adult form, always one of {@link ADULT_FORMS} (`'bloomi'`, `'catti'`, ...).
@@ -90,8 +88,10 @@ export interface BlobbiVisualIdentity {
    */
   adultType?: AdultForm;
   /**
-   * Canonical CSS hex color. On V1 and V2 the seed's; on V3 the colour the
-   * event states (its explicit identity), read from the same tag.
+   * Canonical CSS hex color. On V1 and V2 the seed's. On V3 the seed's too,
+   * in the older generations' mapping, so NOT the colour a V3 Blobbi is
+   * drawn in: that is `createBlobbiV3Identity(v3.seed).colors.base` in the
+   * renderer. The same holds for the other colours, the pattern and the mark.
    */
   baseColor: string;
   /** Canonical CSS hex color. */
@@ -169,9 +169,9 @@ export function getBlobbiVisualIdentity(blobbi: BlobbiVisualIdentitySource): Blo
     // (and its author, without whom there is no address, so no seed).
     const v3 = v3Identity ?? (allTags ? parseBlobbiV3Identity({ pubkey: event?.pubkey, tags: allTags }) : undefined);
     if (v3) {
-      identity.v3 = { colors: { ...v3.colors }, traits: { ...v3.traits } };
-      if (v3.algorithm !== undefined) identity.v3.algorithm = v3.algorithm;
+      identity.v3 = {};
       if (v3.seed !== undefined) identity.v3.seed = v3.seed;
+      if (v3.algorithm !== undefined) identity.v3.algorithm = v3.algorithm;
     }
   }
 

@@ -27,10 +27,10 @@ import {
   deriveBlobbiV3Seed,
   getBlobbiV3Seed,
   parseBlobbiV3Identity,
-  type BlobbiV3Identity,
 } from './blobbi-v3-identity';
 import { getBlobbiVisualIdentity } from './blobbi-visual-identity';
 import VECTORS from './blobbi-v3-seed.vectors.json';
+import IDENTITY_VECTORS from './blobbi-v3-identity.vectors.json';
 
 const ALICE = 'a'.repeat(64);
 const BOB = '3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d';
@@ -38,16 +38,9 @@ const PET_ID = '3196847fb5';
 const CREATED_AT = 1_700_000_000;
 const toHex = (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
-/** A complete identity for a seed; its colours and traits are fixed, so only the seed varies. */
-const identityFor = (seed: string): BlobbiV3Identity => ({
-  seed,
-  algorithm: 1,
-  colors: { base: '#3fb7a5', secondary: '#2a6f8f', eye: '#5a2d12', accent: '#e86a5c' },
-  traits: { antenna: 'double', horns: 'none', ears: 'pointed', tail: 'curl', pattern: 'striped', specialMark: 'moon', belly: false, freckles: true },
-});
 const event = (pubkey: string, tags: string[][], createdAt = CREATED_AT): NostrEvent => ({ id: 'e'.repeat(64), pubkey, created_at: createdAt, kind: KIND_BLOBBI_STATE, tags, content: '', sig: '0'.repeat(128) });
 const bornV3 = (pubkey = ALICE, petId = PET_ID, createdAt = CREATED_AT) =>
-  buildEggTags(pubkey, petId, createdAt, 'Sprout', { visualGeneration: 'v3', v3: identityFor });
+  buildEggTags(pubkey, petId, createdAt, 'Sprout', { visualGeneration: 'v3' });
 const seedOf = (pubkey: string, tags: string[][], createdAt = CREATED_AT) => parseBlobbiEvent(event(pubkey, tags, createdAt))!.v3Identity!.seed;
 const withTag = (tags: string[][], name: string, value: string) => [...tags.filter((t) => t[0] !== name), [name, value]];
 const hatch = (tags: string[][]) => validateAndRepairBlobbiTags(updateBlobbiTags(tags, { stage: 'baby', state: 'active' }), tags, { cleanupTaskTags: true }).tags;
@@ -61,6 +54,14 @@ describe('the derivation, frozen', () => {
       expect(toHex(new TextEncoder().encode(v.d)), v.name).toBe(v.d_utf8_hex);
       expect(toHex(blobbiV3SeedPreimage(v.pubkey, v.d)), v.name).toBe(v.preimage_hex);
       expect(deriveBlobbiV3Seed(v.pubkey, v.d), v.name).toBe(v.seed);
+    }
+  });
+
+  it('reproduces the address half of every identity vector (the renderer checks the seed -> identity half)', () => {
+    expect(IDENTITY_VECTORS.vectors.length).toBeGreaterThanOrEqual(10);
+    for (const v of IDENTITY_VECTORS.vectors) {
+      expect(deriveBlobbiV3Seed(v.pubkey, v.d), v.d).toBe(v.seed);
+      expect(getBlobbiV3Seed({ pubkey: v.pubkey, tags: [['d', v.d]] }), v.d).toBe(v.seed);
     }
   });
 
@@ -170,10 +171,10 @@ describe('the inputs, exactly', () => {
     for (const bad of [BOB.toUpperCase(), BOB.slice(0, 32) + BOB.slice(32).toUpperCase(), `0x${BOB}`, BOB.slice(1), `${BOB}0`, `npub1${'q'.repeat(58)}`, '']) {
       expect(() => deriveBlobbiV3Seed(bad, d), bad).toThrow(TypeError);
       expect(getBlobbiV3Seed({ pubkey: bad, tags: [['d', d]] }), bad).toBeUndefined();
-      const tags = buildEggTags(BOB, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: identityFor });
+      const tags = buildEggTags(BOB, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3' });
       expect(classifyBlobbiEvent(event(bad, tags)), bad).toBe('legacy');
     }
-    expect(() => buildEggTags(BOB.toUpperCase(), PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: identityFor })).toThrow(TypeError);
+    expect(() => buildEggTags(BOB.toUpperCase(), PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3' })).toThrow(TypeError);
   });
 
   it('9. d is its exact UTF-8: no trimming, case folding or Unicode normalization; malformed Unicode has no seed', () => {

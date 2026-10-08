@@ -1,0 +1,312 @@
+{
+  "contract": "(author pubkey, d) -> deriveBlobbiV3Seed -> Algorithm 1 (visual_algorithm = 1) -> intrinsic identity",
+  "note": "Seeds by an independent node:crypto implementation of blobbi:visual-seed:v1; identities by @blobbi-kit/renderer 0.6.0 createBlobbiV3Identity (npm). Core checks address -> seed, the renderer checks seed -> identity. Identity, not SVG: the drawing is pinned elsewhere as shapes and paint.",
+  "vectors": [
+    {
+      "name": "the kit tests' address",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "blobbi-aaaaaaaaaaaa-3196847fb5",
+      "seed": "b24dede26b7ff16ce2526ae40e1e6f0b92b236a9ba09018aa06155d735a315a5",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#805fed",
+          "secondary": "#003580",
+          "eye": "#351341"
+        },
+        "traits": {
+          "antenna": "none",
+          "horns": "none",
+          "ears": "none",
+          "tail": "none",
+          "pattern": "solid",
+          "specialMark": "sparkle",
+          "belly": false,
+          "freckles": false
+        }
+      },
+      "colorScheme": "analogous"
+    },
+    {
+      "name": "another author, the same d",
+      "pubkey": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "d": "blobbi-aaaaaaaaaaaa-3196847fb5",
+      "seed": "452dd8954a0ff703a9fef7f49ed09fa496225e6be9c9c63839c2da555fe04c0b",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#5ce568",
+          "secondary": "#009b78",
+          "eye": "#1e1632",
+          "accent": "#8a64dd"
+        },
+        "traits": {
+          "antenna": "single",
+          "horns": "forehead",
+          "ears": "none",
+          "tail": "nub",
+          "pattern": "solid",
+          "specialMark": "none",
+          "belly": false,
+          "freckles": true
+        }
+      },
+      "colorScheme": "split"
+    },
+    {
+      "name": "a canonical address",
+      "pubkey": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "d": "blobbi-3bf0c63fcb93-7a1e0c44d2",
+      "seed": "50b4b285db2a76b5fb432defc7d196fcc307e37f8dc99ff38222faeba5fcb840",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#f99d4b",
+          "secondary": "#bd4b31",
+          "eye": "#131f5a",
+          "accent": "#617ede"
+        },
+        "traits": {
+          "antenna": "none",
+          "horns": "none",
+          "ears": "none",
+          "tail": "none",
+          "pattern": "spotted",
+          "specialMark": "none",
+          "belly": false,
+          "freckles": true
+        }
+      },
+      "colorScheme": "split"
+    },
+    {
+      "name": "covers a trait kind or colour scheme",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "blobbi-aaaaaaaaaaaa-0000000000",
+      "seed": "621c867b6905a70613e287da4a102cff7e3bfaadb21311b78f3b458657f2199e",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#ee58b1",
+          "secondary": "#940038",
+          "eye": "#3d1519"
+        },
+        "traits": {
+          "antenna": "none",
+          "horns": "none",
+          "ears": "none",
+          "tail": "curl",
+          "pattern": "solid",
+          "specialMark": "moon",
+          "belly": false,
+          "freckles": false
+        }
+      },
+      "colorScheme": "analogous"
+    },
+    {
+      "name": "covers a trait kind or colour scheme",
+      "pubkey": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "d": "blobbi-3bf0c63fcb93-0000000001",
+      "seed": "371e611106b44008a7dc50c1da27fbce8e6146034734f0feebca54126010c483",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#f05cb7",
+          "secondary": "#9c0029",
+          "eye": "#491224"
+        },
+        "traits": {
+          "antenna": "double",
+          "horns": "none",
+          "ears": "none",
+          "tail": "none",
+          "pattern": "solid",
+          "specialMark": "star",
+          "belly": false,
+          "freckles": true
+        }
+      },
+      "colorScheme": "analogous"
+    },
+    {
+      "name": "covers a trait kind or colour scheme",
+      "pubkey": "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
+      "d": "blobbi-82341f882b6e-0000000002",
+      "seed": "e5937b0d822cb86d0975516d7f94718bdfc13fa69c3216255bc19465feb8bef8",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#28d4a4",
+          "secondary": "#007579",
+          "eye": "#480930",
+          "accent": "#e763ad"
+        },
+        "traits": {
+          "antenna": "single",
+          "horns": "side",
+          "ears": "none",
+          "tail": "none",
+          "pattern": "solid",
+          "specialMark": "sparkle",
+          "belly": true,
+          "freckles": true
+        }
+      },
+      "colorScheme": "complementary"
+    },
+    {
+      "name": "covers a trait kind or colour scheme",
+      "pubkey": "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
+      "d": "blobbi-82341f882b6e-0000000006",
+      "seed": "ba75d7ad1cf70e4f215b925d5bb44d4708ce9514fe37cb10a931177cf9c0bd2f",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#56cad6",
+          "secondary": "#128d6e",
+          "eye": "#002b39"
+        },
+        "traits": {
+          "antenna": "none",
+          "horns": "none",
+          "ears": "none",
+          "tail": "leaf",
+          "pattern": "solid",
+          "specialMark": "none",
+          "belly": true,
+          "freckles": false
+        }
+      },
+      "colorScheme": "analogous"
+    },
+    {
+      "name": "covers a trait kind or colour scheme",
+      "pubkey": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "d": "blobbi-3bf0c63fcb93-0000000009",
+      "seed": "22678202ff2f5f0ca11782818ff343473277147be2915635bef6933c1e520686",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#b854d5",
+          "secondary": "#5214b2",
+          "eye": "#471642"
+        },
+        "traits": {
+          "antenna": "double",
+          "horns": "none",
+          "ears": "round",
+          "tail": "nub",
+          "pattern": "solid",
+          "specialMark": "none",
+          "belly": true,
+          "freckles": false
+        }
+      },
+      "colorScheme": "analogous"
+    },
+    {
+      "name": "covers a trait kind or colour scheme",
+      "pubkey": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "d": "blobbi-3bf0c63fcb93-000000000d",
+      "seed": "1b476a01c1dcd834ad8a6e56bb600ab18a0c83f5a724af4cd81af84e364de8ec",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#5373f3",
+          "secondary": "#4d007d",
+          "eye": "#352800",
+          "accent": "#e3c061"
+        },
+        "traits": {
+          "antenna": "single",
+          "horns": "forehead",
+          "ears": "none",
+          "tail": "curl",
+          "pattern": "striped",
+          "specialMark": "none",
+          "belly": false,
+          "freckles": false
+        }
+      },
+      "colorScheme": "complementary"
+    },
+    {
+      "name": "covers a trait kind or colour scheme",
+      "pubkey": "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
+      "d": "blobbi-82341f882b6e-000000000e",
+      "seed": "900571d34053cb12636e2eb79aa4a4ca77af8cbf2c06fe42eda5fd5ca5e39d47",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#e854b0",
+          "secondary": "#8b0088",
+          "eye": "#002d2d",
+          "accent": "#60c3c4"
+        },
+        "traits": {
+          "antenna": "single",
+          "horns": "none",
+          "ears": "none",
+          "tail": "none",
+          "pattern": "gradient",
+          "specialMark": "heart",
+          "belly": false,
+          "freckles": true
+        }
+      },
+      "colorScheme": "split"
+    },
+    {
+      "name": "covers a trait kind or colour scheme",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "blobbi-aaaaaaaaaaaa-0000000020",
+      "seed": "8c9c3efe2512606c65ce86f33d324dc3e8eb7240b9df8911521e92c284a1d4f2",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#7f71ef",
+          "secondary": "#600071",
+          "eye": "#153101",
+          "accent": "#92dc63"
+        },
+        "traits": {
+          "antenna": "none",
+          "horns": "none",
+          "ears": "pointed",
+          "tail": "leaf",
+          "pattern": "spotted",
+          "specialMark": "none",
+          "belly": false,
+          "freckles": false
+        }
+      },
+      "colorScheme": "split"
+    },
+    {
+      "name": "covers a trait kind or colour scheme",
+      "pubkey": "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
+      "d": "blobbi-82341f882b6e-0000000052",
+      "seed": "52f6582484538dd78792a2c5b97bf619b1baf73a13d9bed08575d7764f62b2da",
+      "identity": {
+        "algorithm": 1,
+        "colors": {
+          "base": "#a562eb",
+          "secondary": "#6b006e",
+          "eye": "#33123b"
+        },
+        "traits": {
+          "antenna": "none",
+          "horns": "top",
+          "ears": "none",
+          "tail": "leaf",
+          "pattern": "solid",
+          "specialMark": "none",
+          "belly": true,
+          "freckles": false
+        }
+      },
+      "colorScheme": "analogous"
+    }
+  ]
+}

@@ -38,10 +38,10 @@ this file is the map.
   `sha256("blobbi:v1|pubkey:d:created_at")`, derived once, stated in its
   `seed` tag and never recomputed. Colours, pattern, mark, size and adult form
   are read from byte ranges of that seed. Stored trait tags are mirrors and are
-  rewritten from the seed on republish. A V3 Blobbi's seed is never a tag: it
-  is derived from its address (`deriveBlobbiV3Seed(pubkey, d)`), so no
-  replacement event can restate it. Colour guardrails keep the
-  generated HSL inside a range the renderer's lighten/darken can handle.
+  rewritten from the seed on republish. A V3 Blobbi states neither seed nor
+  traits: its seed is derived from its address (`deriveBlobbiV3Seed(pubkey,
+  d)`) and its colours and traits are Algorithm 1's function of that seed, so
+  no replacement event can change who it is.
 - Decay: pure, per-hour stat decay with stage-specific rates, health penalties
   when other stats are low, reduced decay and energy regen while sleeping, and
   no decay at all for eggs.

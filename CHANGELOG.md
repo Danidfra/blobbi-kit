@@ -40,6 +40,31 @@ unchanged: for a given seed, every V3 drawing is exactly what it was.
   cannot rewrite their identity, but every client must update before V3
   becomes a creation default. Pre-release V3 events that carry a seed tag now
   draw from their address seed instead.
+- **A V3 Blobbi's whole intrinsic identity is its address.** Its colours,
+  anatomy, pattern, special mark, belly and freckles are Algorithm 1's
+  function of the address-derived seed (`createBlobbiV3Identity(seed)` in the
+  renderer), so a V3 event states none of them: `buildEggTags` writes only
+  `visual_generation` and `visual_algorithm` (and takes no `v3` option), the
+  parser reads none of `seed`, `base_color`, `secondary_color`, `eye_color`,
+  `accent_color`, `antenna`, `horns`, `ears`, `tail`, `pattern`,
+  `special_mark`, `belly`, `freckles`, `size`, `adult_type`
+  (`BLOBBI_V3_ABSENT_TAG_NAMES`), and every kit write drops them. A
+  replacement event can no longer repaint or reshape a Blobbi.
+- **API:** `parseBlobbiV3Identity` returns `{ seed, algorithm, missing }`;
+  `getBlobbiVisualIdentity(...).v3` is `{ seed, algorithm }`. Removed:
+  `validateBlobbiV3Identity`, `blobbiV3IdentityTags`, `normalizeBlobbiV3Color`,
+  `BLOBBI_V3_ONLY_TAG_NAMES`, `BuildEggTagsOptions.v3`. `BLOBBI_V3_TAGS` is
+  `{ algorithm }`. Added: `BLOBBI_V3_RETIRED_TAG_NAMES`,
+  `NEW_BLOBBI_V3_ALGORITHM`. For a V3 Blobbi the plain colour, pattern, mark
+  and size fields of `visualTraits` and the projection are its seed in the
+  older generations' mapping, not its colours.
+- **Algorithm 1 freezes its colour generator** (`generateColors`), which it
+  already pinned in its vectors: no output changes, but a seed's colours can
+  no longer be retuned under version 1. `blobbi-v3-identity.vectors.json` pins
+  address -> seed -> colours and trait kinds for 12 addresses covering every
+  trait kind and colour scheme; the renderer checks the identity half. The
+  renderer's runtime is unchanged; only its documentation says so (a
+  docs-only renderer release is optional).
 - **React:** no source change. Its peer range on core moves to `^0.9.0` with
   the release.
 

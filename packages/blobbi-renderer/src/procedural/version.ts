@@ -55,6 +55,11 @@
  *      views' `draw*`).
  *  10. THE PALETTE. Every colour role derived from the identity's four
  *      colours (`derivePalette`, `deriveEggPalette`).
+ *  11. THE COLOUR GENERATOR. Which four colours, and which colour scheme,
+ *      a seed is given (`generateColors`). A V3 event states no colour: its
+ *      seed is its address (`@blobbi-kit/core`, `deriveBlobbiV3Seed`) and
+ *      everything it looks like is this algorithm's function of that seed,
+ *      so the colours are as frozen as the shapes.
  *
  * WHAT IT DOES NOT FREEZE, AND DOES NOT PROMISE
  *
@@ -66,17 +71,15 @@
  *  - STATE, which is not identity: expression, gaze, sleep, motion, egg
  *    crack. How a Blobbi moves and emotes may be improved under the same
  *    version; who it is may not.
- *  - The colour GENERATOR: which four colours a new seed is given. Colours
- *    are explicit identity for exactly this reason, so it can be retuned
- *    for new Blobbis without repainting one that exists. (An identity that
- *    fails to state its colours is painted from the generator as it stands,
- *    and is promised nothing.)
- *
+
  * WHERE IT IS HELD
  *
  * ```
  *   1        the adapter's and core's seed tests ("the seed has one spelling")
  *   2, 3     vectors.json: hash, draws, genes, rolls and genomes of fixed seeds
+ *   4, 11    vectors.json (colours) and core's blobbi-v3-identity.vectors.json:
+ *            address -> seed -> colours and trait kinds
+ *            (artwork/v3/reference/address-identity.test.ts)
  *   4        reference.test.ts: the odds, as a table
  *   5, 6     artwork/v3/reference/morphology.json   (exact)
  *   10       artwork/v3/reference/palette.json      (exact in JavaScript)

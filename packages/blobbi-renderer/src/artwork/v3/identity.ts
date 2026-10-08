@@ -186,14 +186,13 @@ function identityOf(genome: BlobbiGenome): BlobbiV3Identity {
 }
 
 /**
- * CREATE a V3 identity for a seed: the colours and trait kinds this seed
- * gives under the current algorithm, stated explicitly.
- *
- * This is the creation rule's visual half. Call it ONCE, when a Blobbi is
- * born, and store what it returns (the domain kit writes it into the event);
- * from then on the stored identity is the truth, and re-running this for the
- * same seed after the colour generator has been retuned is exactly what must
- * not decide an existing Blobbi's colours.
+ * THE V3 IDENTITY OF A SEED: the colours and trait kinds Algorithm 1
+ * gives it. A V3 Blobbi's intrinsic identity IS this function of its
+ * address-derived seed (`@blobbi-kit/core`, `deriveBlobbiV3Seed`): its event
+ * states none of it, every client computes it, and version 1 freezes it
+ * (colour generator included, `procedural/version.ts`). Use it wherever a
+ * host needs to know what a Blobbi is (its colours for a card, whether it
+ * has horns); the renderer resolves the same from `{ seed, algorithm }`.
  *
  * Pure and deterministic: the same seed always returns an equal identity,
  * and it states the seed canonically (`canonicalBlobbiV3Seed`).

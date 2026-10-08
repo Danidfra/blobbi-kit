@@ -6,18 +6,14 @@ import { blobbiLogger } from '@blobbi-kit/core/logger';
 
 import { ADULT_FORMS, type AdultForm, deriveAdultFormFromSeed } from '@blobbi-kit/core/types/adult';
 import {
-  BLOBBI_MIRRORED_IDENTITY_TAG_NAMES,
   BLOBBI_V3_ABSENT_TAG_NAMES,
-  BLOBBI_V3_ONLY_TAG_NAMES,
-  BLOBBI_V3_TAGS,
-  blobbiV3IdentityTags,
+  BLOBBI_V3_RETIRED_TAG_NAMES,
+  NEW_BLOBBI_V3_ALGORITHM,
+  VISUAL_ALGORITHM_TAG,
   canonicalBlobbiV3Seed,
   deriveBlobbiV3Seed,
   getBlobbiV3Seed,
-  normalizeBlobbiV3Color,
   parseBlobbiV3Identity,
-  validateBlobbiV3Identity,
-  type BlobbiV3Identity,
   type ParsedBlobbiV3Identity,
 } from './blobbi-v3-identity';
 
@@ -406,9 +402,10 @@ export interface BlobbiCompanion {
    */
   visualGeneration: BlobbiVisualGeneration;
   /**
-   * The V3 identity the event states (seed, algorithm version, explicit
-   * colours and trait kinds), present only when `visualGeneration` is
-   * `'v3'`. Exactly what the tags say; see {@link ParsedBlobbiV3Identity}.
+   * The V3 identity of the event: the seed its address derives and the
+   * algorithm version it states, present only when `visualGeneration` is
+   * `'v3'`. Everything the Blobbi looks like follows from those two
+   * (Algorithm 1, in the renderer); see {@link ParsedBlobbiV3Identity}.
    * Optional so hosts that build companions by hand keep compiling.
    */
   v3Identity?: ParsedBlobbiV3Identity;
@@ -928,24 +925,12 @@ export function deriveVisualTraits(
   // Seed is the canonical source of truth for the entire visual identity.
   // When present, all visual trait tags are mirrors — not consulted for rendering.
   if (validSeed) {
-    const seeded = deriveSeedIdentity(validSeed);
-    // The one exception: a V3 Blobbi states its colours, and what it states
-    // is what it is. A colour it does not state (a malformed event) reads as
-    // the seed's here, so this record is always complete; `v3Identity` on the
-    // companion says exactly what was and was not stated.
-    if (parseVisualGeneration(tags) !== 'v3') return seeded;
-    // Its pattern and special mark are stated too. This record keeps the
-    // older generations' vocabulary and shape (a V3 mark it has no word for
-    // reads as `none`, and `size` is still the seed's, though a V3 event
-    // carries none): the V3 identity proper is `v3Identity`.
-    return {
-      ...seeded,
-      baseColor: normalizeBlobbiV3Color(getTagValue(tags, BLOBBI_V3_TAGS.baseColor)) ?? seeded.baseColor,
-      secondaryColor: normalizeBlobbiV3Color(getTagValue(tags, BLOBBI_V3_TAGS.secondaryColor)) ?? seeded.secondaryColor,
-      eyeColor: normalizeBlobbiV3Color(getTagValue(tags, BLOBBI_V3_TAGS.eyeColor)) ?? seeded.eyeColor,
-      pattern: normalizePatternTag(getTagValue(tags, BLOBBI_V3_TAGS.pattern)) ?? seeded.pattern,
-      specialMark: getTagValue(tags, BLOBBI_V3_TAGS.specialMark) === undefined ? seeded.specialMark : (normalizeSpecialMarkTag(getTagValue(tags, BLOBBI_V3_TAGS.specialMark)) ?? 'none'),
-    };
+    // A V3 Blobbi's tags state nothing about its looks (its colours and trait
+    // kinds are Algorithm 1's, which only the renderer computes), so this
+    // record is the seed's in the older generations' mapping, like V1 and V2.
+    // It is NOT a V3 Blobbi's colours: those are `createBlobbiV3Identity(seed)`
+    // in the renderer. Stated colour, pattern or mark tags are never read.
+    return deriveSeedIdentity(validSeed);
   }
   
   // No seed (legacy): use explicit tags with defaults as final fallback.
@@ -1514,27 +1499,11 @@ export interface BuildEggTagsOptions {
    * {@link NEW_BLOBBI_VISUAL_GENERATION} (`'v2'`). Pass `'v1'` for an
    * application that deliberately creates original-generation Blobbis; that
    * output carries no `visual_generation` tag, exactly as before this option.
-   * Pass `'v3'` together with {@link BuildEggTagsOptions.v3} for a
-   * procedural Blobbi.
+   * Pass `'v3'` for a procedural Blobbi: its whole intrinsic identity is
+   * its address, so the egg states only `visual_generation` and
+   * `visual_algorithm`, and needs nothing from the host.
    */
   visualGeneration?: BlobbiVisualGeneration;
-  /**
-   * The V3 identity of the new Blobbi: REQUIRED when `visualGeneration` is
-   * `'v3'`, ignored otherwise. Either the identity itself, or a function of
-   * the new Blobbi's seed that returns it; the second form is how a host
-   * hands over the renderer's creation rule without deriving the seed twice:
-   *
-   * ```ts
-   * import { createBlobbiV3Identity } from '@blobbi-kit/renderer';
-   * buildEggTags(pubkey, petId, createdAt, name, { visualGeneration: 'v3', v3: createBlobbiV3Identity });
-   * ```
-   *
-   * A V3 Blobbi is never born with a partial identity: an identity that is
-   * missing, incomplete, malformed or made for another seed throws, rather
-   * than producing an event whose colours a later renderer would have to
-   * guess.
-   */
-  v3?: BlobbiV3Identity | ((seed: string) => BlobbiV3Identity);
 }
 
 export function buildEggTags(
@@ -1546,26 +1515,15 @@ export function buildEggTags(
 ): string[][] {
   const d = getCanonicalBlobbiD(pubkey, petId);
   const visualGeneration = options.visualGeneration ?? NEW_BLOBBI_VISUAL_GENERATION;
-  // V1 and V2: the seed is derived once, from the birth time too, and stated
-  // in the `seed` tag. V3: the seed is the address (`deriveBlobbiV3Seed`), so
-  // no tag states it and no replacement event can restate it.
-  const seed = visualGeneration === 'v3' ? deriveBlobbiV3Seed(pubkey, d) : deriveBlobbiSeedV1(pubkey, d, createdAt);
   const now = createdAt.toString();
-  
-  // Derive visual traits from seed for explicit storage (tags mirror the seed).
+  const isV3 = visualGeneration === 'v3';
+  // V1 and V2: the seed is derived once, from the birth time too, stated in the
+  // `seed` tag, and the visual traits are written as its mirrors. V3: the seed
+  // is the address (`deriveBlobbiV3Seed`) and everything it looks like is
+  // Algorithm 1's, so the egg states neither. Deriving it here checks the
+  // address: a pubkey Nostr would not write throws.
+  const seed = isV3 ? deriveBlobbiV3Seed(pubkey, d) : deriveBlobbiSeedV1(pubkey, d, createdAt);
   const { baseColor, secondaryColor, eyeColor, pattern, specialMark, size } = deriveSeedIdentity(seed);
-  // A V3 Blobbi states its identity at birth, explicitly and completely: this
-  // is the one moment its seed decides its colours and trait kinds.
-  const v3 = visualGeneration === 'v3' ? resolveNewV3Identity(seed, options.v3) : undefined;
-  // The three colour tags every Blobbi carries: the seed's mirrors on V1 and
-  // V2, the stated identity on V3. The rest of a V3 identity follows the generation.
-  const colours = v3 ? { baseColor: v3.colors.base, secondaryColor: v3.colors.secondary, eyeColor: v3.colors.eye } : { baseColor, secondaryColor, eyeColor };
-  // The surface tags are shared names too: mirrors of the seed on V1 and V2,
-  // stated identity on V3. `size` belongs to the older generations only.
-  const surface = v3
-    ? [['pattern', v3.traits.pattern], ['special_mark', v3.traits.specialMark]]
-    : [['pattern', pattern], ['special_mark', specialMark], ['size', size]];
-  const v3Tags = v3 ? blobbiV3IdentityTags(v3).filter(([name]) => !BLOBBI_MIRRORED_IDENTITY_TAG_NAMES.includes(name)) : [];
   
   return [
     ['d', d],
@@ -1574,7 +1532,7 @@ export function buildEggTags(
     ['stage', 'egg'],
     ['state', 'active'],
     ['progression_state', 'none'],
-    ...(v3 ? [] : [['seed', seed]]),
+    ...(isV3 ? [] : [['seed', seed]]),
     ['generation', '1'],
     ['breeding_ready', 'false'],
     ['experience', '0'],
@@ -1588,29 +1546,20 @@ export function buildEggTags(
     ['energy', DEFAULT_EGG_STATS.energy.toString()],
     ['last_interaction', now],
     ['last_decay_at', now],
-    // Visual traits (derived from seed, explicitly stored for consistency; on V3 the colours are its identity)
-    ['base_color', colours.baseColor],
-    ['secondary_color', colours.secondaryColor],
-    ['eye_color', colours.eyeColor],
-    ...surface,
+    // V1 and V2: visual traits (derived from seed, explicitly stored for consistency)
+    ...(isV3 ? [] : [
+      ['base_color', baseColor],
+      ['secondary_color', secondaryColor],
+      ['eye_color', eyeColor],
+      ['pattern', pattern],
+      ['special_mark', specialMark],
+      ['size', size],
+    ]),
     // Identity from birth: which artwork family draws this Blobbi (see NEW_BLOBBI_VISUAL_GENERATION).
     ...visualGenerationTags(visualGeneration),
-    // V3 only: the rest of the explicit identity (algorithm version, accent colour, anatomy, belly, freckles).
-    ...v3Tags,
+    // V3 only: the algorithm that turns its address into the Blobbi.
+    ...(isV3 ? [[VISUAL_ALGORITHM_TAG, String(NEW_BLOBBI_V3_ALGORITHM)]] : []),
   ];
-}
-
-/** The identity a new V3 Blobbi is born with, validated against its seed. Throws when there is none to state. */
-function resolveNewV3Identity(seed: string, source: BuildEggTagsOptions['v3']): BlobbiV3Identity {
-  if (source === undefined) {
-    throw new Error("[blobbi-kit] A V3 Blobbi needs its identity at creation: pass `v3` (for example `createBlobbiV3Identity` from @blobbi-kit/renderer) with `visualGeneration: 'v3'`.");
-  }
-  const result = validateBlobbiV3Identity(typeof source === 'function' ? source(seed) : source);
-  if (!result.valid) throw new Error(`[blobbi-kit] Invalid V3 identity: ${result.errors.join('; ')}.`);
-  if (result.identity.seed !== seed) {
-    throw new Error('[blobbi-kit] The V3 identity was made for another seed than the new Blobbi\'s.');
-  }
-  return result.identity;
 }
 
 // ─── Managed Tag Sets (Separated by Kind) ─────────────────────────────────────
@@ -1646,8 +1595,8 @@ export const MANAGED_BLOBBI_STATE_TAG_NAMES = new Set([
   'adult_type',
   // Visual generation (identity; never derived from the seed)
   'visual_generation',
-  // V3 identity beyond the colour tags above: algorithm version, accent colour, trait kinds
-  ...BLOBBI_V3_ONLY_TAG_NAMES,
+  // V3: the algorithm version, and the pre-release trait tags a V3 republish drops
+  VISUAL_ALGORITHM_TAG, ...BLOBBI_V3_RETIRED_TAG_NAMES,
   // Extension tags (for themes/crossovers)
   'theme', 'crossover_app',
 ]);
@@ -1779,15 +1728,11 @@ export function mergeTagsForRepublish(
  *
  * GENERATION-AWARE. On a V1 or V2 Blobbi every one of these tags is a
  * mirror and is rewritten here, exactly as it always was. A V3 Blobbi has
- * no mirrors at all:
- *
- *  - its three colours, its `pattern` and its `special_mark` are EXPLICIT
- *    IDENTITY (stated at creation, authoritative ever since). This function
- *    does not touch them: it neither overwrites one nor adds a missing one.
- *  - `size` and `adult_type` describe nothing about it, and its seed is its
- *    address, which no `seed` tag may restate. This function never adds any
- *    of the three, and drops any it finds (an event from before the contract
- *    settled, or a write that tried to state a seed).
+ * no mirrors and no stated looks at all: its seed is its address and its
+ * looks are Algorithm 1's, so no tag may restate either. This function never
+ * adds any of `BLOBBI_V3_ABSENT_TAG_NAMES` to a V3 event, and drops any it
+ * finds (an event from before the contract settled, or a write that tried to
+ * state a seed, a colour or a trait).
  */
 function syncMirrorTagsToSeed(tags: string[][]): string[][] {
   if (parseVisualGeneration(tags) === 'v3') {

@@ -170,7 +170,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: true,
     format: 'CSS hex color (e.g., #F59E0B)',
-    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: EXPLICIT identity, decided by the seed at creation and never rewritten afterwards; `regenerable` does not apply to it.',
+    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: NOT carried. A V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed; a republish drops this tag and nothing reads it.',
   },
   {
     tag: 'secondary_color',
@@ -182,7 +182,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: true,
     format: 'CSS hex color (e.g., #FCD34D)',
-    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: EXPLICIT identity, decided by the seed at creation and never rewritten afterwards; `regenerable` does not apply to it.',
+    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: NOT carried. A V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed; a republish drops this tag and nothing reads it.',
   },
   {
     tag: 'eye_color',
@@ -194,7 +194,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: true,
     format: 'CSS hex color (e.g., #1F2937)',
-    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: EXPLICIT identity, decided by the seed at creation and never rewritten afterwards; `regenerable` does not apply to it.',
+    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: NOT carried. A V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed; a republish drops this tag and nothing reads it.',
   },
   {
     tag: 'pattern',
@@ -206,7 +206,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: true,
     format: 'solid | spotted | striped | gradient',
-    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: EXPLICIT identity (the body\'s one pattern; `solid` is none), decided by the seed at creation and never rewritten afterwards; `regenerable` does not apply to it.',
+    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: NOT carried. A V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed; a republish drops this tag and nothing reads it.',
   },
   {
     tag: 'special_mark',
@@ -218,7 +218,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: true,
     format: 'none | star | heart | sparkle | blush (V1, V2) · none | star | heart | sparkle | moon (V3)',
-    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: EXPLICIT identity (one small permanent marking), decided by the seed at creation and never rewritten afterwards; `regenerable` does not apply to it. `blush` is not a V3 mark: a blush is what a cheek does.',
+    notes: 'V1 and V2: a mirror of the seed, rewritten on every republish (regenerable). V3: NOT carried. A V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed; a republish drops this tag and nothing reads it.',
   },
   {
     tag: 'size',
@@ -615,7 +615,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: false,
     format: "positive integer",
-    notes: 'Identifies the deterministic algorithm, as visual_generation identifies the visual system. A renderer that does not implement the stated version must not draw it as another one. Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
+    notes: 'Identifies the deterministic algorithm, as visual_generation identifies the visual system. A renderer that does not implement the stated version must not draw it as another one. The one identity tag a V3 event states: with the address-derived seed it decides the whole Blobbi. Written at creation, never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
   {
     tag: 'accent_color',
@@ -627,7 +627,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: false,
     format: "#rrggbb",
-    notes: 'Optional: absent means this Blobbi has no accent colour. Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
+    notes: 'Optional: absent means this Blobbi has no accent colour. RETIRED (pre-release V3 contract). Never written, never read: a V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed, and a V3 republish drops this tag. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
   {
     tag: 'antenna',
@@ -639,7 +639,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: false,
     format: "none | single | double",
-    notes: 'Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
+    notes: 'RETIRED (pre-release V3 contract). Never written, never read: a V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed, and a V3 republish drops this tag. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
   {
     tag: 'horns',
@@ -651,7 +651,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: false,
     format: "none | forehead | top | side",
-    notes: 'Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
+    notes: 'RETIRED (pre-release V3 contract). Never written, never read: a V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed, and a V3 republish drops this tag. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
   {
     tag: 'ears',
@@ -663,7 +663,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: false,
     format: "none | round | pointed",
-    notes: 'Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
+    notes: 'RETIRED (pre-release V3 contract). Never written, never read: a V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed, and a V3 republish drops this tag. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
   {
     tag: 'tail',
@@ -675,7 +675,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: false,
     format: "none | nub | curl | leaf",
-    notes: 'Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
+    notes: 'RETIRED (pre-release V3 contract). Never written, never read: a V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed, and a V3 republish drops this tag. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
   {
     tag: 'belly',
@@ -687,7 +687,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: false,
     format: "true | false",
-    notes: 'Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
+    notes: 'RETIRED (pre-release V3 contract). Never written, never read: a V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed, and a V3 republish drops this tag. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
   {
     tag: 'freckles',
@@ -699,7 +699,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: false,
     format: "true | false",
-    notes: 'Procedural (visual_generation = v3) identity: decided by the seed at creation, stated explicitly, authoritative from then on. Never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
+    notes: 'RETIRED (pre-release V3 contract). Never written, never read: a V3 Blobbi\'s looks are Algorithm 1\'s function of its address-derived seed, and a V3 republish drops this tag. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════

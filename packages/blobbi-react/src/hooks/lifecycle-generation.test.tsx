@@ -21,7 +21,7 @@ import {
   type BlobbonautProfile,
 } from '@blobbi-kit/core/blobbi';
 import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
-import { BLOBBI_V3_ONLY_TAG_NAMES, BLOBBI_V3_TAG_NAMES, deriveBlobbiV3Seed, type BlobbiV3Identity } from '@blobbi-kit/core/blobbi-v3-identity';
+import { BLOBBI_V3_ABSENT_TAG_NAMES, BLOBBI_V3_RETIRED_TAG_NAMES, BLOBBI_V3_TAG_NAMES, VISUAL_ALGORITHM_TAG, deriveBlobbiV3Seed } from '@blobbi-kit/core/blobbi-v3-identity';
 import { serializeEvolutionContent } from '@blobbi-kit/core/missions';
 import { deriveAdultFormFromSeed } from '@blobbi-kit/core/types/adult';
 import { planHatchTransition, useBlobbiHatch } from './useBlobbiHatch';
@@ -38,17 +38,9 @@ function event(tags: string[][], content = ''): NostrEvent {
   return { id: 'e'.repeat(64), pubkey: PUBKEY, created_at: CREATED_AT + 60, kind: KIND_BLOBBI_STATE, tags, content, sig: '0'.repeat(128) };
 }
 
-/** A complete V3 identity for a seed, as a renderer's creation rule would state it. */
-const v3IdentityFor = (seed: string): BlobbiV3Identity => ({
-  seed,
-  algorithm: 1,
-  colors: { base: '#3fb7a5', secondary: '#2a6f8f', eye: '#5a2d12', accent: '#e86a5c' },
-  traits: { antenna: 'single', horns: 'top', ears: 'none', tail: 'leaf', pattern: 'striped', specialMark: 'moon', belly: false, freckles: true },
-});
-
 /** An incubating egg of the given generation, exactly as a creating host builds it. */
 function egg(generation: BlobbiVisualGeneration): NostrEvent {
-  const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Shell', { visualGeneration: generation, ...(generation === 'v3' ? { v3: v3IdentityFor } : null) })
+  const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Shell', { visualGeneration: generation })
     .map((t) => (t[0] === 'progression_state' ? ['progression_state', 'incubating'] : t))
     .concat([['progression_started_at', String(CREATED_AT + 60)]]);
   return event(tags, serializeEvolutionContent('', createHatchMissions()));
@@ -176,7 +168,9 @@ describe('a V3 Blobbi keeps its whole identity through its life', () => {
     expect(companion.visualGeneration).toBe('v3');
     // No seed tag: the seed is the address.
     expect(getTagValue(born.tags, 'seed')).toBeUndefined();
-    expect(companion.v3Identity).toEqual({ ...v3IdentityFor(deriveBlobbiV3Seed(PUBKEY, getTagValue(born.tags, 'd')!)), missing: [] });
+    expect(companion.v3Identity).toEqual({ seed: deriveBlobbiV3Seed(PUBKEY, getTagValue(born.tags, 'd')!), algorithm: 1, missing: [] });
+    // Nothing about its looks is stated: Algorithm 1 decides them from the seed.
+    for (const name of BLOBBI_V3_ABSENT_TAG_NAMES) expect(getTagValue(born.tags, name), name).toBeUndefined();
   });
 
   it('v3 egg -> v3 baby -> v3 adult (plan and hooks): the same identity, each tag exactly once', async () => {
@@ -211,21 +205,20 @@ describe('a V3 Blobbi keeps its whole identity through its life', () => {
     for (const name of BLOBBI_V3_TAG_NAMES) expect(grown.filter((t) => t[0] === name), name).toHaveLength(1);
   });
 
-  it('its colours are its own through both transitions: the three colour tags are never rewritten from the seed', async () => {
+  it('no transition writes a colour, a trait or a seed into it: its looks stay its address\'s', async () => {
     const born = egg('v3');
     const plan = planHatchTransition(canonicalFor(born), NOW);
-    for (const name of ['base_color', 'secondary_color', 'eye_color', 'accent_color']) expect(getTagValue(plan.event.tags, name), name).toBe(getTagValue(born.tags, name));
-    expect(getTagValue(plan.event.tags, 'base_color')).toBe('#3fb7a5');
+    for (const name of BLOBBI_V3_ABSENT_TAG_NAMES) expect(getTagValue(plan.event.tags, name), name).toBeUndefined();
+    expect(getTagValue(plan.event.tags, VISUAL_ALGORITHM_TAG)).toBe('1');
     // The same transition on a V2 Blobbi still writes the seed's mirror there.
     const v2 = planHatchTransition(canonicalFor(egg('v2')), NOW);
-    expect(getTagValue(v2.event.tags, 'base_color')).not.toBe('#3fb7a5');
     expect(getTagValue(v2.event.tags, 'base_color')).toBe(getTagValue(egg('v2').tags, 'base_color'));
   });
 
   it('a V1 or V2 Blobbi never gains a V3-only tag on any transition', async () => {
     for (const generation of ['v1', 'v2'] as const) {
       const plan = planHatchTransition(canonicalFor(egg(generation)), NOW);
-      expect(plan.event.tags.filter((t) => BLOBBI_V3_ONLY_TAG_NAMES.includes(t[0]))).toEqual([]);
+      expect(plan.event.tags.filter((t) => t[0] === VISUAL_ALGORITHM_TAG || BLOBBI_V3_RETIRED_TAG_NAMES.includes(t[0]))).toEqual([]);
       expect(parseModernBlobbiEvent(event(plan.event.tags, plan.event.content))!.v3Identity).toBeUndefined();
     }
   });
