@@ -12,6 +12,8 @@ import {
   BLOBBI_V3_TAGS,
   blobbiV3IdentityTags,
   canonicalBlobbiV3Seed,
+  deriveBlobbiV3Seed,
+  getBlobbiV3Seed,
   normalizeBlobbiV3Color,
   parseBlobbiV3Identity,
   validateBlobbiV3Identity,
@@ -565,17 +567,17 @@ export function deriveBlobbiSeedV1(pubkey: string, d: string, createdAt: number)
  * 
  * @param event - The Blobbi event to get/derive seed from
  * @returns The existing seed or a newly derived one
- * @throws When the event is V3 and its seed tag is not a V3 seed
+ * A V3 Blobbi's seed is its address (`getBlobbiV3Seed`), never a tag.
+ *
+ * @throws When the event is V3 and has no single well-formed address
  */
 export function getOrDeriveSeed(event: NostrEvent): string {
-  const existingSeed = getTagValue(event.tags, 'seed');
-  // A V3 Blobbi's seed is never derived: one that is not a V3 seed
-  // (`canonicalBlobbiV3Seed`) has none, and deriving one would draw another individual.
   if (parseVisualGeneration(event.tags) === 'v3') {
-    const seed = canonicalBlobbiV3Seed(existingSeed);
-    if (!seed) throw new Error('Cannot derive seed: a V3 Blobbi without a V3 seed has none');
+    const seed = getBlobbiV3Seed(event);
+    if (!seed) throw new Error('Cannot derive seed: a V3 Blobbi without a single well-formed address (pubkey, d) has none');
     return seed;
   }
+  const existingSeed = getTagValue(event.tags, 'seed');
   if (existingSeed && existingSeed.length === 64) {
     return existingSeed;
   }
@@ -1064,7 +1066,7 @@ export function isUnsupportedLegacyBlobbiEvent(event: NostrEvent): boolean {
  * - it carries old-app / old-schema markers (see isUnsupportedLegacyBlobbiEvent)
  *   — this catches old-app events even when the d-tag looks canonical
  * - the d tag is not in canonical format
- * - the seed tag is missing (on a V3 Blobbi: is not a V3 seed, `canonicalBlobbiV3Seed`)
+ * - the seed tag is missing (on a V3 Blobbi: the event has no single well-formed address, `getBlobbiV3Seed`)
  * - the name tag is missing and must be derived from d
  * - visual traits exist but seed does not
  *
@@ -1100,17 +1102,17 @@ export function isLegacyBlobbiEvent(event: NostrEvent): boolean {
     return true;
   }
   
-  // Check if seed is missing
-  const seed = getTagValue(tags, 'seed');
-  if (!seed || seed.length !== 64) {
-    return true;
-  }
-
-  // A V3 Blobbi's seed is its Algorithm 1 seed: 64 hexadecimal digits
-  // (`canonicalBlobbiV3Seed`). Anything else is no seed at all, so the event
-  // is not a modern V3 Blobbi. V1 and V2 keep the length check above.
-  if (parseVisualGeneration(tags) === 'v3' && !canonicalBlobbiV3Seed(seed)) {
-    return true;
+  // A V3 Blobbi's seed is its address (`getBlobbiV3Seed`): an event with no
+  // single well-formed one has no seed, so it is not a modern V3 Blobbi. A
+  // `seed` tag says nothing about it either way. V1 and V2 keep their check.
+  if (parseVisualGeneration(tags) === 'v3') {
+    if (!getBlobbiV3Seed(event)) return true;
+  } else {
+    // Check if seed is missing
+    const seed = getTagValue(tags, 'seed');
+    if (!seed || seed.length !== 64) {
+      return true;
+    }
   }
 
   // Check if name tag is missing
@@ -1118,18 +1120,7 @@ export function isLegacyBlobbiEvent(event: NostrEvent): boolean {
   if (!name) {
     return true;
   }
-  
-  // Check if visual traits exist but seed does not
-  // (This case is already covered by seed check above, but being explicit)
-  const hasVisualTags = getTagValue(tags, 'base_color') !== undefined ||
-                        getTagValue(tags, 'pattern') !== undefined ||
-                        getTagValue(tags, 'special_mark') !== undefined ||
-                        getTagValue(tags, 'size') !== undefined;
-  
-  if (hasVisualTags && !seed) {
-    return true;
-  }
-  
+
   return false;
 }
 
@@ -1350,7 +1341,8 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
   const nameTag = getTagValue(tags, 'name');
   const stage = getTagValue(tags, 'stage') as BlobbiStage;
   const rawState = getTagValue(tags, 'state')!;
-  const seed = getTagValue(tags, 'seed');
+  // A V3 Blobbi's seed is its address; V1 and V2 state theirs in a tag.
+  const seed = parseVisualGeneration(tags) === 'v3' ? getBlobbiV3Seed(event) : getTagValue(tags, 'seed');
   
   // `state` is an activity state (isValidBlobbiEvent guarantees the value) and
   // progression lives only in `progression_state`. There is no read-time
@@ -1442,7 +1434,7 @@ export function parseBlobbiEvent(event: NostrEvent): BlobbiCompanion | undefined
         ? deriveAdultFormFromSeed(seed)
         : getTagValue(tags, 'adult_type'),
     visualGeneration: parseVisualGeneration(tags),
-    ...(parseVisualGeneration(tags) === 'v3' ? { v3Identity: parseBlobbiV3Identity(tags) } : null),
+    ...(parseVisualGeneration(tags) === 'v3' ? { v3Identity: parseBlobbiV3Identity(event) } : null),
     publishedAt: parseNumericTag(tags, 'published_at'),
     stateStartedAt: parseNumericTag(tags, 'state_started_at'),
     progressionStartedAt: parseNumericTag(tags, 'progression_started_at') ?? parseNumericTag(tags, 'state_started_at'),
@@ -1553,12 +1545,15 @@ export function buildEggTags(
   options: BuildEggTagsOptions = {}
 ): string[][] {
   const d = getCanonicalBlobbiD(pubkey, petId);
-  const seed = deriveBlobbiSeedV1(pubkey, d, createdAt);
+  const visualGeneration = options.visualGeneration ?? NEW_BLOBBI_VISUAL_GENERATION;
+  // V1 and V2: the seed is derived once, from the birth time too, and stated
+  // in the `seed` tag. V3: the seed is the address (`deriveBlobbiV3Seed`), so
+  // no tag states it and no replacement event can restate it.
+  const seed = visualGeneration === 'v3' ? deriveBlobbiV3Seed(pubkey, d) : deriveBlobbiSeedV1(pubkey, d, createdAt);
   const now = createdAt.toString();
   
   // Derive visual traits from seed for explicit storage (tags mirror the seed).
   const { baseColor, secondaryColor, eyeColor, pattern, specialMark, size } = deriveSeedIdentity(seed);
-  const visualGeneration = options.visualGeneration ?? NEW_BLOBBI_VISUAL_GENERATION;
   // A V3 Blobbi states its identity at birth, explicitly and completely: this
   // is the one moment its seed decides its colours and trait kinds.
   const v3 = visualGeneration === 'v3' ? resolveNewV3Identity(seed, options.v3) : undefined;
@@ -1579,7 +1574,7 @@ export function buildEggTags(
     ['stage', 'egg'],
     ['state', 'active'],
     ['progression_state', 'none'],
-    ['seed', seed],
+    ...(v3 ? [] : [['seed', seed]]),
     ['generation', '1'],
     ['breeding_ready', 'false'],
     ['experience', '0'],
@@ -1789,17 +1784,18 @@ export function mergeTagsForRepublish(
  *  - its three colours, its `pattern` and its `special_mark` are EXPLICIT
  *    IDENTITY (stated at creation, authoritative ever since). This function
  *    does not touch them: it neither overwrites one nor adds a missing one.
- *  - `size` and `adult_type` describe nothing about it. This function never
- *    adds them, and drops any it finds (an event from before the contract
- *    settled).
+ *  - `size` and `adult_type` describe nothing about it, and its seed is its
+ *    address, which no `seed` tag may restate. This function never adds any
+ *    of the three, and drops any it finds (an event from before the contract
+ *    settled, or a write that tried to state a seed).
  */
 function syncMirrorTagsToSeed(tags: string[][]): string[][] {
-  const seed = getTagValue(tags, 'seed');
-  if (!seed || seed.length !== 64) return tags;
-
   if (parseVisualGeneration(tags) === 'v3') {
     return tags.some((t) => BLOBBI_V3_ABSENT_TAG_NAMES.includes(t[0])) ? tags.filter((t) => !BLOBBI_V3_ABSENT_TAG_NAMES.includes(t[0])) : tags;
   }
+
+  const seed = getTagValue(tags, 'seed');
+  if (!seed || seed.length !== 64) return tags;
 
   const canonical = deriveSeedIdentity(seed);
   const MIRROR_TAG_NAMES = new Set(['base_color', 'secondary_color', 'eye_color', 'pattern', 'special_mark', 'size']);

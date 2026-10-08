@@ -1,3 +1,6 @@
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+
 /**
  * V3 IDENTITY ON THE EVENT: how a procedural (`visual_generation = v3`)
  * Blobbi states who it is in its kind 31124 tags.
@@ -5,8 +8,7 @@
  * ```
  *   visual_generation = v3          the visual system (blobbi.ts)
  *   visual_algorithm  = 1           the frozen procedural algorithm its micro-geometry derives under
- *   seed              = <64 hex>    the Blobbi's one seed (the existing tag; there is no second, V3 seed),
- *                                   32 bytes as 64 lower-case hexadecimal digits (`canonicalBlobbiV3Seed`)
+ *   (no seed tag)                   the seed is the Blobbi's ADDRESS, hashed: `deriveBlobbiV3Seed(pubkey, d)`
  *   base_color, secondary_color,
  *   eye_color, accent_color         its colours: EXPLICIT
  *   antenna, horns, ears, tail      its anatomy, the kind of each: EXPLICIT
@@ -16,6 +18,16 @@
  *
  * A V3 event carries NO `size` and NO `adult_type`: a V3 Blobbi has neither
  * (its proportions are micro-geometry, and it has one adult body, its own).
+ *
+ * THE SEED IS THE ADDRESS. A kind 31124 event is parameterized replaceable:
+ * every event at one address (author pubkey, `d`) is a version of the same
+ * Blobbi, and a new version replaces the old. A seed the event STATES could
+ * be restated by any replacement, rerolling who the Blobbi is while keeping
+ * its address. So a V3 seed is never stated: it is the address itself,
+ * hashed under a domain of its own (`deriveBlobbiV3Seed`, specified there).
+ * Any client holding the current event, and nothing else, derives the same
+ * seed; no earlier event, birth record or relay history is needed to draw
+ * it. A `seed` tag on a V3 event is not read, and a republish drops it.
  *
  * THE MODEL. The seed is used twice, for two different things:
  *
@@ -49,10 +61,10 @@
  * generation check, in the one function that does the rewriting
  * (`syncMirrorTagsToSeed` in blobbi.ts) and the one that reads the traits
  * (`deriveVisualTraits`); V1 and V2 keep their behaviour exactly. A client
- * that predates V3 does not make the check: if it republishes a V3 Blobbi
- * it will overwrite those five with the seed's. Clients are expected to be
- * updated to V3; nothing here duplicates the identity to protect it from one
- * that is not.
+ * on a kit older than the address-derived seed finds no `seed` tag on a V3
+ * event, so its kit classifies the event as legacy and never republishes
+ * it: it cannot overwrite those five. Clients are expected to be updated to
+ * V3; nothing here duplicates the identity to protect it from one that is not.
  *
  * ONE VOCABULARY PER TAG. `pattern` says `solid | spotted | striped |
  * gradient` on every generation (`solid` is "no pattern"); V3 does not
@@ -70,7 +82,7 @@
 /** The kind 31124 tag that names the procedural algorithm version: `["visual_algorithm", "1"]`. */
 export const VISUAL_ALGORITHM_TAG = 'visual_algorithm';
 
-/** The tag each field of a V3 identity is stated in. The seed is the Blobbi's existing `seed` tag. */
+/** The tag each field of a V3 identity is stated in. The seed is stated in none: it is derived from the address. */
 export const BLOBBI_V3_TAGS = {
   algorithm: VISUAL_ALGORITHM_TAG,
   baseColor: 'base_color',
@@ -112,11 +124,12 @@ export const BLOBBI_MIRRORED_IDENTITY_TAG_NAMES: readonly string[] = [...BLOBBI_
 export const BLOBBI_V3_ONLY_TAG_NAMES: readonly string[] = BLOBBI_V3_TAG_NAMES.filter((name) => !BLOBBI_MIRRORED_IDENTITY_TAG_NAMES.includes(name));
 
 /**
- * Seed-mirror tags of the older generations that a V3 Blobbi does NOT have:
- * they describe nothing about it, so a V3 event never carries them and a V3
- * republish drops any it finds.
+ * Tags of the older generations that a V3 Blobbi does NOT have, so a V3
+ * event never carries them and a V3 republish drops any it finds: `size`
+ * and `adult_type` describe nothing about it, and `seed` would state what
+ * its address already decides (see `deriveBlobbiV3Seed`).
  */
-export const BLOBBI_V3_ABSENT_TAG_NAMES: readonly string[] = ['size', 'adult_type'];
+export const BLOBBI_V3_ABSENT_TAG_NAMES: readonly string[] = ['seed', 'size', 'adult_type'];
 
 export const BLOBBI_V3_ANTENNA_KINDS = ['none', 'single', 'double'] as const;
 export type BlobbiV3AntennaKind = (typeof BLOBBI_V3_ANTENNA_KINDS)[number];
@@ -158,7 +171,7 @@ export interface BlobbiV3Traits {
  * field is stated; there is nothing left for a renderer to decide.
  */
 export interface BlobbiV3Identity {
-  /** The seed the micro-geometry derives from: the Blobbi's `seed` tag, as 64 lower-case hexadecimal digits. */
+  /** The seed the micro-geometry derives from: `deriveBlobbiV3Seed` of the Blobbi's address, as 64 lower-case hexadecimal digits. */
   seed: string;
   /** The procedural algorithm version, a positive integer. */
   algorithm: number;
@@ -175,7 +188,7 @@ export interface BlobbiV3Identity {
  * what was not stated, so a host can always tell stated from inferred.
  */
 export interface ParsedBlobbiV3Identity {
-  /** The seed, canonically (`canonicalBlobbiV3Seed`). Absent when the tag is missing or is not a V3 seed. */
+  /** The seed, derived from the event's address (`getBlobbiV3Seed`). Absent when the event has no single well-formed address. */
   seed?: string;
   /**
    * The algorithm version the event states. Absent when the tag is missing
@@ -185,7 +198,10 @@ export interface ParsedBlobbiV3Identity {
   algorithm?: number;
   colors: Partial<BlobbiV3Colors>;
   traits: Partial<BlobbiV3Traits>;
-  /** The identity tags that were absent or malformed (`seed` included). Empty for every Blobbi this kit created. */
+  /**
+   * The identity fields that were absent or malformed: tag names, and `seed`
+   * when the address yields none. Empty for every Blobbi this kit created.
+   */
   missing: string[];
 }
 
@@ -195,8 +211,8 @@ const HEX_SEED = /^[0-9a-fA-F]{64}$/;
 
 /**
  * THE V3 SEED, canonically: 32 bytes written as exactly 64 lower-case
- * hexadecimal digits (`0-9a-f`), which is what `deriveBlobbiSeedV1` has
- * always produced.
+ * hexadecimal digits (`0-9a-f`), which is what `deriveBlobbiV3Seed`
+ * produces.
  *
  * A procedural algorithm hashes the seed's CHARACTERS, so two spellings of
  * the same bytes would be two different individuals. There is therefore one
@@ -211,11 +227,127 @@ const HEX_SEED = /^[0-9a-fA-F]{64}$/;
  *    clients guessing differently would draw two Blobbis.
  *
  * Returns the canonical seed, or `undefined` when the value is not one.
- * This governs V3 identity only: the `seed` tag itself is never rewritten,
- * and V1 and V2 read it exactly as before.
+ * This governs V3 seeds only (an identity handed to `buildEggTags`, a value
+ * a host passes the renderer); V1 and V2 read their `seed` tag exactly as
+ * before.
  */
 export function canonicalBlobbiV3Seed(value: unknown): string | undefined {
   return typeof value === 'string' && HEX_SEED.test(value) ? value.toLowerCase() : undefined;
+}
+
+// ─── The seed is the address ────────────────────────────────────────────────
+
+/**
+ * The domain the V3 seed is hashed under. It names the SCHEME (a Blobbi's
+ * visual seed, derivation version 1), not an artwork algorithm: every
+ * `visual_algorithm` reads the same seed (see `deriveBlobbiV3Seed`).
+ */
+export const BLOBBI_V3_SEED_DOMAIN = 'blobbi:visual-seed:v1';
+
+const NOSTR_PUBKEY = /^[0-9a-f]{64}$/;
+const textEncoder = new TextEncoder();
+
+/** True when a string has no lone UTF-16 surrogate, so it has exactly one UTF-8 encoding. */
+function isWellFormedUnicode(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const unit = value.charCodeAt(i);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+      i++;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * The exact bytes `deriveBlobbiV3Seed` hashes, for an implementation in
+ * another language to check itself against. Throws a `TypeError` for an
+ * input that has no address (see `deriveBlobbiV3Seed`).
+ */
+export function blobbiV3SeedPreimage(pubkey: string, d: string): Uint8Array {
+  if (typeof pubkey !== 'string' || !NOSTR_PUBKEY.test(pubkey)) {
+    throw new TypeError('[blobbi-kit] A V3 seed is derived from a Nostr pubkey: 64 lower-case hexadecimal digits.');
+  }
+  if (typeof d !== 'string' || d === '' || !isWellFormedUnicode(d)) {
+    throw new TypeError('[blobbi-kit] A V3 seed is derived from a non-empty, well-formed `d` value.');
+  }
+  const domain = textEncoder.encode(BLOBBI_V3_SEED_DOMAIN);
+  const key = hexToBytes(pubkey);
+  const dBytes = textEncoder.encode(d);
+  const out = new Uint8Array(1 + domain.length + key.length + 4 + dBytes.length);
+  let at = 0;
+  out[at++] = domain.length;
+  out.set(domain, at); at += domain.length;
+  out.set(key, at); at += key.length;
+  new DataView(out.buffer).setUint32(at, dBytes.length, false); at += 4;
+  out.set(dBytes, at);
+  return out;
+}
+
+/**
+ * THE V3 SEED OF A BLOBBI, from its address. A V3 Blobbi is whoever lives
+ * at (author pubkey, `d`): every replacement event at that address derives
+ * the same seed, and no tag can restate it.
+ *
+ * ```
+ *   seed = lowercase_hex( SHA-256(
+ *            u8(len(DOMAIN)) || DOMAIN          DOMAIN = ASCII "blobbi:visual-seed:v1" (21 bytes)
+ *            || PUBKEY                          the 32 bytes of the author's x-only public key
+ *            || u32_be(len(D)) || D ))          D = the `d` value as UTF-8, byte for byte
+ * ```
+ *
+ * - PUBKEY is accepted only as Nostr writes it (NIP-01): 64 lower-case
+ *   hexadecimal digits. Anything else is not an event author, and throws;
+ *   it is never lower-cased or repaired here.
+ * - D is the `d` value exactly as the event carries it: no trimming, no case
+ *   folding, no Unicode normalization (relays address by the exact string, so
+ *   two spellings are two addresses, and two Blobbis). It must be non-empty
+ *   and well-formed Unicode (no lone surrogate), so its UTF-8 is one byte
+ *   string; otherwise this throws.
+ * - The kind (31124) does not participate: the domain already scopes the hash
+ *   to a Blobbi's visual seed, and a Blobbi moved to another kind is still the
+ *   Blobbi at (pubkey, `d`).
+ * - `visual_algorithm` does not participate: the seed is who the Blobbi is,
+ *   and an algorithm is how it is drawn. A future algorithm reads the same
+ *   seed, so changing the tag can never select a different seed; the
+ *   algorithm already changes everything it draws.
+ * - The output is 32 bytes as 64 lower-case hexadecimal digits: a canonical
+ *   V3 seed (`canonicalBlobbiV3Seed`), the procedural engine's input as before.
+ *
+ * Frozen: `blobbi-v3-seed.vectors.json` pins it. A change is a new domain,
+ * never an edit.
+ */
+export function deriveBlobbiV3Seed(pubkey: string, d: string): string {
+  return bytesToHex(sha256(blobbiV3SeedPreimage(pubkey, d)));
+}
+
+/** An event's author and tags: all `getBlobbiV3Seed` reads. A `NostrEvent` is one. */
+export interface BlobbiV3AddressSource {
+  pubkey?: string;
+  tags: string[][];
+}
+
+/**
+ * The V3 seed of a kind 31124 event, from its address, or `undefined` when
+ * the event has no single well-formed address:
+ *
+ * - exactly ONE `d` tag. Relays read the first; a second makes the address
+ *   ambiguous to anything that does not, so it is no address at all here;
+ * - its value non-empty and well-formed Unicode;
+ * - a NIP-01 pubkey (64 lower-case hexadecimal digits).
+ *
+ * Total and pure. Every tag but `d` is ignored: a `seed` tag in particular.
+ */
+export function getBlobbiV3Seed(event: BlobbiV3AddressSource): string | undefined {
+  const dTags = event.tags.filter((tag) => tag[0] === 'd');
+  if (dTags.length !== 1) return undefined;
+  const d = dTags[0][1];
+  if (typeof event.pubkey !== 'string' || !NOSTR_PUBKEY.test(event.pubkey)) return undefined;
+  if (typeof d !== 'string' || d === '' || !isWellFormedUnicode(d)) return undefined;
+  return deriveBlobbiV3Seed(event.pubkey, d);
 }
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -291,7 +423,7 @@ export function validateBlobbiV3Identity(input: unknown): BlobbiV3Validation {
 
 /**
  * The tags that state a V3 identity, all of them, in canonical order. The
- * seed is not among them: it is the Blobbi's existing `seed` tag. A Blobbi
+ * seed is not among them: it is the Blobbi's address (`getBlobbiV3Seed`). A Blobbi
  * with no accent colour has no `accent_color` tag (absence is the statement).
  */
 export function blobbiV3IdentityTags(identity: BlobbiV3Identity): string[][] {
@@ -320,17 +452,18 @@ const valueOf = (tags: string[][], name: string): string | undefined => tags.fin
 const booleanOf = (value: string | undefined): boolean | undefined => (value === 'true' ? true : value === 'false' ? false : undefined);
 
 /**
- * Read the V3 identity a tag list states. Pure and total: any tag list
- * yields a result, and nothing is ever invented. It does not check the
- * generation; a caller reads it for a `visual_generation = v3` event
- * (`parseBlobbiEvent` does, into `BlobbiCompanion.v3Identity`).
+ * Read the V3 identity of an event: the seed its address derives, and what
+ * its tags state. Pure and total: any input yields a result, and nothing is
+ * ever invented. It does not check the generation; a caller reads it for a
+ * `visual_generation = v3` event (`parseBlobbiEvent` does, into
+ * `BlobbiCompanion.v3Identity`).
  *
- * The seed is returned canonically (`canonicalBlobbiV3Seed`): hexadecimal
- * digits in upper case read as the same seed in lower case, and a `seed`
- * tag that is not 64 hexadecimal digits is not a V3 seed, so it is absent
- * here and named in `missing`. The tag on the event is left as it is.
+ * The seed is `getBlobbiV3Seed(event)`. A `seed` tag is never read: it cannot
+ * name another seed. Without an author (`pubkey` absent) or a single
+ * well-formed `d`, there is no seed, and `missing` names it.
  */
-export function parseBlobbiV3Identity(tags: string[][]): ParsedBlobbiV3Identity {
+export function parseBlobbiV3Identity(event: BlobbiV3AddressSource): ParsedBlobbiV3Identity {
+  const { tags } = event;
   const missing: string[] = [];
   const read = <T>(name: string, parse: (value: string | undefined) => T | undefined): T | undefined => {
     const parsed = parse(valueOf(tags, name));
@@ -338,7 +471,7 @@ export function parseBlobbiV3Identity(tags: string[][]): ParsedBlobbiV3Identity 
     return parsed;
   };
 
-  const seed = canonicalBlobbiV3Seed(valueOf(tags, 'seed'));
+  const seed = getBlobbiV3Seed(event);
   if (!seed) missing.push('seed');
   const algorithmTag = valueOf(tags, BLOBBI_V3_TAGS.algorithm);
   const algorithmValue = algorithmTag !== undefined && /^[0-9]{1,4}$/.test(algorithmTag) ? Number(algorithmTag) : undefined;

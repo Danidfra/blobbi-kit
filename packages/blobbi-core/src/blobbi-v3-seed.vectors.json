@@ -1,0 +1,95 @@
+{
+  "scheme": "blobbi:visual-seed:v1",
+  "spec": "seed = lowercase_hex(SHA-256(u8(len(DOMAIN)) || DOMAIN || PUBKEY[32] || u32_be(len(D)) || D)); DOMAIN = ASCII \"blobbi:visual-seed:v1\"; PUBKEY = the 32 bytes of the NIP-01 pubkey (64 lower-case hex digits); D = the d tag value as UTF-8, exactly as on the event (no trimming, case folding or Unicode normalization), non-empty and well-formed",
+  "generatedBy": "an independent node:crypto implementation, not the kit; the kit must reproduce every vector",
+  "vectors": [
+    {
+      "name": "canonical d",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "blobbi-aaaaaaaaaaaa-3196847fb5",
+      "d_utf8_hex": "626c6f6262692d6161616161616161616161612d33313936383437666235",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a7631aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000001e626c6f6262692d6161616161616161616161612d33313936383437666235",
+      "seed": "b24dede26b7ff16ce2526ae40e1e6f0b92b236a9ba09018aa06155d735a315a5"
+    },
+    {
+      "name": "same author, another d",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "blobbi-aaaaaaaaaaaa-0000000001",
+      "d_utf8_hex": "626c6f6262692d6161616161616161616161612d30303030303030303031",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a7631aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000001e626c6f6262692d6161616161616161616161612d30303030303030303031",
+      "seed": "76aa1db22967bc93e46aa326460e829857eaa16380bf897827f194dfbc6c1680"
+    },
+    {
+      "name": "another author, the same d",
+      "pubkey": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "d": "blobbi-aaaaaaaaaaaa-3196847fb5",
+      "d_utf8_hex": "626c6f6262692d6161616161616161616161612d33313936383437666235",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a76313bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d0000001e626c6f6262692d6161616161616161616161612d33313936383437666235",
+      "seed": "452dd8954a0ff703a9fef7f49ed09fa496225e6be9c9c63839c2da555fe04c0b"
+    },
+    {
+      "name": "a real-looking canonical address",
+      "pubkey": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+      "d": "blobbi-3bf0c63fcb93-7a1e0c44d2",
+      "d_utf8_hex": "626c6f6262692d3362663063363366636239332d37613165306334346432",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a76313bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d0000001e626c6f6262692d3362663063363366636239332d37613165306334346432",
+      "seed": "50b4b285db2a76b5fb432defc7d196fcc307e37f8dc99ff38222faeba5fcb840"
+    },
+    {
+      "name": "smallest pubkey value, one-character d",
+      "pubkey": "0000000000000000000000000000000000000000000000000000000000000001",
+      "d": "x",
+      "d_utf8_hex": "78",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a763100000000000000000000000000000000000000000000000000000000000000010000000178",
+      "seed": "3a170030a59d741adade16bc18c430ffd26368baf39da1119e057e5dac9842a1"
+    },
+    {
+      "name": "framing: separators inside d are just bytes",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "a:b|c",
+      "d_utf8_hex": "613a627c63",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a7631aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa00000005613a627c63",
+      "seed": "bb396f380726775db5b9f5f89dca39f537c40f8880c9076bb41b76b2393870a0"
+    },
+    {
+      "name": "framing: the same characters split differently",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "a:b|c ",
+      "d_utf8_hex": "613a627c6320",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a7631aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa00000006613a627c6320",
+      "seed": "6641d69b936d9aa4e23bcfe9d20fac30a1fd8ad6e4972dec7b4a24278a390bf7"
+    },
+    {
+      "name": "Unicode d, NFC (U+00FC)",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "blobbi-ü",
+      "d_utf8_hex": "626c6f6262692dc3bc",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a7631aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa00000009626c6f6262692dc3bc",
+      "seed": "5c3c8b6d0895586626a5709c87e657326bfc56adf231e38e589651819c23caf9"
+    },
+    {
+      "name": "Unicode d, NFD (u + U+0308): a different address",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "blobbi-ü",
+      "d_utf8_hex": "626c6f6262692d75cc88",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a7631aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000000a626c6f6262692d75cc88",
+      "seed": "2006a6b6645c36536befc87884264b3da6f6aae0632fb00b275934ec8cde68ba"
+    },
+    {
+      "name": "astral-plane d (U+1F423)",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "🐣",
+      "d_utf8_hex": "f09f90a3",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a7631aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa00000004f09f90a3",
+      "seed": "79668cac57aac819ae46daf2bde1d62dffcca88e53c253a2e4066b0474fd558a"
+    },
+    {
+      "name": "long d (300 bytes)",
+      "pubkey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "d": "blobbi-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "d_utf8_hex": "626c6f6262692d7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+      "preimage_hex": "15626c6f6262693a76697375616c2d736565643a7631aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000012c626c6f6262692d7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+      "seed": "2e5e67345303b664da627b38e4ca9b728cde5317088870d3d3438fee3aa89664"
+    }
+  ]
+}

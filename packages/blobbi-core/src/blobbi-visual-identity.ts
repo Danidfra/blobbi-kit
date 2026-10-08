@@ -70,7 +70,9 @@ export interface BlobbiVisualIdentity {
    *
    * For V3 the seed IS visual identity (every proportion and every trait's
    * shape derive from it), which is the one exception to "transport data is
-   * not identity" above. Fields the event does not state are absent (the
+   * not identity" above. It is derived from the Blobbi's address (author
+   * pubkey and `d`) by core, so the renderer receives the resolved seed and
+   * never needs to know about events. Fields the event does not state are absent (the
    * algorithm version included); a renderer may resolve them for drawing,
    * and reports an algorithm version it cannot draw rather than guessing.
    */
@@ -126,7 +128,10 @@ export interface BlobbiVisualIdentity {
  * been a Nostr event.
  */
 export type BlobbiVisualIdentitySource = Pick<BlobbiCompanion, 'stage' | 'visualTraits'> &
-  Partial<Pick<BlobbiCompanion, 'adultType' | 'name' | 'allTags' | 'visualGeneration' | 'v3Identity'>>;
+  Partial<Pick<BlobbiCompanion, 'adultType' | 'name' | 'allTags' | 'visualGeneration' | 'v3Identity'>> & {
+    /** The event's author: with `allTags`, what a V3 seed is derived from when `v3Identity` is absent. */
+    event?: { pubkey: string };
+  };
 
 /**
  * Project a Blobbi's domain state onto its visual identity.
@@ -143,7 +148,7 @@ export type BlobbiVisualIdentitySource = Pick<BlobbiCompanion, 'stage' | 'visual
  * is a canonical adult form. That is not policy, it is the type of the field.
  */
 export function getBlobbiVisualIdentity(blobbi: BlobbiVisualIdentitySource): BlobbiVisualIdentity {
-  const { stage, visualTraits, adultType, name, allTags, visualGeneration, v3Identity } = blobbi;
+  const { stage, visualTraits, adultType, name, allTags, visualGeneration, v3Identity, event } = blobbi;
   const generation = visualGeneration ?? parseVisualGeneration(allTags ?? []);
 
   const identity: BlobbiVisualIdentity = {
@@ -160,8 +165,9 @@ export function getBlobbiVisualIdentity(blobbi: BlobbiVisualIdentitySource): Blo
   };
 
   if (generation === 'v3') {
-    // A parsed companion carries it; a minimal source may carry only tags.
-    const v3 = v3Identity ?? (allTags ? parseBlobbiV3Identity(allTags) : undefined);
+    // A parsed companion carries it; a minimal source may carry only tags
+    // (and its author, without whom there is no address, so no seed).
+    const v3 = v3Identity ?? (allTags ? parseBlobbiV3Identity({ pubkey: event?.pubkey, tags: allTags }) : undefined);
     if (v3) {
       identity.v3 = { colors: { ...v3.colors }, traits: { ...v3.traits } };
       if (v3.algorithm !== undefined) identity.v3.algorithm = v3.algorithm;

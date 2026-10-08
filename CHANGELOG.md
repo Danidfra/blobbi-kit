@@ -10,6 +10,39 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## Unreleased: the V3 seed is the address (proposed `@blobbi-kit/core` 0.9.0, `@blobbi-kit/react` 0.9.0)
+
+Breaking for V3 only, and V3 is not yet any client's production creation
+format. V1 and V2 are unchanged. The renderer and `@blobbi-kit/3d` are
+unchanged: for a given seed, every V3 drawing is exactly what it was.
+
+- **A V3 seed is derived from the Blobbi's address, never stated.** A kind
+  31124 event is parameterized replaceable, so a `seed` tag could be
+  restated by any replacement event at the same (author pubkey, `d`),
+  rerolling the Blobbi in place. The seed is now
+  `SHA-256(u8(21) || "blobbi:visual-seed:v1" || pubkey[32] || u32_be(len(d)) || d)`
+  as 64 lower-case hex digits (`deriveBlobbiV3Seed`, `blobbiV3SeedPreimage`,
+  `getBlobbiV3Seed`, `BLOBBI_V3_SEED_DOMAIN`). The pubkey must be NIP-01
+  (64 lower-case hex digits); `d` is its exact UTF-8, with no normalization,
+  and must be the event's only `d` tag, non-empty and well-formed. Neither
+  the kind nor `visual_algorithm` is hashed. Reference vectors, made by an
+  independent implementation, are in `blobbi-v3-seed.vectors.json`.
+- **No `seed` tag on V3.** `buildEggTags` writes none for V3, the parser
+  never reads one, and every kit write (merge, mirror sync, tag repair) drops
+  one and never restores it: `'seed'` joins `BLOBBI_V3_ABSENT_TAG_NAMES`.
+  A V3 event without a single well-formed address is legacy.
+- **`parseBlobbiV3Identity(event)`** now takes `{ pubkey, tags }` (a
+  `NostrEvent` is one) instead of a tag list. `getBlobbiVisualIdentity`
+  derives the seed from `event.pubkey` when a minimal source has `allTags`
+  but no parsed `v3Identity`.
+- **Older kits ignore new V3 events.** Without a `seed` tag, core 0.8.0
+  classifies them as legacy: it neither draws nor republishes them, so it
+  cannot rewrite their identity, but every client must update before V3
+  becomes a creation default. Pre-release V3 events that carry a seed tag now
+  draw from their address seed instead.
+- **React:** no source change. Its peer range on core moves to `^0.9.0` with
+  the release.
+
 ## `@blobbi-kit/3d` 0.1.1 (fix: a raised arm goes out, not in)
 
 - **The rig raised the arms into the body.** `bindRig`'s pose applier

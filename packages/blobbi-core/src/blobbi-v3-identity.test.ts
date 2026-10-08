@@ -9,7 +9,8 @@
  * (the three colours, `pattern`, `special_mark`). These tests pin both
  * readings of them, side by side: mirrors on V1 and V2, exactly as before;
  * explicit, authoritative identity on V3, through every path the kit
- * republishes an event by. A V3 event has no `size` and no `adult_type`.
+ * republishes an event by. A V3 event has no `size`, no `adult_type` and no
+ * `seed`: its seed is its address (`blobbi-v3-seed.test.ts` pins that).
  */
 import { describe, it, expect } from 'vitest';
 import type { NostrEvent } from './nostr-protocol';
@@ -28,7 +29,6 @@ import {
   getCanonicalBlobbiD,
   getOrDeriveSeed,
   getTagValue,
-  isLegacyBlobbiEvent,
   parseBlobbiEvent,
   updateBlobbiTags,
 } from './blobbi';
@@ -46,6 +46,7 @@ import {
   BLOBBI_V3_SEED_LENGTH,
   blobbiV3IdentityTags,
   canonicalBlobbiV3Seed,
+  deriveBlobbiV3Seed,
   normalizeBlobbiV3Color,
   parseBlobbiV3Identity,
   validateBlobbiV3Identity,
@@ -56,7 +57,11 @@ import { getBlobbiVisualIdentity } from './blobbi-visual-identity';
 const PUBKEY = 'a'.repeat(64);
 const PET_ID = '3196847fb5';
 const CREATED_AT = 1_700_000_000;
-const SEED = deriveBlobbiSeedV1(PUBKEY, getCanonicalBlobbiD(PUBKEY, PET_ID), CREATED_AT);
+const D = getCanonicalBlobbiD(PUBKEY, PET_ID);
+/** The V1/V2 seed: stated in the `seed` tag, derived once from the birth time too. */
+const SEED = deriveBlobbiSeedV1(PUBKEY, D, CREATED_AT);
+/** The V3 seed: the address, hashed. No tag states it. */
+const V3_SEED = deriveBlobbiV3Seed(PUBKEY, D);
 const MIRRORS = deriveSeedIdentity(SEED);
 /** A pattern this seed's mirror is NOT, so a rewrite from the seed would show. (`moon` is no mirror's mark at all.) */
 const STATED_PATTERN = MIRRORS.pattern === 'striped' ? 'gradient' : 'striped';
@@ -101,7 +106,7 @@ describe('the vocabulary', () => {
     expect(BLOBBI_MIRRORED_COLOR_TAG_NAMES).toEqual(['base_color', 'secondary_color', 'eye_color']);
     expect(BLOBBI_MIRRORED_IDENTITY_TAG_NAMES).toEqual(['base_color', 'secondary_color', 'eye_color', 'pattern', 'special_mark']);
     expect(BLOBBI_V3_ONLY_TAG_NAMES).toEqual(['visual_algorithm', 'accent_color', 'antenna', 'horns', 'ears', 'tail', 'belly', 'freckles']);
-    expect(BLOBBI_V3_ABSENT_TAG_NAMES).toEqual(['size', 'adult_type']);
+    expect(BLOBBI_V3_ABSENT_TAG_NAMES).toEqual(['seed', 'size', 'adult_type']);
     for (const tags of [bornV3(), born('v1'), born('v2')]) expect(tags.some((t) => t[0].startsWith('v3_'))).toBe(false);
   });
 
@@ -153,10 +158,10 @@ describe('creating a V3 Blobbi', () => {
     const v3 = bornV3();
     const v2 = born('v2');
     expect(getTagValue(v3, VISUAL_GENERATION_TAG)).toBe('v3');
-    expect(getTagValue(v3, 'seed')).toBe(SEED);
+    // No seed tag: the seed is the address.
+    expect(getTagValue(v3, 'seed')).toBeUndefined();
     // The whole identity, as an example a reader can check against the documentation.
     expect(v3.filter((t) => BLOBBI_V3_TAG_NAMES.includes(t[0]) || t[0] === VISUAL_GENERATION_TAG || t[0] === 'seed')).toEqual([
-      ['seed', SEED],
       ['base_color', '#3fb7a5'],
       ['secondary_color', '#2a6f8f'],
       ['eye_color', '#5a2d12'],
@@ -174,10 +179,10 @@ describe('creating a V3 Blobbi', () => {
     ]);
     // Each identity tag exactly once.
     for (const name of BLOBBI_V3_TAG_NAMES) expect(v3.filter((t) => t[0] === name), name).toHaveLength(1);
-    // Up to the generation tag a V3 egg is a V2 egg without its `size`, in every tag but the five it states for itself.
+    // Up to the generation tag a V3 egg is a V2 egg without its `seed` and `size`, in every tag but the five it states for itself.
     const head = (tags: string[][]) => tags.slice(0, tags.findIndex((t) => t[0] === VISUAL_GENERATION_TAG));
-    expect(head(v3).map((t) => t[0])).toEqual(head(v2).map((t) => t[0]).filter((name) => name !== 'size'));
-    const unstated = (tags: string[][]) => head(tags).filter((t) => !BLOBBI_MIRRORED_IDENTITY_TAG_NAMES.includes(t[0]) && t[0] !== 'size');
+    expect(head(v3).map((t) => t[0])).toEqual(head(v2).map((t) => t[0]).filter((name) => name !== 'size' && name !== 'seed'));
+    const unstated = (tags: string[][]) => head(tags).filter((t) => !BLOBBI_MIRRORED_IDENTITY_TAG_NAMES.includes(t[0]) && t[0] !== 'size' && t[0] !== 'seed');
     expect(unstated(v3)).toEqual(unstated(v2));
     // And those three are the identity's, not the seed's.
     expect(colourTags(v3)).toEqual({ base_color: '#3fb7a5', secondary_color: '#2a6f8f', eye_color: '#5a2d12' });
@@ -186,28 +191,29 @@ describe('creating a V3 Blobbi', () => {
   });
 
   it('takes the identity as a value or as a function of the new seed (the one moment the seed decides it)', () => {
-    expect(buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: identityFor(SEED) })).toEqual(bornV3());
+    expect(buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: identityFor(V3_SEED) })).toEqual(bornV3());
     let seen = '';
     buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: (seed) => ((seen = seed), identityFor(seed)) });
-    // The Blobbi's one seed: the existing seed tag, nothing derived from it for V3.
-    expect(seen).toBe(SEED);
+    // The Blobbi's one seed: its address, hashed; not the V1/V2 derivation, which also hashes the birth time.
+    expect(seen).toBe(V3_SEED);
+    expect(seen).not.toBe(SEED);
   });
 
   it('is never born with a missing, partial, malformed or foreign identity', () => {
     const build = (v3: unknown) => () => buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: v3 as never });
     expect(build(undefined)).toThrow(/needs its identity/);
-    expect(build({ ...identityFor(SEED), colors: { base: '#3fb7a5' } })).toThrow(/colors\.secondary/);
-    expect(build({ ...identityFor(SEED), colors: { ...identityFor(SEED).colors, base: 'red' } })).toThrow(/colors\.base/);
-    expect(build({ ...identityFor(SEED), traits: { ...identityFor(SEED).traits, horns: 'antlers' } })).toThrow(/traits\.horns/);
-    expect(build({ ...identityFor(SEED), algorithm: 0 })).toThrow(/algorithm/);
+    expect(build({ ...identityFor(V3_SEED), colors: { base: '#3fb7a5' } })).toThrow(/colors\.secondary/);
+    expect(build({ ...identityFor(V3_SEED), colors: { ...identityFor(V3_SEED).colors, base: 'red' } })).toThrow(/colors\.base/);
+    expect(build({ ...identityFor(V3_SEED), traits: { ...identityFor(V3_SEED).traits, horns: 'antlers' } })).toThrow(/traits\.horns/);
+    expect(build({ ...identityFor(V3_SEED), algorithm: 0 })).toThrow(/algorithm/);
     expect(build(identityFor('f'.repeat(64)))).toThrow(/another seed/);
   });
 
   it('omits accent_color for a Blobbi with no accent colour, and reads that back as none, with nothing missing', () => {
-    const { accent: _accent, ...colors } = identityFor(SEED).colors;
-    const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: { ...identityFor(SEED), colors } });
+    const { accent: _accent, ...colors } = identityFor(V3_SEED).colors;
+    const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: { ...identityFor(V3_SEED), colors } });
     expect(getTagValue(tags, 'accent_color')).toBeUndefined();
-    const parsed = parseBlobbiV3Identity(tags);
+    const parsed = parseBlobbiV3Identity(makeEvent(tags));
     expect(parsed.colors.accent).toBeUndefined();
     expect(parsed.missing).toEqual([]);
   });
@@ -317,12 +323,18 @@ describe('the three colour tags: mirrors on V1 and V2, explicit identity on V3',
   });
 
   it('turning the generation marker is what switches the reading, in both directions', () => {
-    // The same tags read as V2: mirrors again, and the next republish rewrites them.
+    // The same tags read as V2 have no `seed` tag, which V2 needs: a legacy event, read from its tags,
+    // and no republish invents a seed to rewrite them from.
     const asV2 = withTag(bornV3(), VISUAL_GENERATION_TAG, 'v2');
-    expect(parseBlobbiEvent(makeEvent(asV2))!.visualTraits.baseColor).toBe(MIRRORS.baseColor);
-    expect(getTagValue(care(asV2), 'base_color')).toBe(MIRRORS.baseColor);
-    // An unknown generation is V1, so the same.
-    expect(getTagValue(care(withTag(bornV3(), VISUAL_GENERATION_TAG, 'v4')), 'base_color')).toBe(MIRRORS.baseColor);
+    expect(classifyBlobbiEvent(makeEvent(asV2))).toBe('legacy');
+    expect(parseBlobbiEvent(makeEvent(asV2))!.visualTraits.baseColor.toLowerCase()).toBe('#3fb7a5');
+    expect(getTagValue(care(asV2), 'base_color')).toBe('#3fb7a5');
+    // With a V2 seed stated, they are mirrors again and the next republish rewrites them; an unknown generation is V1, the same.
+    for (const generation of ['v2', 'v4']) {
+      const seeded = [...withTag(bornV3(), VISUAL_GENERATION_TAG, generation), ['seed', SEED]];
+      expect(parseBlobbiEvent(makeEvent(seeded))!.visualTraits.baseColor).toBe(MIRRORS.baseColor);
+      expect(getTagValue(care(seeded), 'base_color')).toBe(MIRRORS.baseColor);
+    }
   });
 });
 
@@ -330,7 +342,7 @@ describe('reading a V3 identity', () => {
   it('round-trips: what creation wrote is what an event reads back, with nothing missing', () => {
     const companion = parseBlobbiEvent(makeEvent(bornV3()))!;
     expect(companion.visualGeneration).toBe('v3');
-    expect(companion.v3Identity).toEqual({ ...identityFor(SEED), missing: [] });
+    expect(companion.v3Identity).toEqual({ ...identityFor(V3_SEED), missing: [] });
     // Through JSON, as a relay would carry it.
     expect(parseBlobbiEvent(JSON.parse(JSON.stringify(makeEvent(bornV3()))))!.v3Identity).toEqual(companion.v3Identity);
     // parse -> serialize -> parse: the tag builder writes back exactly the identity tags the event has.
@@ -338,12 +350,12 @@ describe('reading a V3 identity', () => {
     const rebuilt = blobbiV3IdentityTags(identity as BlobbiV3Identity);
     expect(rebuilt.map((t) => t[0])).toEqual(BLOBBI_V3_TAG_NAMES);
     for (const [name, value] of rebuilt) expect(getTagValue(bornV3(), name), name).toBe(value);
-    expect(parseBlobbiV3Identity([['seed', SEED], ...rebuilt])).toEqual(companion.v3Identity);
+    expect(parseBlobbiV3Identity(makeEvent([['d', D], ...rebuilt]))).toEqual(companion.v3Identity);
   });
 
   it('is read for V3 only: a V1 or V2 companion has none, whatever tags it carries', () => {
     for (const generation of ['v1', 'v2'] as const) {
-      const tags = [...born(generation), ...blobbiV3IdentityTags(identityFor(SEED)).filter((t) => BLOBBI_V3_ONLY_TAG_NAMES.includes(t[0]))];
+      const tags = [...born(generation), ...blobbiV3IdentityTags(identityFor(V3_SEED)).filter((t) => BLOBBI_V3_ONLY_TAG_NAMES.includes(t[0]))];
       const companion = parseBlobbiEvent(makeEvent(tags))!;
       expect(companion.visualGeneration).toBe(generation);
       expect(companion.v3Identity).toBeUndefined();
@@ -356,24 +368,24 @@ describe('reading a V3 identity', () => {
     const tags = bornV3()
       .filter((t) => t[0] !== 'tail' && t[0] !== 'visual_algorithm')
       .map((t) => (t[0] === 'eye_color' ? ['eye_color', 'javascript:alert(1)'] : t[0] === 'belly' ? ['belly', 'yes'] : t[0] === 'special_mark' ? ['special_mark', 'blush'] : t[0] === 'accent_color' ? ['accent_color', '#12'] : t));
-    const parsed = parseBlobbiV3Identity(tags);
+    const parsed = parseBlobbiV3Identity(makeEvent(tags));
     expect(parsed.missing.sort()).toEqual(['accent_color', 'belly', 'eye_color', 'special_mark', 'tail', 'visual_algorithm']);
     // The algorithm is not assumed: a missing one is missing.
     expect(parsed.algorithm).toBeUndefined();
     expect(parsed.colors).toEqual({ base: '#3fb7a5', secondary: '#2a6f8f' });
     expect(parsed.traits).toEqual({ antenna: 'double', horns: 'none', ears: 'pointed', pattern: STATED_PATTERN, freckles: true });
     // Total: nothing at all still parses, and says so.
-    expect(parseBlobbiV3Identity([])).toEqual({ colors: {}, traits: {}, missing: ['seed', ...BLOBBI_V3_TAG_NAMES.filter((n) => n !== 'accent_color')] });
+    expect(parseBlobbiV3Identity({ tags: [] })).toEqual({ colors: {}, traits: {}, missing: ['seed', ...BLOBBI_V3_TAG_NAMES.filter((n) => n !== 'accent_color')] });
     // Parsing mutates nothing.
     const frozen = tags.map((t) => Object.freeze([...t])) as string[][];
-    expect(() => parseBlobbiV3Identity(Object.freeze(frozen) as string[][])).not.toThrow();
+    expect(() => parseBlobbiV3Identity(Object.freeze({ pubkey: PUBKEY, tags: Object.freeze(frozen) as string[][] }))).not.toThrow();
   });
 
   it('reports the algorithm version as stated, whatever it is: whether it can be drawn is not core\'s to say', () => {
-    expect(parseBlobbiV3Identity(withTag(bornV3(), 'visual_algorithm', '2')).algorithm).toBe(2);
-    expect(parseBlobbiV3Identity(withTag(bornV3(), 'visual_algorithm', '2')).missing).toEqual([]);
+    expect(parseBlobbiV3Identity(makeEvent(withTag(bornV3(), 'visual_algorithm', '2'))).algorithm).toBe(2);
+    expect(parseBlobbiV3Identity(makeEvent(withTag(bornV3(), 'visual_algorithm', '2'))).missing).toEqual([]);
     for (const bad of ['0', '-1', '1.5', 'one', '', '99999']) {
-      const parsed = parseBlobbiV3Identity(withTag(bornV3(), 'visual_algorithm', bad));
+      const parsed = parseBlobbiV3Identity(makeEvent(withTag(bornV3(), 'visual_algorithm', bad)));
       expect(parsed.algorithm, bad).toBeUndefined();
       expect(parsed.missing).toEqual(['visual_algorithm']);
     }
@@ -388,7 +400,7 @@ describe('reading a V3 identity', () => {
     expect(normalizeBlobbiV3Color('#ABCDEF')).toBe('#abcdef');
     expect(normalizeBlobbiV3Color('#Fa0')).toBe('#ffaa00');
     for (const bad of ['abcdef', '#abcd', 'rgb(1,2,3)', '#12345g', '', undefined, 7, '#fff" onload="x']) expect(normalizeBlobbiV3Color(bad)).toBeUndefined();
-    const result = validateBlobbiV3Identity({ ...identityFor(SEED), colors: { base: '#3FB7A5', secondary: '#2A6F8F', eye: '#5A2D12' } });
+    const result = validateBlobbiV3Identity({ ...identityFor(V3_SEED), colors: { base: '#3FB7A5', secondary: '#2A6F8F', eye: '#5A2D12' } });
     expect(result.valid && result.identity.colors).toEqual({ base: '#3fb7a5', secondary: '#2a6f8f', eye: '#5a2d12' });
   });
 });
@@ -397,7 +409,7 @@ describe('the visual identity projection', () => {
   it('carries the V3 identity to a renderer exactly as stated', () => {
     const identity = getBlobbiVisualIdentity(parseBlobbiEvent(makeEvent(bornV3()))!);
     expect(identity.visualGeneration).toBe('v3');
-    expect(identity.v3).toEqual({ seed: SEED, algorithm: 1, colors: identityFor(SEED).colors, traits: identityFor(SEED).traits });
+    expect(identity.v3).toEqual({ seed: V3_SEED, algorithm: 1, colors: identityFor(V3_SEED).colors, traits: identityFor(V3_SEED).traits });
     expect(JSON.parse(JSON.stringify(identity))).toEqual(identity);
   });
 
@@ -408,14 +420,17 @@ describe('the visual identity projection', () => {
     expect(identity.v3?.traits.horns).toBeUndefined();
     expect(identity.v3?.colors.secondary).toBeUndefined();
     // The plain colour field is typed as always present: there, a colour the event does not state reads as the seed's.
-    expect(identity.secondaryColor).toBe(MIRRORS.secondaryColor);
+    expect(identity.secondaryColor).toBe(deriveSeedIdentity(V3_SEED).secondaryColor);
     expect(identity.baseColor).toBe('#3fb7a5');
   });
 
-  it('reads it from tags when the source is not a parsed companion', () => {
+  it('reads it from tags and the author when the source is not a parsed companion; without an author there is no seed', () => {
     const companion = parseBlobbiEvent(makeEvent(bornV3()))!;
-    const minimal = getBlobbiVisualIdentity({ stage: 'baby', visualTraits: companion.visualTraits, allTags: bornV3() });
+    const minimal = getBlobbiVisualIdentity({ stage: 'baby', visualTraits: companion.visualTraits, allTags: bornV3(), event: { pubkey: PUBKEY } });
     expect(minimal.v3).toEqual(getBlobbiVisualIdentity(companion).v3);
+    const anonymous = getBlobbiVisualIdentity({ stage: 'baby', visualTraits: companion.visualTraits, allTags: bornV3() });
+    expect(anonymous.v3?.seed).toBeUndefined();
+    expect(anonymous.v3?.colors).toEqual(minimal.v3?.colors);
   });
 });
 
@@ -478,135 +493,88 @@ describe('a V3 identity survives everything the kit does to an event', () => {
   });
 });
 
-describe('the V3 seed has one spelling', () => {
-  const UPPER = SEED.toUpperCase();
-  const MIXED = SEED.replace(/[a-f]/g, (c, i: number) => (i % 2 ? c.toUpperCase() : c));
+describe('a V3 seed has one spelling', () => {
+  const UPPER = V3_SEED.toUpperCase();
+  const MIXED = V3_SEED.replace(/[a-f]/g, (c, i: number) => (i % 2 ? c.toUpperCase() : c));
   /** Things that look like the seed and are not one. Each would need a guess to become it. */
   const NOT_SEEDS: unknown[] = [
     '',
-    ` ${SEED}`,
-    `${SEED} `,
-    `${SEED}\n`,
-    `0x${SEED}`,
-    `0x${SEED.slice(2)}`,
-    SEED.slice(1),
-    `${SEED}0`,
-    `${SEED.slice(0, 63)}g`,
-    `${SEED.slice(0, 63)}\u0661`, // an Arabic-Indic digit one
-    `${SEED.slice(0, 63)}\uff11`, // a full-width digit one
+    ` ${V3_SEED}`,
+    `${V3_SEED} `,
+    `${V3_SEED}\n`,
+    `0x${V3_SEED}`,
+    `0x${V3_SEED.slice(2)}`,
+    V3_SEED.slice(1),
+    `${V3_SEED}0`,
+    `${V3_SEED.slice(0, 63)}g`,
+    `${V3_SEED.slice(0, 63)}\u0661`, // an Arabic-Indic digit one
+    `${V3_SEED.slice(0, 63)}\uff11`, // a full-width digit one
     'x'.repeat(64),
     'abc123',
     undefined,
     null,
     7,
-    [SEED],
-    { seed: SEED },
+    [V3_SEED],
+    { seed: V3_SEED },
   ];
 
-  it('is what the kit has always derived: 64 lower-case hexadecimal digits', () => {
+  it('is what the address derives: 64 lower-case hexadecimal digits', () => {
     expect(BLOBBI_V3_SEED_LENGTH).toBe(64);
-    expect(SEED).toMatch(/^[0-9a-f]{64}$/);
-    expect(canonicalBlobbiV3Seed(SEED)).toBe(SEED);
+    expect(V3_SEED).toMatch(/^[0-9a-f]{64}$/);
+    expect(canonicalBlobbiV3Seed(V3_SEED)).toBe(V3_SEED);
     for (let i = 0; i < 50; i++) {
-      const seed = deriveBlobbiSeedV1(PUBKEY, getCanonicalBlobbiD(PUBKEY, PET_ID), CREATED_AT + i);
+      const seed = deriveBlobbiV3Seed(PUBKEY, getCanonicalBlobbiD(PUBKEY, i.toString(16).padStart(10, '0')));
       expect(canonicalBlobbiV3Seed(seed)).toBe(seed);
     }
   });
 
   it('reads hexadecimal digits in any case as the same seed, and nothing else as a seed at all', () => {
-    expect(UPPER).not.toBe(SEED);
-    expect(MIXED).not.toBe(SEED);
-    expect(canonicalBlobbiV3Seed(UPPER)).toBe(SEED);
-    expect(canonicalBlobbiV3Seed(MIXED)).toBe(SEED);
+    expect(UPPER).not.toBe(V3_SEED);
+    expect(MIXED).not.toBe(V3_SEED);
+    expect(canonicalBlobbiV3Seed(UPPER)).toBe(V3_SEED);
+    expect(canonicalBlobbiV3Seed(MIXED)).toBe(V3_SEED);
     for (const value of NOT_SEEDS) expect(canonicalBlobbiV3Seed(value), JSON.stringify(value)).toBeUndefined();
   });
 
-  it('creation states the canonical seed, and refuses an identity whose seed is not one', () => {
-    const fromUpper = validateBlobbiV3Identity({ ...identityFor(SEED), seed: UPPER });
-    expect(fromUpper).toEqual({ valid: true, identity: identityFor(SEED) });
+  it('creation accepts an identity for the address seed in any spelling, and refuses one whose seed is not one', () => {
+    const fromUpper = validateBlobbiV3Identity({ ...identityFor(V3_SEED), seed: UPPER });
+    expect(fromUpper).toEqual({ valid: true, identity: identityFor(V3_SEED) });
     // The same bytes in another case are the same seed, so the same Blobbi may be born from it...
-    const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: { ...identityFor(SEED), seed: MIXED } });
+    const tags = buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: { ...identityFor(V3_SEED), seed: MIXED } });
     expect(tags).toEqual(bornV3());
-    expect(getTagValue(tags, 'seed')).toBe(SEED);
+    expect(getTagValue(tags, 'seed')).toBeUndefined();
     // ...and nothing that is not a seed is.
     for (const value of NOT_SEEDS) {
-      const result = validateBlobbiV3Identity({ ...identityFor(SEED), seed: value });
+      const result = validateBlobbiV3Identity({ ...identityFor(V3_SEED), seed: value });
       expect(result.valid, JSON.stringify(value)).toBe(false);
-      expect(() => buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: { ...identityFor(SEED), seed: value as string } })).toThrow(/Invalid V3 identity/);
+      expect(() => buildEggTags(PUBKEY, PET_ID, CREATED_AT, 'Sprout', { visualGeneration: 'v3', v3: { ...identityFor(V3_SEED), seed: value as string } })).toThrow(/Invalid V3 identity/);
     }
-    expect(validateBlobbiV3Identity({ ...identityFor(SEED), seed: 'abc123' })).toEqual({ valid: false, errors: ['seed is not 64 hexadecimal digits'] });
-    expect(validateBlobbiV3Identity({ ...identityFor(SEED), seed: '' })).toEqual({ valid: false, errors: ['seed is missing'] });
+    expect(validateBlobbiV3Identity({ ...identityFor(V3_SEED), seed: 'abc123' })).toEqual({ valid: false, errors: ['seed is not 64 hexadecimal digits'] });
+    expect(validateBlobbiV3Identity({ ...identityFor(V3_SEED), seed: '' })).toEqual({ valid: false, errors: ['seed is missing'] });
   });
 
-  it('an event read in any accepted spelling is the same identity; one that is not a seed has none', () => {
-    const canonical = identityOf(bornV3())!;
-    expect(canonical.seed).toBe(SEED);
-    for (const spelling of [UPPER, MIXED]) {
-      const parsed = identityOf(withTag(bornV3(), 'seed', spelling))!;
-      expect(parsed).toEqual(canonical);
-      expect(getBlobbiVisualIdentity(parseBlobbiEvent(makeEvent(withTag(bornV3(), 'seed', spelling)))!).v3).toEqual(getBlobbiVisualIdentity(parseBlobbiEvent(makeEvent(bornV3()))!).v3);
-    }
-    // 64 characters that are not hexadecimal pass the older generations' length check, and are still no V3 seed.
-    const parsed = parseBlobbiV3Identity(withTag(bornV3(), 'seed', 'x'.repeat(64)));
-    expect(parsed.seed).toBeUndefined();
-    expect(parsed.missing).toEqual(['seed']);
-    for (const value of NOT_SEEDS.filter((v): v is string => typeof v === 'string' && v !== '')) {
-      const read = parseBlobbiV3Identity(withTag(bornV3(), 'seed', value));
-      expect(read.seed, JSON.stringify(value)).toBeUndefined();
-      expect(read.missing).toEqual(['seed']);
-      // What the event states explicitly is still read.
-      expect(read.colors).toEqual(canonical.colors);
-      expect(read.traits).toEqual(canonical.traits);
-    }
-  });
-
-  it('decides whether a V3 event is modern: a lower- or upper-case seed is, anything else is not (V1 and V2 keep the length check)', () => {
+  it('leaves V1 and V2 reading their seed tag exactly as before', () => {
     const classify = (tags: string[][]) => classifyBlobbiEvent(makeEvent(tags));
-    // A valid seed, in its canonical spelling and in upper case: modern, the same individual.
-    expect(classify(bornV3())).toBe('modern');
-    expect(classify(withTag(bornV3(), 'seed', UPPER))).toBe('modern');
-    expect(parseBlobbiEvent(makeEvent(withTag(bornV3(), 'seed', UPPER)))!.isLegacy).toBe(false);
-    expect(identityOf(withTag(bornV3(), 'seed', UPPER))).toEqual(identityOf(bornV3()));
-    expect(getOrDeriveSeed(makeEvent(withTag(bornV3(), 'seed', UPPER)))).toBe(SEED);
-    // 64 characters that are not hexadecimal, a wrong length, arbitrary text: no V3 seed, so not a modern V3 Blobbi.
-    for (const bad of ['x'.repeat(64), `${SEED.slice(0, 63)}g`, SEED.slice(1), `${SEED}0`, 'a text seed']) {
-      const tags = withTag(bornV3(), 'seed', bad);
-      expect(classify(tags), bad).toBe('legacy');
-      expect(isLegacyBlobbiEvent(makeEvent(tags)), bad).toBe(true);
-      // Never another individual: no V3 seed is read, none is derived, and nothing is hashed from the text.
-      expect(identityOf(tags)!.seed, bad).toBeUndefined();
-      expect(() => getOrDeriveSeed(makeEvent(tags)), bad).toThrow(/V3/);
-      expect(deriveVisualTraits(tags, bad), bad).toEqual(deriveVisualTraits(tags.filter((t) => t[0] !== 'seed'), undefined));
-    }
-    // V1 and V2: exactly as before. Any 64 characters pass, a wrong length does not, and a missing seed is still derived.
+    const V1_UPPER = SEED.toUpperCase();
+    // Any 64 characters pass, a wrong length does not, and a missing seed is still derived (from the birth time too).
     for (const generation of ['v1', 'v2'] as const) {
       expect(classify(born(generation))).toBe('modern');
-      expect(classify(withTag(born(generation), 'seed', UPPER))).toBe('modern');
+      expect(classify(withTag(born(generation), 'seed', V1_UPPER))).toBe('modern');
       expect(classify(withTag(born(generation), 'seed', 'x'.repeat(64)))).toBe('modern');
       expect(getOrDeriveSeed(makeEvent(withTag(born(generation), 'seed', 'x'.repeat(64))))).toBe('x'.repeat(64));
-      expect(getOrDeriveSeed(makeEvent(withTag(born(generation), 'seed', UPPER)))).toBe(UPPER);
+      expect(getOrDeriveSeed(makeEvent(withTag(born(generation), 'seed', V1_UPPER)))).toBe(V1_UPPER);
       expect(deriveVisualTraits(born(generation), 'x'.repeat(64))).toEqual(deriveSeedIdentity('x'.repeat(64)));
       for (const bad of [SEED.slice(1), 'a text seed']) expect(classify(withTag(born(generation), 'seed', bad)), bad).toBe('legacy');
       const unseeded = born(generation).filter((t) => t[0] !== 'seed');
       expect(getOrDeriveSeed(makeEvent(unseeded))).toBe(SEED);
-    }
-  });
-
-  it('never rewrites the seed tag, and leaves V1 and V2 reading it exactly as before', () => {
-    // A republish of a V3 event keeps the tag as it is written, whatever its case.
-    const upper = withTag(bornV3(), 'seed', UPPER);
-    expect(getTagValue(care(upper), 'seed')).toBe(UPPER);
-    expect(getTagValue(evolve(hatch(upper)), 'seed')).toBe(UPPER);
-    for (const generation of ['v1', 'v2'] as const) {
-      const lower = parseBlobbiEvent(makeEvent(born(generation)))!;
-      const shouted = parseBlobbiEvent(makeEvent(withTag(born(generation), 'seed', UPPER)))!;
       // The older generations read the digits by value, as they always have: the same traits, the tag untouched.
-      expect(shouted.seed).toBe(UPPER);
+      const lower = parseBlobbiEvent(makeEvent(born(generation)))!;
+      const shouted = parseBlobbiEvent(makeEvent(withTag(born(generation), 'seed', V1_UPPER)))!;
+      expect(shouted.seed).toBe(V1_UPPER);
       expect(shouted.visualTraits).toEqual(lower.visualTraits);
       expect(shouted.v3Identity).toBeUndefined();
-      // And a 64-character seed that is not hexadecimal is still theirs to read, as before.
-      const odd = parseBlobbiEvent(makeEvent(withTag(born(generation), 'seed', 'x'.repeat(64))))!;
-      expect(odd.seed).toBe('x'.repeat(64));
+      expect(getTagValue(care(withTag(born(generation), 'seed', V1_UPPER)), 'seed')).toBe(V1_UPPER);
+      expect(parseBlobbiEvent(makeEvent(withTag(born(generation), 'seed', 'x'.repeat(64))))!.seed).toBe('x'.repeat(64));
     }
   });
 });

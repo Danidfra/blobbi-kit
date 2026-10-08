@@ -34,10 +34,13 @@ this file is the map.
 - Tag merge helpers for republishing an event after a change, backed by a
   declarative tag schema (`@blobbi-kit/core/blobbi-tag-schema`, deep import
   only) that knows which tags are required, per stage, persistent, or derived.
-- Seed identity: a Blobbi's seed is `sha256("blobbi:v1|pubkey:d:created_at")`,
-  derived once and never recomputed. Colours, pattern, mark, size and adult
-  form are read from byte ranges of that seed. Stored trait tags are mirrors
-  and are rewritten from the seed on republish. Colour guardrails keep the
+- Seed identity: a V1 or V2 Blobbi's seed is
+  `sha256("blobbi:v1|pubkey:d:created_at")`, derived once, stated in its
+  `seed` tag and never recomputed. Colours, pattern, mark, size and adult form
+  are read from byte ranges of that seed. Stored trait tags are mirrors and are
+  rewritten from the seed on republish. A V3 Blobbi's seed is never a tag: it
+  is derived from its address (`deriveBlobbiV3Seed(pubkey, d)`), so no
+  replacement event can restate it. Colour guardrails keep the
   generated HSL inside a range the renderer's lighten/darken can handle.
 - Decay: pure, per-hour stat decay with stage-specific rates, health penalties
   when other stats are low, reduced decay and energy regen while sleeping, and
@@ -115,9 +118,10 @@ The kit does not do any of the following:
 - Choosing which pubkey to read. The collection hook queries
   `authors: [pubkey]` with the pubkey you give it.
 - Verifying signatures or ownership. Core checks event shape only. It does not
-  compare `event.pubkey` with the `d` tag, and it trusts an existing `seed`
-  tag without recomputing it. If you need those checks, do them before events
-  reach the kit.
+  compare `event.pubkey` with the `d` tag, and it trusts an existing V1/V2
+  `seed` tag without recomputing it. (A V3 seed is never a tag: core derives
+  it from the event's author and `d`.) If you need those checks, do them
+  before events reach the kit.
 - Economy, coins, consumable inventory and equipment. Earlier versions had a
   profile coin and storage model; both were removed (see the
   [CHANGELOG](./CHANGELOG.md)). Their old tags are preserved as opaque data.

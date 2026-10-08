@@ -21,7 +21,7 @@ import {
   type BlobbonautProfile,
 } from '@blobbi-kit/core/blobbi';
 import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
-import { BLOBBI_V3_ONLY_TAG_NAMES, BLOBBI_V3_TAG_NAMES, type BlobbiV3Identity } from '@blobbi-kit/core/blobbi-v3-identity';
+import { BLOBBI_V3_ONLY_TAG_NAMES, BLOBBI_V3_TAG_NAMES, deriveBlobbiV3Seed, type BlobbiV3Identity } from '@blobbi-kit/core/blobbi-v3-identity';
 import { serializeEvolutionContent } from '@blobbi-kit/core/missions';
 import { deriveAdultFormFromSeed } from '@blobbi-kit/core/types/adult';
 import { planHatchTransition, useBlobbiHatch } from './useBlobbiHatch';
@@ -174,7 +174,9 @@ describe('a V3 Blobbi keeps its whole identity through its life', () => {
     expect(generationOf(born.tags)).toBe('v3');
     const companion = parseModernBlobbiEvent(born)!;
     expect(companion.visualGeneration).toBe('v3');
-    expect(companion.v3Identity).toEqual({ ...v3IdentityFor(getTagValue(born.tags, 'seed')!), missing: [] });
+    // No seed tag: the seed is the address.
+    expect(getTagValue(born.tags, 'seed')).toBeUndefined();
+    expect(companion.v3Identity).toEqual({ ...v3IdentityFor(deriveBlobbiV3Seed(PUBKEY, getTagValue(born.tags, 'd')!)), missing: [] });
   });
 
   it('v3 egg -> v3 baby -> v3 adult (plan and hooks): the same identity, each tag exactly once', async () => {

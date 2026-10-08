@@ -141,7 +141,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'system',
     regenerable: false,
     format: '64 lowercase hex characters',
-    notes: 'Derived once at creation: sha256("blobbi:v1|{pubkey}:{d}:{createdAt}"). MUST NOT be recomputed.',
+    notes: 'V1 and V2: derived once at creation, sha256("blobbi:v1|{pubkey}:{d}:{createdAt}"), and MUST NOT be recomputed. V3: NOT a tag. The seed is derived from the address (deriveBlobbiV3Seed(pubkey, d)); a V3 event carries no seed tag, a republish drops one, and none is ever read. Required on V1 and V2 only.',
   },
   {
     tag: 'generation',
@@ -1124,11 +1124,17 @@ export function validateAndRepairBlobbiTags(
   // ─── Step 5: Check for required tags and attempt recovery ───
   const requiredTags = getRequiredTagNames();
   const repairedTags = [...filteredTags];
+  // A V3 Blobbi has no size, no adult form and no seed tag (its seed is its
+  // address): a republish dropped them on purpose, and nothing restores them.
+  const isV3 = repairedTags.some((t) => t[0] === 'visual_generation' && t[1] === 'v3');
   
   for (const requiredTag of requiredTags) {
     // Skip required tags that aren't valid for this stage
     const schema = getTagSchema(requiredTag);
     if (schema && !schema.stages.includes(finalStage)) {
+      continue;
+    }
+    if (isV3 && BLOBBI_V3_ABSENT_TAG_NAMES.includes(requiredTag)) {
       continue;
     }
     
@@ -1169,8 +1175,6 @@ export function validateAndRepairBlobbiTags(
   if (previousTags) {
     const persistentTags = getPersistentTagNames();
     const currentTagNames = new Set(repairedTags.map(t => t[0]));
-    // A V3 Blobbi has no size and no adult form: a republish dropped them on purpose.
-    const isV3 = repairedTags.some((t) => t[0] === 'visual_generation' && t[1] === 'v3');
     
     for (const [tagName, tagValue] of previousTagMap.entries()) {
       // Skip if already present in current tags
@@ -1182,7 +1186,7 @@ export function validateAndRepairBlobbiTags(
       // Skip task-related tags if cleanup is requested
       if (taskCleanupTags.has(tagName)) continue;
 
-      // Skip the older generations' mirrors a V3 event does not carry
+      // Skip the older generations' tags a V3 event does not carry
       if (isV3 && BLOBBI_V3_ABSENT_TAG_NAMES.includes(tagName)) continue;
       
       // Skip tags that are not valid for the final stage
