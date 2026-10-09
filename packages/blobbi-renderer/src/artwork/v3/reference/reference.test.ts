@@ -2,7 +2,7 @@
  * THE REFERENCE BLOBBIS OF ALGORITHM 1, held to their pinned morphology,
  * palette and paint lists.
  *
- * What a failure here means: a `visual_algorithm = 1` Blobbi would no longer
+ * What a failure here means: a Algorithm 1 (V3) Blobbi would no longer
  * be drawn as the same Blobbi. See `procedural/version.ts` for what that
  * version freezes, and `reference.ts` for when these files may be rewritten:
  *
@@ -100,7 +100,7 @@ describe('the reference Blobbis', () => {
     for (const c of REFERENCE_CASES) expect(morphology[c.name].baby.mark?.region, c.name).toBe(morphology[c.name].adult.mark?.region);
   });
 
-  it('the two written down as created are still what creation gives their seeds today (informational: creation may be retuned)', () => {
+  it('the two written down as created are still what creation gives their seeds today (Algorithm 1 freezes creation, colour generator included)', () => {
     // If this fails after a deliberate retuning of the colour generator or the
     // trait odds, that is allowed: the reference identities stay as written,
     // and this expectation is what gets updated. It is here so that such a

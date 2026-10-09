@@ -37,10 +37,11 @@ export type {
 } from './blobbi-render-model';
 
 // ── V3: procedural identity ────────────────────────────────────────────────
-// A V3 Blobbi is not picked from artwork: it is generated from its identity
-// (a seed, four colours, its trait kinds). `createBlobbiV3Identity(seed)` is
-// the creation rule's visual half, called once when a Blobbi is born; the
-// result is what its event stores and what `visual.v3` takes back. A V3 seed
+// A V3 Blobbi is not picked from artwork: it is generated from its seed,
+// which `@blobbi-kit/core` derives from its address. `createBlobbiV3Identity(seed)`
+// is Algorithm 1's identity of that seed (four colours, its trait kinds),
+// for any host that needs to know who a Blobbi is; `visual.v3` takes the
+// seed (and, for previews and fixtures, stated fields). A V3 seed
 // has one spelling, 64 lower-case hexadecimal digits (`canonicalBlobbiV3Seed`). The
 // engine behind it (`procedural/`) is NOT part of this barrel: genes,
 // morphology and geometry are implementation, frozen per algorithm version.

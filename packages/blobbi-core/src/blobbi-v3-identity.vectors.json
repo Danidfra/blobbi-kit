@@ -1,5 +1,5 @@
 {
-  "contract": "(author pubkey, d) -> deriveBlobbiV3Seed -> Algorithm 1 (visual_algorithm = 1) -> intrinsic identity",
+  "contract": "(author pubkey, d, visual_generation = v3) -> deriveBlobbiV3Seed -> Algorithm 1 (V3 is Algorithm 1) -> intrinsic identity",
   "note": "Seeds by an independent node:crypto implementation of blobbi:visual-seed:v1; identities by @blobbi-kit/renderer 0.6.0 createBlobbiV3Identity (npm). Core checks address -> seed, the renderer checks seed -> identity. Identity, not SVG: the drawing is pinned elsewhere as shapes and paint.",
   "vectors": [
     {

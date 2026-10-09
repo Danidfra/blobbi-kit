@@ -200,8 +200,8 @@ export function canonicalBlobbiV3Seed(value: unknown): string | undefined {
 
 /**
  * The domain the V3 seed is hashed under. It names the SCHEME (a Blobbi's
- * visual seed, derivation version 1), not an artwork algorithm: every
- * `visual_algorithm` reads the same seed (see `deriveBlobbiV3Seed`).
+ * visual seed, derivation version 1), not an artwork algorithm or a visual
+ * generation (see `deriveBlobbiV3Seed`).
  */
 export const BLOBBI_V3_SEED_DOMAIN = 'blobbi:visual-seed:v1';
 
@@ -271,10 +271,9 @@ export function blobbiV3SeedPreimage(pubkey: string, d: string): Uint8Array {
  * - The kind (31124) does not participate: the domain already scopes the hash
  *   to a Blobbi's visual seed, and a Blobbi moved to another kind is still the
  *   Blobbi at (pubkey, `d`).
- * - `visual_algorithm` does not participate: the seed is who the Blobbi is,
- *   and an algorithm is how it is drawn. A future algorithm reads the same
- *   seed, so changing the tag can never select a different seed; the
- *   algorithm already changes everything it draws.
+ * - The visual generation does not participate: the seed is who the Blobbi
+ *   is at its address, and the generation is how it is drawn (V3 is
+ *   Algorithm 1, fixed; no tag selects another algorithm).
  * - The output is 32 bytes as 64 lower-case hexadecimal digits: a canonical
  *   V3 seed (`canonicalBlobbiV3Seed`), the procedural engine's input as before.
  *

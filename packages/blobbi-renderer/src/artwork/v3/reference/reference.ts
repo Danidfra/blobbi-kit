@@ -23,7 +23,7 @@
  *    that is the tolerance a port should allow, and no more.
  *  - PAINT: positions and sizes within `TOLERANCE`, paint exactly.
  *
- * These files are the contract for `visual_algorithm = 1`, in the sense
+ * These files are the contract for Algorithm 1 (V3), in the sense
  * `procedural/version.ts` states. They are regenerated
  * (`UPDATE_REFERENCE=1`) only for an ADDITION (a new reference case), or
  * for a change shown not to alter any picture. A difference in an existing

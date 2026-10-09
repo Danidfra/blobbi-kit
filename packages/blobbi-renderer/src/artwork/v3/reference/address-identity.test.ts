@@ -1,5 +1,5 @@
 /**
- * THE SEED IS THE WHOLE INTRINSIC BLOBBI, under `visual_algorithm = 1`.
+ * THE SEED IS THE WHOLE INTRINSIC BLOBBI, under Algorithm 1 (V3).
  *
  * A V3 event states no colour and no trait: `@blobbi-kit/core` derives the
  * seed from the Blobbi's address and hands this package `{ seed, algorithm }`

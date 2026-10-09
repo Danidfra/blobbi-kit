@@ -9,21 +9,20 @@
  *
  * A V3 identity has two layers, and they are kept apart on purpose:
  *
- *  - EXPLICIT (semantic identity): the colours, the kind of each trait, the
- *    body's pattern and its special mark.
- *    The seed DECIDES them once, at creation (`createBlobbiV3Identity`);
- *    from then on what the identity states is authoritative, and a stated
- *    value always wins over anything the seed would give. An existing
- *    Blobbi keeps the colours it was created with, however the generator is
- *    tuned for new ones.
+ *  - SEMANTIC: the colours, the kind of each trait, the body's pattern and
+ *    its special mark.
+ *    Algorithm 1's function of the seed (`createBlobbiV3Identity`), frozen
+ *    with the rest of it, colour generator included. A real V3 Blobbi
+ *    states none of them (`@blobbi-kit/core` hands over `{ seed, algorithm }`
+ *    only); a visual that does state one (a host's preview, a fixture) is
+ *    drawn as stated, because a valid stated value wins here.
  *  - DERIVED (micro-geometry): every proportion and every trait's own size,
  *    curve and place, from `seed` under `algorithm`. Never stored;
  *    reproducible only because the algorithm version is frozen (see
  *    `procedural/version.ts`).
  *
- * The seed is the Blobbi's one seed. It is used at creation (to decide the
- * explicit layer) and at every render (to derive the micro-geometry), and
- * for nothing else; there is no second, V3-specific seed. It has ONE
+ * The seed is the Blobbi's one seed, derived from its address by
+ * `@blobbi-kit/core`; both layers come from it at every render. It has ONE
  * spelling, 64 lower-case hexadecimal digits: see `canonicalBlobbiV3Seed`.
  *
  * AN ALGORITHM VERSION IS NOT A HINT. Micro-geometry derived under another

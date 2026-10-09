@@ -2,7 +2,7 @@
  * THE PAINT LIST: what a V3 drawing paints, read back from its markup with
  * everything that is only markup taken out.
  *
- * `visual_algorithm = 1` promises the same Blobbi, not the same SVG (see
+ * Algorithm 1 (V3) promises the same Blobbi, not the same SVG (see
  * `procedural/version.ts`). So the reference tests cannot compare strings.
  * They compare this instead: for each shape the drawing paints, in paint
  * order,

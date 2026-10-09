@@ -279,8 +279,9 @@ When you republish through `updateBlobbiTags`, `updateBlobbonautTags` or the
 - On V1 and V2 the seed is authoritative for visual traits. `base_color`,
   `secondary_color`, `eye_color`, `pattern`, `special_mark`, `size` and the
   adult form are rewritten from the seed on every republish; edits to those
-  tags do not survive. On V3 the three colour tags are explicit identity and
-  are left alone (see "V3 identity"); the other mirrors behave the same.
+  tags do not survive. A V3 event carries none of them: its looks are
+  Algorithm 1's function of its address, and a republish drops any such tag
+  (see "V3 identity").
 - `validateAndRepairBlobbiTags` (tag schema module) drops deprecated tags,
   filters tags by stage, and can restore required or persistent tags from the
   previous event. It will not invent a `name`, `seed`, `d` or personality tag

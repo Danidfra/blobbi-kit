@@ -6,7 +6,7 @@
  * drawing is written: what is painted over what, what is clipped to the
  * body, at which fixed opacity, in which of the identity's colours, and the
  * four special-mark shapes themselves. They are as much the Blobbi as its
- * proportions, and `visual_algorithm = 1` freezes them (see
+ * proportions, and Algorithm 1 (V3) freezes them (see
  * `procedural/version.ts`).
  *
  * The reference paint lists already hold all of this for twelve Blobbis, as
