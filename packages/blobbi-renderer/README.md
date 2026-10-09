@@ -416,8 +416,8 @@ included. A visual that does state colours or trait kinds (a host's preview,
 a fixture) is still drawn as stated: `resolveBlobbiV3Visual` lets a valid
 stated field win; the kit simply never states one for a real Blobbi.
 
-**What a version promises:** the same V3 identity under the same
-`visual_algorithm` is the same Blobbi: the same shapes, in the same places,
+**What V3 promises:** V3 is Algorithm 1, forever, so the same V3 seed is
+the same Blobbi: the same shapes, in the same places,
 painted the same way. It does NOT promise the same SVG bytes, DOM, CSS or
 pixels. `procedural/version.ts` lists exactly what version 1 freezes (the
 seed's reading, the random streams, the genome, the trait odds, morphology,
@@ -425,8 +425,10 @@ the stage plans, geometry, patterns and marks, paint order and opacities,
 the palette, the colour generator) and what it does not. It is held by `procedural/vectors.json`
 and by `artwork/v3/reference/`: twelve reference Blobbis whose morphology,
 palette and drawings are pinned, the drawings as shapes and paint, never as
-markup. Changing any of it for existing Blobbis means a new version beside
-this one, never an edit.
+markup. A change to any of it is a new visual generation (`v4`) for Blobbis
+born into it, never an edit and never a per-Blobbi version tag; a rendering
+improvement that keeps every Blobbi the same Blobbi needs no version at all
+(`procedural/version.ts` lists which is which).
 
 **The seed has one spelling.** A V3 seed is 32 bytes written as 64
 lower-case hexadecimal digits, which is what `@blobbi-kit/core` derives.

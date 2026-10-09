@@ -9,19 +9,21 @@
  *    identity semantics and is meant to stay put.
  *
  *  - {@link PROCEDURAL_ALGORITHM_VERSION} is the version of the RULES that
- *    turn an identity into a Blobbi: what an event names as
- *    `visual_algorithm`.
+ *    turn a seed into a Blobbi: Algorithm 1. V3 IS Algorithm 1, forever:
+ *    the generation fixes the rules, and no tag on an event names others
+ *    (`@blobbi-kit/core` retired the pre-release `visual_algorithm` tag, so
+ *    a replacement event cannot redraw a Blobbi by naming another version).
  *
- * THE CONTRACT OF A VERSION
+ * THE CONTRACT
  *
  * ```
- *   the same V3 identity + the same visual_algorithm  ─►  the same Blobbi
+ *   the same V3 seed  ─►  the same Blobbi, for as long as V3 is drawn
  * ```
  *
  * The same BLOBBI: the same shapes, in the same places, painted the same
  * way. Not necessarily the same SVG, and not necessarily the same pixels.
  *
- * WHAT `visual_algorithm = 1` FREEZES
+ * WHAT ALGORITHM 1 (V3) FREEZES
  *
  *   1. THE SEED'S READING. A seed is 32 bytes written as 64 lower-case
  *      hexadecimal digits. Upper-case digits read as lower-case; nothing
@@ -89,11 +91,24 @@
  *   9        artwork/v3/reference/art-structure.test.ts: the same, in words
  * ```
  *
- * Changing any frozen thing for creatures that already exist is not a
- * tuning pass: it is a new algorithm version, added beside this one and
- * selected by the version an identity carries. Version 1 must keep drawing
- * every version 1 Blobbi as it does today, and those files are how that is
- * known.
+ * WHEN A CHANGE NEEDS A NEW GENERATION
+ *
+ *  - No version at all: a renderer or backend optimization, another backend
+ *    (canvas, 3D), animation, motion, expressions, gaze, sleep and egg-crack
+ *    state, cosmetic layers drawn over the Blobbi (clothing, accessories,
+ *    effects), and SVG structure, ids or number formatting. None of them is
+ *    who the Blobbi is.
+ *  - A fix, still no version: when the implementation has drifted from what
+ *    the files above pin, bringing it back to them is a fix. The pinned
+ *    reference IS Algorithm 1; it is never "fixed" toward something else.
+ *  - A new visual generation (`v4`, its own rules, its own reference files):
+ *    any change to a frozen thing above, so new trait odds, new morphology,
+ *    a new palette or colour generator, a new genome or a new seed reading.
+ *    It applies to Blobbis BORN into it. Every V3 Blobbi stays V3 and keeps
+ *    being drawn by Algorithm 1; a V3 drawing never silently changes.
+ *
+ * Version 1 must keep drawing every V3 Blobbi as it does today, and those
+ * files are how that is known.
  */
 export const PROCEDURAL_GENERATION = 'v3' as const;
 

@@ -73,8 +73,9 @@ export interface BlobbiVisualIdentity {
    * function of the seed, which the renderer computes
    * (`createBlobbiV3Identity`). The seed is derived by core from the
    * Blobbi's address (author pubkey and `d`), the one exception to
-   * "transport data is not identity" above. An absent field is absent; a
-   * renderer reports an algorithm version it cannot draw rather than guessing.
+   * "transport data is not identity" above. `algorithm` is always 1: V3 is
+   * Algorithm 1, fixed by the generation, never by a tag. Without an author
+   * there is no address, so no `seed`.
    */
   v3?: {
     seed?: string;

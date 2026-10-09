@@ -8,8 +8,6 @@ import { ADULT_FORMS, type AdultForm, deriveAdultFormFromSeed } from '@blobbi-ki
 import {
   BLOBBI_V3_ABSENT_TAG_NAMES,
   BLOBBI_V3_RETIRED_TAG_NAMES,
-  NEW_BLOBBI_V3_ALGORITHM,
-  VISUAL_ALGORITHM_TAG,
   canonicalBlobbiV3Seed,
   deriveBlobbiV3Seed,
   getBlobbiV3Seed,
@@ -402,10 +400,10 @@ export interface BlobbiCompanion {
    */
   visualGeneration: BlobbiVisualGeneration;
   /**
-   * The V3 identity of the event: the seed its address derives and the
-   * algorithm version it states, present only when `visualGeneration` is
-   * `'v3'`. Everything the Blobbi looks like follows from those two
-   * (Algorithm 1, in the renderer); see {@link ParsedBlobbiV3Identity}.
+   * The V3 identity of the event: the seed its address derives, under
+   * Algorithm 1, present only when `visualGeneration` is `'v3'`. Everything
+   * the Blobbi looks like follows from it (Algorithm 1, in the renderer);
+   * see {@link ParsedBlobbiV3Identity}.
    * Optional so hosts that build companions by hand keep compiling.
    */
   v3Identity?: ParsedBlobbiV3Identity;
@@ -1500,8 +1498,8 @@ export interface BuildEggTagsOptions {
    * application that deliberately creates original-generation Blobbis; that
    * output carries no `visual_generation` tag, exactly as before this option.
    * Pass `'v3'` for a procedural Blobbi: its whole intrinsic identity is
-   * its address, so the egg states only `visual_generation` and
-   * `visual_algorithm`, and needs nothing from the host.
+   * its address under Algorithm 1, so the egg states only
+   * `visual_generation`, and needs nothing from the host.
    */
   visualGeneration?: BlobbiVisualGeneration;
 }
@@ -1557,8 +1555,6 @@ export function buildEggTags(
     ]),
     // Identity from birth: which artwork family draws this Blobbi (see NEW_BLOBBI_VISUAL_GENERATION).
     ...visualGenerationTags(visualGeneration),
-    // V3 only: the algorithm that turns its address into the Blobbi.
-    ...(isV3 ? [[VISUAL_ALGORITHM_TAG, String(NEW_BLOBBI_V3_ALGORITHM)]] : []),
   ];
 }
 
@@ -1595,8 +1591,8 @@ export const MANAGED_BLOBBI_STATE_TAG_NAMES = new Set([
   'adult_type',
   // Visual generation (identity; never derived from the seed)
   'visual_generation',
-  // V3: the algorithm version, and the pre-release trait tags a V3 republish drops
-  VISUAL_ALGORITHM_TAG, ...BLOBBI_V3_RETIRED_TAG_NAMES,
+  // The pre-release V3 tags (algorithm version, trait kinds) a V3 republish drops
+  ...BLOBBI_V3_RETIRED_TAG_NAMES,
   // Extension tags (for themes/crossovers)
   'theme', 'crossover_app',
 ]);

@@ -597,13 +597,13 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PROCEDURAL IDENTITY (Optional; stated on visual_generation = v3 events)
+  // RETIRED PROCEDURAL IDENTITY TAGS (the pre-release V3 contract)
   //
-  // Generation-independent names. A V3 Blobbi's colours are the three colour
-  // tags above plus accent_color, and its surface the pattern and
-  // special_mark tags above plus belly and freckles (the shared names are
-  // explicit identity there, seed mirrors on V1 and V2); these are the rest
-  // of what it states.
+  // A V3 event once stated its algorithm version, colours and trait kinds.
+  // It states none of them now: its address is its seed, and V3 is
+  // Algorithm 1. These entries stay so the tags remain managed (a V1 or V2
+  // event carrying one is merged exactly as before) and so a V3 republish
+  // knows to drop them.
   // ═══════════════════════════════════════════════════════════════════════════
   {
     tag: 'visual_algorithm',
@@ -615,7 +615,7 @@ export const BLOBBI_TAG_SCHEMA: readonly BlobbiTagSchema[] = [
     source: 'generated',
     regenerable: false,
     format: "positive integer",
-    notes: 'Identifies the deterministic algorithm, as visual_generation identifies the visual system. A renderer that does not implement the stated version must not draw it as another one. The one identity tag a V3 event states: with the address-derived seed it decides the whole Blobbi. Written at creation, never rewritten from the seed and never invented. Absent on V1 and V2. See blobbi-v3-identity.ts.',
+    notes: 'RETIRED (pre-release V3 contract). V3 is Algorithm 1 by definition: the generation fixes the rules, so no per-Blobbi version is stated. Never written, never read; a V3 republish drops it. A change to frozen rules is a new visual_generation, not a version tag. Absent on V1 and V2. See blobbi-v3-identity.ts.',
   },
   {
     tag: 'accent_color',

@@ -1,6 +1,5 @@
 /**
- * V3 IDENTITY ON THE EVENT: the address, the algorithm version, and nothing
- * else.
+ * V3 IDENTITY ON THE EVENT: the address, and nothing else. V3 is Algorithm 1.
  *
  * A procedural Blobbi's whole intrinsic identity (colours, anatomy, pattern,
  * mark, belly, freckles, every proportion) is Algorithm 1's function of the
@@ -32,10 +31,8 @@ import {
   BLOBBI_MIRRORED_COLOR_TAG_NAMES,
   BLOBBI_MIRRORED_IDENTITY_TAG_NAMES,
   BLOBBI_V3_ABSENT_TAG_NAMES,
+  BLOBBI_V3_ALGORITHM,
   BLOBBI_V3_RETIRED_TAG_NAMES,
-  BLOBBI_V3_TAGS,
-  BLOBBI_V3_TAG_NAMES,
-  NEW_BLOBBI_V3_ALGORITHM,
   VISUAL_ALGORITHM_TAG,
   deriveBlobbiV3Seed,
   parseBlobbiV3Identity,
@@ -92,23 +89,26 @@ const FORGERIES: [string, string][] = [
   ['freckles', 'false'],
   ['size', 'large'],
   ['adult_type', 'catti'],
+  ['visual_algorithm', '1'],
+  ['visual_algorithm', '2'],
+  ['visual_algorithm', '0'],
+  ['visual_algorithm', 'two'],
+  ['visual_algorithm', ''],
 ];
 
 describe('the vocabulary', () => {
-  it('a V3 event states one identity tag (the algorithm version); everything else it does not carry is named', () => {
-    expect(BLOBBI_V3_TAGS).toEqual({ algorithm: 'visual_algorithm' });
-    expect(BLOBBI_V3_TAG_NAMES).toEqual(['visual_algorithm']);
+  it('a V3 event states no identity tag: everything it does not carry is named, the algorithm version included', () => {
+    expect(BLOBBI_V3_ALGORITHM).toBe(1);
     expect(VISUAL_ALGORITHM_TAG).toBe('visual_algorithm');
-    expect(NEW_BLOBBI_V3_ALGORITHM).toBe(1);
     expect(BLOBBI_MIRRORED_COLOR_TAG_NAMES).toEqual(['base_color', 'secondary_color', 'eye_color']);
     expect(BLOBBI_MIRRORED_IDENTITY_TAG_NAMES).toEqual(['base_color', 'secondary_color', 'eye_color', 'pattern', 'special_mark']);
-    expect(BLOBBI_V3_RETIRED_TAG_NAMES).toEqual(['accent_color', 'antenna', 'horns', 'ears', 'tail', 'belly', 'freckles']);
-    expect(BLOBBI_V3_ABSENT_TAG_NAMES).toEqual(['seed', 'base_color', 'secondary_color', 'eye_color', 'pattern', 'special_mark', 'accent_color', 'antenna', 'horns', 'ears', 'tail', 'belly', 'freckles', 'size', 'adult_type']);
+    expect(BLOBBI_V3_RETIRED_TAG_NAMES).toEqual(['visual_algorithm', 'accent_color', 'antenna', 'horns', 'ears', 'tail', 'belly', 'freckles']);
+    expect(BLOBBI_V3_ABSENT_TAG_NAMES).toEqual(['seed', 'base_color', 'secondary_color', 'eye_color', 'pattern', 'special_mark', 'visual_algorithm', 'accent_color', 'antenna', 'horns', 'ears', 'tail', 'belly', 'freckles', 'size', 'adult_type']);
     for (const [name] of FORGERIES) expect(BLOBBI_V3_ABSENT_TAG_NAMES, name).toContain(name);
   });
 
   it('every tag stays managed exactly as before, so a V1 or V2 event is merged exactly as before', () => {
-    for (const name of [VISUAL_ALGORITHM_TAG, ...BLOBBI_V3_RETIRED_TAG_NAMES, ...BLOBBI_MIRRORED_IDENTITY_TAG_NAMES, 'seed', 'size', 'adult_type']) {
+    for (const name of [...BLOBBI_V3_RETIRED_TAG_NAMES, ...BLOBBI_MIRRORED_IDENTITY_TAG_NAMES, 'seed', 'size', 'adult_type']) {
       expect(MANAGED_BLOBBI_STATE_TAG_NAMES.has(name), name).toBe(true);
     }
     for (const name of BLOBBI_V3_RETIRED_TAG_NAMES) expect(getTagSchema(name)!.notes, name).toMatch(/RETIRED/);
@@ -122,14 +122,14 @@ describe('creating a V3 Blobbi', () => {
     expect(NEW_BLOBBI_VISUAL_GENERATION).toBe('v2');
   });
 
-  it('writes no intrinsic identity: the V2 egg without its seed and mirrors, plus the generation and the algorithm', () => {
+  it('writes no intrinsic identity: the V2 egg without its seed and mirrors, with generation v3, and no algorithm version', () => {
     const v3 = bornV3();
     const v2 = born('v2');
     for (const name of BLOBBI_V3_ABSENT_TAG_NAMES) expect(getTagValue(v3, name), name).toBeUndefined();
-    expect(v3.slice(-2)).toEqual([[VISUAL_GENERATION_TAG, 'v3'], [VISUAL_ALGORITHM_TAG, '1']]);
-    const common = (tags: string[][]) => tags.filter((t) => !BLOBBI_V3_ABSENT_TAG_NAMES.includes(t[0]) && t[0] !== VISUAL_GENERATION_TAG && t[0] !== VISUAL_ALGORITHM_TAG);
+    expect(v3.slice(-1)).toEqual([[VISUAL_GENERATION_TAG, 'v3']]);
+    const common = (tags: string[][]) => tags.filter((t) => !BLOBBI_V3_ABSENT_TAG_NAMES.includes(t[0]) && t[0] !== VISUAL_GENERATION_TAG);
     expect(common(v3)).toEqual(common(v2));
-    expect(v3).toHaveLength(common(v2).length + 2);
+    expect(v3).toHaveLength(common(v2).length + 1);
   });
 
   it('needs nothing from the host, and refuses an address Nostr would not write', () => {
@@ -150,7 +150,7 @@ describe('creating a V3 Blobbi', () => {
         ['special_mark', MIRRORS.specialMark],
         ['size', MIRRORS.size],
       ]);
-      for (const name of [VISUAL_ALGORITHM_TAG, ...BLOBBI_V3_RETIRED_TAG_NAMES]) expect(getTagValue(tags, name), name).toBeUndefined();
+      for (const name of BLOBBI_V3_RETIRED_TAG_NAMES) expect(getTagValue(tags, name), name).toBeUndefined();
     }
     expect(getTagValue(born('v1'), VISUAL_GENERATION_TAG)).toBeUndefined();
     expect(getTagValue(born('v2'), VISUAL_GENERATION_TAG)).toBe('v2');
@@ -158,7 +158,7 @@ describe('creating a V3 Blobbi', () => {
 });
 
 describe('reading a V3 Blobbi', () => {
-  it('is its address-derived seed and its algorithm version, with nothing missing', () => {
+  it('is its address-derived seed under Algorithm 1, with nothing missing', () => {
     const companion = companionOf(bornV3());
     expect(companion.visualGeneration).toBe('v3');
     expect(companion.seed).toBe(V3_SEED);
@@ -185,21 +185,37 @@ describe('reading a V3 Blobbi', () => {
     expect(getBlobbiVisualIdentity({ stage: 'baby', visualTraits: companion.visualTraits, allTags: bornV3() }).v3).toEqual({ algorithm: 1 });
   });
 
-  it('reports the algorithm version as stated, whatever it is: whether it can be drawn is not core\'s to say', () => {
-    const at = (value: string) => parseBlobbiV3Identity(makeEvent(withTag(bornV3(), VISUAL_ALGORITHM_TAG, value)));
-    expect(at('2')).toEqual({ seed: V3_SEED, algorithm: 2, missing: [] });
-    for (const bad of ['0', '-1', '1.5', 'one', '', '99999']) expect(at(bad), bad).toEqual({ seed: V3_SEED, missing: ['visual_algorithm'] });
-    expect(parseBlobbiV3Identity(makeEvent(bornV3().filter((t) => t[0] !== VISUAL_ALGORITHM_TAG)))).toEqual({ seed: V3_SEED, missing: ['visual_algorithm'] });
-    expect(parseBlobbiV3Identity({ tags: [] })).toEqual({ missing: ['seed', 'visual_algorithm'] });
-    const future = withTag(bornV3(), VISUAL_ALGORITHM_TAG, '2');
-    expect(getBlobbiVisualIdentity(companionOf(future)).v3).toEqual({ seed: V3_SEED, algorithm: 2 });
-    expect(getTagValue(care(future), VISUAL_ALGORITHM_TAG)).toBe('2');
-    expect(getTagValue(evolve(hatch(future)), VISUAL_ALGORITHM_TAG)).toBe('2');
+  it('is always Algorithm 1: no algorithm tag, a "1", a "2", a malformed or several change nothing', () => {
+    const canonical = { seed: V3_SEED, algorithm: 1, missing: [] };
+    const variants: [string, string[][]][] = [
+      ['none', bornV3()],
+      ['1', [...bornV3(), [VISUAL_ALGORITHM_TAG, '1']]],
+      ['2', [...bornV3(), [VISUAL_ALGORITHM_TAG, '2']]],
+      ['9999', [...bornV3(), [VISUAL_ALGORITHM_TAG, '9999']]],
+      ['malformed', [...bornV3(), [VISUAL_ALGORITHM_TAG, 'two']]],
+      ['empty', [...bornV3(), [VISUAL_ALGORITHM_TAG, '']]],
+      ['valueless', [...bornV3(), [VISUAL_ALGORITHM_TAG]]],
+      ['several', [...bornV3(), [VISUAL_ALGORITHM_TAG, '2'], [VISUAL_ALGORITHM_TAG, '1'], [VISUAL_ALGORITHM_TAG, '3']]],
+    ];
+    const projection = getBlobbiVisualIdentity(companionOf(bornV3()));
+    for (const [label, tags] of variants) {
+      expect(parseBlobbiV3Identity(makeEvent(tags)), label).toEqual(canonical);
+      expect(companionOf(tags).v3Identity, label).toEqual(canonical);
+      expect(getBlobbiVisualIdentity(companionOf(tags)), label).toEqual(projection);
+      expect(getBlobbiVisualIdentity(companionOf(tags)).v3, label).toEqual({ seed: V3_SEED, algorithm: 1 });
+      expect(classifyBlobbiEvent(makeEvent(tags)), label).toBe('modern');
+      // Every kit write drops the tag; the address seed never moves.
+      for (const republished of [care(tags), evolve(hatch(tags))]) {
+        expect(republished.filter((t) => t[0] === VISUAL_ALGORITHM_TAG), label).toEqual([]);
+        expect(companionOf(republished).seed, label).toBe(V3_SEED);
+      }
+    }
+    expect(parseBlobbiV3Identity({ tags: [] })).toEqual({ algorithm: 1, missing: ['seed'] });
   });
 
   it('a V1 or V2 companion has no V3 identity, whatever tags it carries', () => {
     for (const generation of ['v1', 'v2'] as const) {
-      const tags = [...born(generation), [VISUAL_ALGORITHM_TAG, '1'], ['antenna', 'double'], ['horns', 'side']];
+      const tags = [...born(generation), [VISUAL_ALGORITHM_TAG, '2'], ['antenna', 'double'], ['horns', 'side']];
       const companion = companionOf(tags);
       expect(companion.visualGeneration).toBe(generation);
       expect(companion.v3Identity).toBeUndefined();
@@ -245,16 +261,14 @@ describe('a replacement event cannot restate who a V3 Blobbi is', () => {
     expect(repaired.errors).toEqual([]);
   });
 
-  it('a V3 republish keeps the generation, the algorithm and every non-identity tag; nothing is invented', () => {
+  it('a V3 republish keeps the generation and every non-identity tag; nothing is invented', () => {
     const tags = bornV3();
     for (const republished of [care(tags), hatch(tags), evolve(hatch(tags))]) {
       expect(getTagValue(republished, VISUAL_GENERATION_TAG)).toBe('v3');
-      expect(getTagValue(republished, VISUAL_ALGORITHM_TAG)).toBe('1');
-      expect(republished.filter((t) => t[0] === VISUAL_ALGORITHM_TAG)).toHaveLength(1);
+      for (const name of BLOBBI_V3_ABSENT_TAG_NAMES) expect(getTagValue(republished, name), name).toBeUndefined();
     }
-    const dropped = tags.filter((t) => t[0] !== VISUAL_ALGORITHM_TAG);
-    expect(getTagValue(validateAndRepairBlobbiTags(dropped, tags).tags, VISUAL_ALGORITHM_TAG)).toBe('1');
-    expect(getTagValue(validateAndRepairBlobbiTags(dropped, dropped).tags, VISUAL_ALGORITHM_TAG)).toBeUndefined();
+    // The repair restores no algorithm version from a previous event that stated one.
+    expect(getTagValue(validateAndRepairBlobbiTags(tags, [...tags, [VISUAL_ALGORITHM_TAG, '1']]).tags, VISUAL_ALGORITHM_TAG)).toBeUndefined();
   });
 });
 

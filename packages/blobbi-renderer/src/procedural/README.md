@@ -41,14 +41,14 @@ of where the engine came from, no longer byte for byte what it is.
 ## The rule that matters
 
 ```
-the same V3 identity + the same visual_algorithm  ─►  the same Blobbi
+the same V3 seed  ─►  the same Blobbi (V3 is Algorithm 1, forever)
 ```
 
 The same Blobbi, not the same SVG and not the same pixels. `version.ts`
-lists exactly what `visual_algorithm = 1` freezes and what it does not.
+lists exactly what Algorithm 1 freezes and what it does not.
 Tuning a frozen thing changes what existing Blobbis look like, so it is not
-a tuning pass: it is a new algorithm version, added beside this one and
-selected by the version an identity carries.
+a tuning pass: it is a new visual generation (`v4`) for Blobbis born into
+it. V3 Blobbis stay V3, drawn by Algorithm 1.
 
 Where version 1 is held:
 

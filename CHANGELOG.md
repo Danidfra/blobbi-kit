@@ -44,18 +44,24 @@ unchanged: for a given seed, every V3 drawing is exactly what it was.
   anatomy, pattern, special mark, belly and freckles are Algorithm 1's
   function of the address-derived seed (`createBlobbiV3Identity(seed)` in the
   renderer), so a V3 event states none of them: `buildEggTags` writes only
-  `visual_generation` and `visual_algorithm` (and takes no `v3` option), the
+  `visual_generation` (and takes no `v3` option), the
   parser reads none of `seed`, `base_color`, `secondary_color`, `eye_color`,
   `accent_color`, `antenna`, `horns`, `ears`, `tail`, `pattern`,
   `special_mark`, `belly`, `freckles`, `size`, `adult_type`
   (`BLOBBI_V3_ABSENT_TAG_NAMES`), and every kit write drops them. A
   replacement event can no longer repaint or reshape a Blobbi.
-- **API:** `parseBlobbiV3Identity` returns `{ seed, algorithm, missing }`;
-  `getBlobbiVisualIdentity(...).v3` is `{ seed, algorithm }`. Removed:
+- **V3 is Algorithm 1, forever.** The generation fixes the rules, so V3
+  events carry no `visual_algorithm` tag: creation writes none, parsing
+  reports Algorithm 1 whatever a tag says (absent, `1`, `2`, malformed or
+  several), and every kit write drops it. A change to anything Algorithm 1
+  freezes is a new visual generation (`v4`) for Blobbis born into it; a
+  rendering, animation, backend or cosmetic change needs no version.
+- **API:** `parseBlobbiV3Identity` returns `{ seed, algorithm: 1, missing }`;
+  `getBlobbiVisualIdentity(...).v3` is `{ seed, algorithm: 1 }`. Removed:
   `validateBlobbiV3Identity`, `blobbiV3IdentityTags`, `normalizeBlobbiV3Color`,
-  `BLOBBI_V3_ONLY_TAG_NAMES`, `BuildEggTagsOptions.v3`. `BLOBBI_V3_TAGS` is
-  `{ algorithm }`. Added: `BLOBBI_V3_RETIRED_TAG_NAMES`,
-  `NEW_BLOBBI_V3_ALGORITHM`. For a V3 Blobbi the plain colour, pattern, mark
+  `BLOBBI_V3_ONLY_TAG_NAMES`, `BLOBBI_V3_TAGS`, `BLOBBI_V3_TAG_NAMES`,
+  `BuildEggTagsOptions.v3`. Added: `BLOBBI_V3_RETIRED_TAG_NAMES` (now
+  including `visual_algorithm`), `BLOBBI_V3_ALGORITHM` (`1`). For a V3 Blobbi the plain colour, pattern, mark
   and size fields of `visualTraits` and the projection are its seed in the
   older generations' mapping, not its colours.
 - **Algorithm 1 freezes its colour generator** (`generateColors`), which it

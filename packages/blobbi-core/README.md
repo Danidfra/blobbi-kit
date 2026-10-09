@@ -142,8 +142,7 @@ A `visual_generation = v3` Blobbi is drawn procedurally, and its event states
 almost nothing about who it is:
 
 ```
-visual_generation = v3            the visual system
-visual_algorithm  = 1             the frozen procedural algorithm that turns the seed into the Blobbi
+visual_generation = v3            the visual system, and with it the rules: V3 IS Algorithm 1, forever
 (the address: pubkey, d)          the seed, hashed from it: deriveBlobbiV3Seed(pubkey, d), below
 ```
 
@@ -157,7 +156,7 @@ Everything a V3 Blobbi is, intrinsically, follows from those:
 Algorithm 1 is the renderer's (core and the renderer never import each
 other): core resolves the address to the seed, and
 `createBlobbiV3Identity(seed)` in `@blobbi-kit/renderer` gives the colours and
-trait kinds, frozen under `visual_algorithm = 1` (the colour generator
+trait kinds, frozen by Algorithm 1 (the colour generator
 included). A V3 event carries no `seed`, no colour, `pattern` or
 `special_mark` (the V1/V2 seed mirrors), none of the pre-release V3 trait tags
 (`accent_color`, `antenna`, `horns`, `ears`, `tail`, `belly`, `freckles`), and
@@ -188,18 +187,17 @@ seed = lowercase_hex( SHA-256(
   `d` byte for byte: no trimming, case folding or Unicode normalization (relays
   address by the exact string, so two spellings are two Blobbis). A `d` with a
   lone UTF-16 surrogate has no single UTF-8 encoding and no seed.
-- Neither the kind nor `visual_algorithm` is hashed. The domain already
+- Neither the kind nor the visual generation is hashed. The domain already
   scopes the hash to a Blobbi's visual seed, and the seed is who the Blobbi
-  is while the algorithm is how it is drawn: a future algorithm reads the same
-  seed, so editing that tag can never select another seed.
+  is while the generation decides how it is drawn.
 - A `seed` tag on a V3 event is never read, and every kit write drops it
   (`BLOBBI_V3_ABSENT_TAG_NAMES`). V1 and V2 keep theirs exactly as before.
 - No birth record or earlier event is needed to draw a V3 Blobbi.
 
 ```ts
 const tags = buildEggTags(pubkey, petId, createdAt, name, { visualGeneration: 'v3' });  // needs nothing else
-parseBlobbiEvent(event).v3Identity;          // { seed, algorithm, missing }
-getBlobbiVisualIdentity(companion).v3;       // { seed, algorithm }: what a renderer takes
+parseBlobbiEvent(event).v3Identity;          // { seed, algorithm: 1, missing }
+getBlobbiVisualIdentity(companion).v3;       // { seed, algorithm: 1 }: what a renderer takes
 
 import { createBlobbiV3Identity } from '@blobbi-kit/renderer';
 createBlobbiV3Identity(seed);                // its colours and trait kinds, for any host that needs them
@@ -231,11 +229,28 @@ createBlobbiV3Identity(seed);                // its colours and trait kinds, for
   classifies the event as legacy and neither shows nor republishes it: clients
   must be updated before V3 Blobbis are created for real.
 - **Opt-in.** `NEW_BLOBBI_VISUAL_GENERATION` is still `'v2'`.
-- **The algorithm version is the one stated input.** It is reported as
-  stated (a missing or malformed one is in `missing`); whether a renderer
-  can draw it is the renderer's to say. Editing it cannot select a different
-  individual while version 1 is the only one: an unknown version is drawn as a
-  stand-in.
+- **V3 is Algorithm 1, forever.** The generation fixes the rules; no tag
+  names a version. A `visual_algorithm` tag (the pre-release contract) is
+  never read, whatever it says, and every kit write drops it, so a
+  replacement event cannot redraw a Blobbi by naming another algorithm.
+
+### When a change needs a new visual generation
+
+| Change | What it needs |
+| --- | --- |
+| renderer or backend optimization, another backend (canvas, 3D) | nothing |
+| animation, motion, expressions, gaze, sleep, egg-crack state | nothing |
+| cosmetic layers over the Blobbi (clothing, accessories, effects) | nothing: a separate, mutable layer |
+| SVG structure, ids, number formatting | nothing |
+| a fix bringing the implementation back to Algorithm 1's pinned reference (`procedural/vectors.json`, `artwork/v3/reference/`, `blobbi-v3-identity.vectors.json`) | nothing: the reference IS Algorithm 1 |
+| new trait odds, morphology, palette or colour generator, genome, seed reading: anything `procedural/version.ts` freezes | a new visual generation (`v4`), for Blobbis born into it |
+
+A V3 Blobbi stays V3 and is drawn by Algorithm 1 for as long as V3 is
+drawn. There is no Algorithm 2 inside V3.
+
+An older kit reading a future `v4` event treats the unknown generation as
+V1, finds no `seed` tag, and classifies it as legacy: it hides the Blobbi
+rather than drawing it wrong.
 
 ## Tags and compatibility
 

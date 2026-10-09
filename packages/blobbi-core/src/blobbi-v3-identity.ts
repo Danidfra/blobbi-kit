@@ -6,8 +6,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
  * kind 31124 event says about who the Blobbi is. Almost nothing, on purpose:
  *
  * ```
- *   visual_generation = v3          the visual system (blobbi.ts)
- *   visual_algorithm  = 1           the frozen procedural algorithm that turns the seed into the Blobbi
+ *   visual_generation = v3          the visual system, and with it the rules: V3 IS Algorithm 1
  *   (the address: pubkey, d)        the seed, hashed from it: `deriveBlobbiV3Seed(pubkey, d)`
  * ```
  *
@@ -29,9 +28,9 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
  * WHAT A V3 EVENT DOES NOT CARRY (`BLOBBI_V3_ABSENT_TAG_NAMES`): a `seed`;
  * the colour, pattern and mark tags V1 and V2 carry as seed mirrors
  * (`base_color`, `secondary_color`, `eye_color`, `pattern`,
- * `special_mark`); the trait tags of the pre-release V3 contract
- * (`accent_color`, `antenna`, `horns`, `ears`, `tail`, `belly`,
- * `freckles`); and `size` and `adult_type`. Creation writes none of them,
+ * `special_mark`); the tags of the pre-release V3 contract
+ * (`visual_algorithm`, `accent_color`, `antenna`, `horns`, `ears`, `tail`,
+ * `belly`, `freckles`); and `size` and `adult_type`. Creation writes none of them,
  * reading ignores any it finds, and every kit write drops them. They are
  * not kept as mirrors either: a mirror is a second source that can
  * disagree, and relays do not index multi-letter tags, so one would buy no
@@ -40,7 +39,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
  * WHERE THE IDENTITY IS COMPUTED. Algorithm 1 is the renderer's
  * (`@blobbi-kit/renderer`): core and the renderer never import each other,
  * and nothing re-implements the engine. Core resolves the address to the
- * seed and reports the algorithm version; the renderer's
+ * seed and names Algorithm 1; the renderer's
  * `createBlobbiV3Identity(seed)` turns the seed into the colours and trait
  * kinds, and the renderer draws from the same seed.
  *
@@ -49,23 +48,31 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
  * identity. Customization (clothing, accessories, dyes) belongs to a
  * separate layer when it exists, never to a tag that rewrites genetics.
  *
- * THE ONE STATED INPUT. `visual_algorithm` is still a tag, because it is the
- * version boundary between algorithms. A version the renderer does not
- * implement is drawn as a stand-in, never as another individual, so editing
- * it cannot select a different Blobbi while version 1 is the only one.
+ * V3 IS ALGORITHM 1, FOREVER. There is no algorithm version inside V3: a
+ * per-Blobbi version would be one more tag a replacement event could edit
+ * to redraw the Blobbi. What the rules are is decided by the generation:
+ *
+ *  - a change that keeps every V3 Blobbi the same Blobbi (a faster or
+ *    different backend, animation, expressions, render state, cosmetic
+ *    layers, a fix that brings the implementation back to Algorithm 1's
+ *    pinned reference) needs no version at all;
+ *  - a change to anything Algorithm 1 freezes (`procedural/version.ts` in
+ *    the renderer: the seed's reading, the random streams, the genome, the
+ *    trait odds, the colour generator, morphology, the stage plans,
+ *    geometry, patterns and marks, paint structure, the palette) is a new
+ *    visual GENERATION (`v4`) for Blobbis born into it. Existing V3 Blobbis
+ *    stay V3 and are drawn by Algorithm 1 for as long as V3 is drawn.
+ *
+ * A `visual_algorithm` tag on a V3 event is the pre-release contract's: it
+ * is never read and every kit write drops it. The algorithm a V3 Blobbi is
+ * reported under is always `BLOBBI_V3_ALGORITHM`.
  */
 
-/** The kind 31124 tag that names the procedural algorithm version: `["visual_algorithm", "1"]`. */
+/** The pre-release tag that named a per-Blobbi algorithm version. Retired: V3 is Algorithm 1. */
 export const VISUAL_ALGORITHM_TAG = 'visual_algorithm';
 
-/** The algorithm a new V3 Blobbi is born under: the renderer's `BLOBBI_V3_ALGORITHM_VERSION`. */
-export const NEW_BLOBBI_V3_ALGORITHM = 1;
-
-/** What a V3 event states about its identity, beyond `visual_generation` and its address: the algorithm version. */
-export const BLOBBI_V3_TAGS = { algorithm: VISUAL_ALGORITHM_TAG } as const;
-
-/** Every identity tag a V3 event carries, in the order it is written. */
-export const BLOBBI_V3_TAG_NAMES: readonly string[] = Object.values(BLOBBI_V3_TAGS);
+/** The algorithm every V3 Blobbi is drawn by, fixed by its generation: the renderer's `BLOBBI_V3_ALGORITHM_VERSION`. */
+export const BLOBBI_V3_ALGORITHM = 1;
 
 /** The colour tags that are seed MIRRORS on V1 and V2. A V3 event has none. */
 export const BLOBBI_MIRRORED_COLOR_TAG_NAMES: readonly string[] = ['base_color', 'secondary_color', 'eye_color'];
@@ -78,12 +85,12 @@ export const BLOBBI_MIRRORED_COLOR_TAG_NAMES: readonly string[] = ['base_color',
 export const BLOBBI_MIRRORED_IDENTITY_TAG_NAMES: readonly string[] = [...BLOBBI_MIRRORED_COLOR_TAG_NAMES, 'pattern', 'special_mark'];
 
 /**
- * The trait tags of the pre-release V3 contract, when a V3 event stated its
- * colours and trait kinds: never written now, never read, dropped by every
- * kit write. Still managed, so a V1 or V2 event carrying one is treated
- * exactly as before, and never invented on any event.
+ * The tags of the pre-release V3 contract, when a V3 event stated its
+ * algorithm version, colours and trait kinds: never written now, never read,
+ * dropped by every kit write. Still managed, so a V1 or V2 event carrying
+ * one is treated exactly as before, and never invented on any event.
  */
-export const BLOBBI_V3_RETIRED_TAG_NAMES: readonly string[] = ['accent_color', 'antenna', 'horns', 'ears', 'tail', 'belly', 'freckles'];
+export const BLOBBI_V3_RETIRED_TAG_NAMES: readonly string[] = [VISUAL_ALGORITHM_TAG, 'accent_color', 'antenna', 'horns', 'ears', 'tail', 'belly', 'freckles'];
 
 /**
  * Every tag a V3 event does NOT carry: a V3 republish drops any it finds,
@@ -147,19 +154,15 @@ export interface BlobbiV3Identity {
 }
 
 /**
- * A V3 identity as core READS it from an event: the seed its address derives
- * and the algorithm version it states. Nothing else on the event is identity.
+ * A V3 identity as core READS it from an event: the seed its address derives,
+ * under Algorithm 1. Nothing on the event but its address is identity.
  */
 export interface ParsedBlobbiV3Identity {
   /** The seed, derived from the event's address (`getBlobbiV3Seed`). Absent when the event has no single well-formed address. */
   seed?: string;
-  /**
-   * The algorithm version the event states. Absent when the tag is missing
-   * or malformed. It is reported as stated, whatever its value: whether a
-   * given version can be drawn is the renderer's knowledge, not core's.
-   */
-  algorithm?: number;
-  /** What is absent or malformed: `seed` when the address yields none, `visual_algorithm` when the tag does. Empty for every Blobbi this kit created. */
+  /** Always `BLOBBI_V3_ALGORITHM`: the generation fixes the rules; no tag can name others. */
+  algorithm: typeof BLOBBI_V3_ALGORITHM;
+  /** `['seed']` when the address yields no seed; empty otherwise. */
   missing: string[];
 }
 
@@ -308,26 +311,17 @@ export function getBlobbiV3Seed(event: BlobbiV3AddressSource): string | undefine
   return deriveBlobbiV3Seed(event.pubkey, d);
 }
 
-const validAlgorithm = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 9999;
-
 /**
- * Read the V3 identity of an event: the seed its address derives and the
- * algorithm version it states. Pure and total: any input yields a result,
- * and nothing is ever invented. It does not check the generation; a caller
- * reads it for a `visual_generation = v3` event (`parseBlobbiEvent` does,
- * into `BlobbiCompanion.v3Identity`).
+ * Read the V3 identity of an event: the seed its address derives, under
+ * Algorithm 1. Pure and total: any input yields a result, and nothing is
+ * ever invented. It does not check the generation; a caller reads it for a
+ * `visual_generation = v3` event (`parseBlobbiEvent` does, into
+ * `BlobbiCompanion.v3Identity`).
  *
- * No colour, trait or `seed` tag is read: none can name another Blobbi.
+ * No `visual_algorithm`, `seed`, colour or trait tag is read: none can name
+ * another Blobbi.
  */
 export function parseBlobbiV3Identity(event: BlobbiV3AddressSource): ParsedBlobbiV3Identity {
-  const missing: string[] = [];
   const seed = getBlobbiV3Seed(event);
-  if (!seed) missing.push('seed');
-  const algorithmTag = event.tags.find((tag) => tag[0] === VISUAL_ALGORITHM_TAG)?.[1];
-  const algorithmValue = algorithmTag !== undefined && /^[0-9]{1,4}$/.test(algorithmTag) ? Number(algorithmTag) : undefined;
-  if (!validAlgorithm(algorithmValue)) missing.push(VISUAL_ALGORITHM_TAG);
-  const identity: ParsedBlobbiV3Identity = { missing };
-  if (validAlgorithm(algorithmValue)) identity.algorithm = algorithmValue;
-  if (seed) identity.seed = seed;
-  return identity;
+  return seed ? { seed, algorithm: BLOBBI_V3_ALGORITHM, missing: [] } : { algorithm: BLOBBI_V3_ALGORITHM, missing: ['seed'] };
 }
