@@ -13,8 +13,8 @@ npm under the `@blobbi-kit` scope.
 
 | Package | Version | What it is | Runtime dependencies |
 | --- | --- | --- | --- |
-| [`@blobbi-kit/core`](./packages/blobbi-core) | 0.8.0 | Event kinds, parsing, domain rules, decay, seed identity. No React, no DOM, no Nostr library. | `@noble/hashes` |
-| [`@blobbi-kit/react`](./packages/blobbi-react) | 0.8.0 | React hooks over core: reading a user's Blobbis, projecting state, syncing and publishing through host-supplied functions. Browser only. | peers: core, `react`, `@tanstack/react-query`, `@nostrify/react` |
+| [`@blobbi-kit/core`](./packages/blobbi-core) | 0.9.0 | Event kinds, parsing, domain rules, decay, seed identity. No React, no DOM, no Nostr library. | `@noble/hashes` |
+| [`@blobbi-kit/react`](./packages/blobbi-react) | 0.9.0 | React hooks over core: reading a user's Blobbis, projecting state, syncing and publishing through host-supplied functions. Browser only. | peers: core, `react`, `@tanstack/react-query`, `@nostrify/react` |
 | [`@blobbi-kit/renderer`](./packages/blobbi-renderer) | 0.6.0 | React component and string API that draws a Blobbi as SVG from plain visual data. Imports neither kit package. Its `procedural` subpath is the V3 engine, for other renderers. | peer: `react` |
 | [`@blobbi-kit/3d`](./packages/blobbi-3d) | 0.1.1 | Procedural 3D Blobbi for Babylon.js from the same V3 identity: body, face, traits, rig, animation. Builds on the renderer's `procedural` engine. | `@blobbi-kit/renderer`; peer: `@babylonjs/core` |
 | [`renderer-consumer-fixture`](./packages/blobbi-renderer-consumer) | private | Test-only consumer of the renderer. Proves it renders with no provider, no host CSS and no kit package around it. | |

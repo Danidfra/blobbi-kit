@@ -10,69 +10,90 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
-## Unreleased: the V3 seed is the address (proposed `@blobbi-kit/core` 0.9.0, `@blobbi-kit/react` 0.9.0)
+## `@blobbi-kit/core` 0.9.0, `@blobbi-kit/react` 0.9.0: the production V3 identity contract
 
-Breaking for V3 only, and V3 is not yet any client's production creation
-format. V1 and V2 are unchanged. The renderer and `@blobbi-kit/3d` are
-unchanged: for a given seed, every V3 drawing is exactly what it was.
+This is the V3 contract Blobbis are meant to be created under. It replaces
+the pre-release V3 representation of 0.8.0 and is breaking for V3 only.
+No client has created V3 Blobbis in production yet, so there is nothing to
+migrate. V1 and V2 are unchanged. `@blobbi-kit/renderer` (0.6.0) and
+`@blobbi-kit/3d` (0.1.1) are not re-released: their code is unchanged, and
+for a given seed every V3 drawing is exactly what it was.
 
-- **A V3 seed is derived from the Blobbi's address, never stated.** A kind
-  31124 event is parameterized replaceable, so a `seed` tag could be
-  restated by any replacement event at the same (author pubkey, `d`),
-  rerolling the Blobbi in place. The seed is now
-  `SHA-256(u8(21) || "blobbi:visual-seed:v1" || pubkey[32] || u32_be(len(d)) || d)`
-  as 64 lower-case hex digits (`deriveBlobbiV3Seed`, `blobbiV3SeedPreimage`,
-  `getBlobbiV3Seed`, `BLOBBI_V3_SEED_DOMAIN`). The pubkey must be NIP-01
-  (64 lower-case hex digits); `d` is its exact UTF-8, with no normalization,
-  and must be the event's only `d` tag, non-empty and well-formed. Neither
-  the kind nor `visual_algorithm` is hashed. Reference vectors, made by an
-  independent implementation, are in `blobbi-v3-seed.vectors.json`.
-- **No `seed` tag on V3.** `buildEggTags` writes none for V3, the parser
-  never reads one, and every kit write (merge, mirror sync, tag repair) drops
-  one and never restores it: `'seed'` joins `BLOBBI_V3_ABSENT_TAG_NAMES`.
-  A V3 event without a single well-formed address is legacy.
-- **`parseBlobbiV3Identity(event)`** now takes `{ pubkey, tags }` (a
-  `NostrEvent` is one) instead of a tag list. `getBlobbiVisualIdentity`
-  derives the seed from `event.pubkey` when a minimal source has `allTags`
-  but no parsed `v3Identity`.
-- **Older kits ignore new V3 events.** Without a `seed` tag, core 0.8.0
-  classifies them as legacy: it neither draws nor republishes them, so it
-  cannot rewrite their identity, but every client must update before V3
-  becomes a creation default. Pre-release V3 events that carry a seed tag now
-  draw from their address seed instead.
-- **A V3 Blobbi's whole intrinsic identity is its address.** Its colours,
-  anatomy, pattern, special mark, belly and freckles are Algorithm 1's
-  function of the address-derived seed (`createBlobbiV3Identity(seed)` in the
-  renderer), so a V3 event states none of them: `buildEggTags` writes only
-  `visual_generation` (and takes no `v3` option), the
-  parser reads none of `seed`, `base_color`, `secondary_color`, `eye_color`,
-  `accent_color`, `antenna`, `horns`, `ears`, `tail`, `pattern`,
-  `special_mark`, `belly`, `freckles`, `size`, `adult_type`
-  (`BLOBBI_V3_ABSENT_TAG_NAMES`), and every kit write drops them. A
-  replacement event can no longer repaint or reshape a Blobbi.
-- **V3 is Algorithm 1, forever.** The generation fixes the rules, so V3
-  events carry no `visual_algorithm` tag: creation writes none, parsing
-  reports Algorithm 1 whatever a tag says (absent, `1`, `2`, malformed or
-  several), and every kit write drops it. A change to anything Algorithm 1
-  freezes is a new visual generation (`v4`) for Blobbis born into it; a
-  rendering, animation, backend or cosmetic change needs no version.
-- **API:** `parseBlobbiV3Identity` returns `{ seed, algorithm: 1, missing }`;
-  `getBlobbiVisualIdentity(...).v3` is `{ seed, algorithm: 1 }`. Removed:
-  `validateBlobbiV3Identity`, `blobbiV3IdentityTags`, `normalizeBlobbiV3Color`,
-  `BLOBBI_V3_ONLY_TAG_NAMES`, `BLOBBI_V3_TAGS`, `BLOBBI_V3_TAG_NAMES`,
-  `BuildEggTagsOptions.v3`. Added: `BLOBBI_V3_RETIRED_TAG_NAMES` (now
-  including `visual_algorithm`), `BLOBBI_V3_ALGORITHM` (`1`). For a V3 Blobbi the plain colour, pattern, mark
-  and size fields of `visualTraits` and the projection are its seed in the
-  older generations' mapping, not its colours.
-- **Algorithm 1 freezes its colour generator** (`generateColors`), which it
-  already pinned in its vectors: no output changes, but a seed's colours can
-  no longer be retuned under version 1. `blobbi-v3-identity.vectors.json` pins
-  address -> seed -> colours and trait kinds for 12 addresses covering every
-  trait kind and colour scheme; the renderer checks the identity half. The
-  renderer's runtime is unchanged; only its documentation says so (a
-  docs-only renderer release is optional).
-- **React:** no source change. Its peer range on core moves to `^0.9.0` with
-  the release.
+**A V3 Blobbi is its address.** It is identified by
+(author pubkey, `d`, `visual_generation = v3`), and its whole intrinsic
+identity follows from the address alone:
+
+```
+(pubkey, d) ─► seed ─► Algorithm 1 ─► colours, anatomy, pattern, special mark,
+                                      belly, freckles, every proportion
+```
+
+A kind 31124 event is parameterized replaceable, so anything an event
+STATES can be restated by the next version at the same address. A V3 event
+therefore states nothing about who the Blobbi is, and no replacement event
+can reroll, repaint or reshape it. Any client can draw it from the current
+event alone, with no earlier event or birth record.
+
+- **The seed is derived from the address.**
+  `deriveBlobbiV3Seed(pubkey, d)` is
+  `lowercase_hex(SHA-256(u8(21) || "blobbi:visual-seed:v1" || pubkey[32] || u32_be(len(d)) || d))`.
+  The pubkey must be NIP-01 (64 lower-case hex digits), `d` is its exact
+  UTF-8 (no trimming, case folding or Unicode normalization), and the event
+  must have exactly one non-empty, well-formed `d` tag; otherwise it has no
+  seed and is legacy. Neither the kind nor the visual generation is hashed.
+  Also exported: `blobbiV3SeedPreimage` (the exact bytes hashed),
+  `getBlobbiV3Seed(event)`, `BLOBBI_V3_SEED_DOMAIN`. Reference vectors made
+  by an independent implementation: `blobbi-v3-seed.vectors.json`.
+- **The whole intrinsic identity is Algorithm 1's function of the seed**
+  (`createBlobbiV3Identity(seed)` in `@blobbi-kit/renderer`), colour
+  generator included, which Algorithm 1 now freezes (it already pinned its
+  output). `blobbi-v3-identity.vectors.json` pins address -> seed ->
+  colours and trait kinds for 12 addresses covering every trait kind and
+  colour scheme.
+- **V3 is Algorithm 1, forever.** The generation fixes the rules. A change
+  to anything Algorithm 1 freezes (seed reading, random streams, genome,
+  trait odds, colour generator, morphology, plans, geometry, patterns and
+  marks, paint structure, palette) is a new visual generation (`v4`) for
+  Blobbis born into it; rendering, backend, animation and cosmetic changes
+  need no version. Existing V3 Blobbis stay Algorithm 1.
+- **A V3 event carries only `visual_generation = v3`** (with its `d` and the
+  ordinary state tags). It never carries `seed`, `visual_algorithm`,
+  `base_color`, `secondary_color`, `eye_color`, `accent_color`, `antenna`,
+  `horns`, `ears`, `tail`, `pattern`, `special_mark`, `belly`, `freckles`,
+  `size` or `adult_type` (`BLOBBI_V3_ABSENT_TAG_NAMES`). Creation writes
+  none, parsing reads none (whatever their values), and every kit write
+  (merge, mirror sync, tag repair) drops any it finds and never restores
+  one.
+
+API changes (core):
+
+- `buildEggTags(..., { visualGeneration: 'v3' })` needs nothing else; the
+  `v3` option is removed.
+- `parseBlobbiV3Identity(event)` takes `{ pubkey, tags }` (a `NostrEvent`
+  is one) and returns `{ seed, algorithm: 1, missing }`; `missing` is
+  `['seed']` only when the address yields none.
+- `getBlobbiVisualIdentity(...).v3` is `{ seed, algorithm: 1 }`. A minimal
+  source with `allTags` must also carry `event: { pubkey }` to have a seed.
+  For a V3 Blobbi the plain colour, pattern, mark and size fields (here and
+  in `visualTraits`) are the seed in the V1/V2 mapping, not its colours: use
+  the renderer's `createBlobbiV3Identity(seed)`.
+- `getOrDeriveSeed` returns the address seed for V3, and throws when there
+  is no single well-formed address.
+- Removed: `validateBlobbiV3Identity`, `blobbiV3IdentityTags`,
+  `normalizeBlobbiV3Color`, `BLOBBI_V3_TAGS`, `BLOBBI_V3_TAG_NAMES`,
+  `BLOBBI_V3_ONLY_TAG_NAMES`. Added: `BLOBBI_V3_ALGORITHM` (`1`),
+  `BLOBBI_V3_RETIRED_TAG_NAMES` (the pre-release V3 tags, still managed so
+  V1 and V2 events are merged exactly as before).
+
+Compatibility:
+
+- **V1 and V2 are unchanged**: their `seed` tag, its mirrors and every
+  republish behave exactly as in 0.8.0.
+- **Older kits hide new V3 events.** Core 0.8.0 finds no `seed` tag and
+  classifies a 0.9.0 V3 event as legacy: it neither draws nor republishes
+  it, so it cannot damage it. Every client must move to 0.9.0 before V3
+  becomes a creation default.
+- **React:** no source change; its peer range on core is `^0.9.0`.
 
 ## `@blobbi-kit/3d` 0.1.1 (fix: a raised arm goes out, not in)
 
