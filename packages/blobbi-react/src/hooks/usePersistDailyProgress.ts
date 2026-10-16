@@ -154,8 +154,9 @@ export function usePersistDailyProgress(options: PersistDailyProgressOptions): v
     // ─── Daily mission update handler (debounced) ───
     const onMissionUpdate = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      // Skip evolution updates — those are handled by usePersistEvolutionProgress
-      if (detail?.evolution) return;
+      // Skip evolution updates — those are handled by usePersistEvolutionProgress — and merges of a copy read from
+      // elsewhere (`hydrated`: the profile loading, a saved pending copy): nothing new happened in the app
+      if (detail?.evolution || detail?.hydrated) return;
 
       dirtyRef.current = true;
 

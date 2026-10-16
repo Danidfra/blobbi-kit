@@ -14,6 +14,7 @@
 
 import type { Mission } from '@blobbi-kit/core/missions';
 import type { MissionsContent } from '@blobbi-kit/core/missions';
+import { mergeDailyMissions } from '@blobbi-kit/core/missions';
 import type { DailyMissionAction } from './daily-missions';
 import {
   getTodayDateString,
@@ -164,6 +165,25 @@ export function readDailyFromStorage(pubkey?: string): MissionsContent | undefin
  */
 export function ensureDailyStore(pubkey?: string): MissionsContent {
   return ensureDailyCurrent(pubkey);
+}
+
+/**
+ * Merge a copy of the day's missions (the profile's, a saved pending copy) into
+ * the session store, without losing the progress already there
+ * (`mergeDailyMissions`). Only today's copies count. When the store changes,
+ * listeners are told with `{ hydrated: true }`: a merge never starts a save
+ * (nothing new happened in the app). Returns the store's copy for today.
+ */
+export function mergeIntoDailyStore(missions: MissionsContent | undefined, pubkey?: string): MissionsContent | undefined {
+  const k = dailyKey(pubkey);
+  const current = dailyStore.get(k);
+  const merged = mergeDailyMissions(current, missions, getTodayDateString());
+  if (!merged) return undefined;
+  if (JSON.stringify(merged) !== JSON.stringify(current)) {
+    dailyStore.set(k, merged);
+    notify({ hydrated: true });
+  }
+  return merged;
 }
 
 /** Write daily state to session store for a pubkey. */

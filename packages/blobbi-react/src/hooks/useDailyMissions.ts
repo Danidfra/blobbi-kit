@@ -35,6 +35,7 @@ import {
 } from '@blobbi-kit/react/lib/daily-missions';
 
 import {
+  mergeIntoDailyStore,
   readDailyFromStorage,
   writeDailyToStorage,
 } from '@blobbi-kit/react/lib/daily-mission-tracker';
@@ -117,53 +118,23 @@ export function useDailyMissions(options: UseDailyMissionsOptions = {}): UseDail
   // Track whether we've hydrated for this pubkey
   const hydratedRef = useRef<string | null>(null);
 
-  // Hydrate session store from kind 11125 content on mount / account switch.
-  // If profileContent hasn't loaded yet, we still mark as hydrated so the hook
-  // can generate fresh missions rather than blocking. If profileContent arrives
-  // later with persisted progress for today, we merge it in.
-  const profileHydratedRef = useRef<string | null>(null);
+  // Hydrate the session store from the kind 11125 content: on mount, on account switch, and whenever the profile
+  // changes (a save from this app, another device, another Blobbi app). The profile's missions are MERGED into what
+  // this page already has (`mergeIntoDailyStore`, `mergeDailyMissions`): progress made here before the profile
+  // arrived, or not saved yet, is never overwritten by an older profile. A merge never starts a save.
+  // If profileContent hasn't loaded yet, we still mark as hydrated so the hook can generate fresh missions.
   useEffect(() => {
     if (!pubkey) return;
 
-    if (!profileContent) {
-      // No profile loaded yet — mark hydrated so we can generate fresh missions.
-      // When profileContent arrives, this effect re-runs and can merge.
-      if (hydratedRef.current !== pubkey) {
-        hydratedRef.current = pubkey;
-        setVersion((v) => v + 1);
-      }
-      return;
+    if (profileContent) {
+      const parsed = parseProfileContent(profileContent);
+      if (parsed.missions) mergeIntoDailyStore(parsed.missions, pubkey);
     }
 
-    // Only attempt profile hydration once per pubkey per session
-    if (profileHydratedRef.current === pubkey) return;
-    profileHydratedRef.current = pubkey;
-
-    // Parse persisted daily missions from profile content
-    const parsed = parseProfileContent(profileContent);
-    if (parsed.missions && !needsDailyReset(parsed.missions)) {
-      // Daily missions are still current — hydrate or merge.
-      // Merge strategy: persisted missions from the relay represent accumulated
-      // progress from prior sessions. If they have ANY real progress, they are
-      // authoritative and should overwrite local (which at most has trivial
-      // progress from the brief window before profile loaded). If persisted has
-      // zero progress everywhere, local is equally valid — keep it to avoid
-      // swapping mission assignments the user has already seen.
-      const persistedHasProgress = parsed.missions.daily.some((m) => missionProgress(m) > 0);
-      if (persistedHasProgress) {
-        // Persisted carries real work — always prefer it
-        writeDailyToStorage(parsed.missions, pubkey);
-      } else {
-        // Persisted has zero progress — only hydrate if local is empty
-        const existing = readDailyFromStorage(pubkey);
-        if (!existing) {
-          writeDailyToStorage(parsed.missions, pubkey);
-        }
-      }
+    if (hydratedRef.current !== pubkey) {
+      hydratedRef.current = pubkey;
+      setVersion((v) => v + 1);
     }
-
-    hydratedRef.current = pubkey;
-    setVersion((v) => v + 1);
   }, [pubkey, profileContent]);
 
   // Listen for tracker events
