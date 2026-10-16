@@ -180,6 +180,125 @@ export function serializeProfileContent(
   return JSON.stringify(merged);
 }
 
+/**
+ * Read a `missions` object (as stored in the kind 11125 content) safely: the
+ * same validation as `parseProfileContent`. Undefined when it is not one.
+ */
+export function parseMissionsValue(raw: unknown): MissionsContent | undefined {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
+  return parseMissionsContent(raw as Record<string, unknown>);
+}
+
+// ─── Merging two copies of the day's missions ───────────────────────────────
+
+/**
+ * Merge two copies of the day's missions (this device's, another device's or
+ * app's, the profile's) into one, without losing progress.
+ *
+ * WHAT A COPY SAYS. `daily` is the day's three missions by slot; a reroll
+ * replaces the mission of one slot and spends one of `rerolls`. Progress on a
+ * mission only grows during the day (a count up to its target, event ids
+ * added).
+ *
+ * THE RULES.
+ *  1. The day: only copies dated `today` count; none: undefined.
+ *  2. Progress: of the copies holding a mission in the same slot, the one
+ *     with MORE progress counts (the higher count; for an event mission the
+ *     larger set of event ids, then the lower one in sorted order), capped at
+ *     the lower target. Progress is never added across copies: adding would
+ *     count one action twice when a copy is merged again, and a union of two
+ *     incomplete event lists could complete a mission no copy completed,
+ *     which would make the merge depend on the order of merging. So a
+ *     mission is complete exactly when some copy completed it.
+ *  3. Rerolls: `rerolls` is the lower of the two (a spent reroll is never
+ *     restored). In each slot, a COMPLETE mission comes first (completed work
+ *     is never replaced; between two complete missions, the lower id); then
+ *     the mission of the copy with FEWER rerolls left (it has seen more
+ *     rerolls), then the lower id. Missions are placed best first over all
+ *     slots at once, so a completed mission is always placed, and no mission
+ *     is placed in two slots (a slot whose every candidate went elsewhere
+ *     keeps its best one).
+ *
+ * GUARANTEES. Deterministic and commutative; idempotent once normalized
+ * (`merge(m, m)` is `m` with sorted events); a completed mission is never
+ * replaced by an incomplete one; `rerolls` never goes up. When the copies come
+ * from ONE line of rerolls (no two devices rerolling independently on the
+ * same day), it is also associative (three copies merge to the same result in
+ * any order) and never brings back a mission a reroll replaced, unless that
+ * mission was completed elsewhere first (completed work wins).
+ *
+ * KNOWN LIMITS (the missions data has no reroll history; see the tests):
+ *  - Two devices or apps rerolling independently on the same day (or making
+ *    the day's missions independently): still deterministic and commutative,
+ *    but not associative, a replaced mission can come back, and one spent
+ *    reroll can be counted once instead of twice.
+ *  - A reroll that picks, in the SAME slot, a mission replaced there earlier
+ *    the same day: the two are one mission to the merge, so the earlier
+ *    progress carries over.
+ */
+export function mergeDailyMissions(a: MissionsContent | null | undefined, b: MissionsContent | null | undefined, today: string): MissionsContent | undefined {
+  const copies = [a, b].filter((m): m is MissionsContent => !!m && m.date === today);
+  if (copies.length === 0) return undefined;
+  const [p, q] = copies.length === 1 ? [copies[0], copies[0]] : copies;
+
+  // Progress by (slot, id): the same mission in the same slot
+  const key = (slot: number, id: string) => `${slot}\u0000${id}`;
+  const joined = new Map<string, Mission>();
+  for (const copy of [p, q]) {
+    copy.daily.forEach((m, slot) => {
+      const k = key(slot, m.id);
+      joined.set(k, joinMission(joined.get(k), m));
+    });
+  }
+
+  type Candidate = { slot: number; id: string; rerolls: number; mission: Mission };
+  const rank = (c: Candidate): [number, number, string, number] => (isMissionComplete(c.mission) ? [0, 0, c.id, c.slot] : [1, c.rerolls, c.id, c.slot]);
+  const before = (x: Candidate, y: Candidate) => {
+    const [a0, a1, a2, a3] = rank(x);
+    const [b0, b1, b2, b3] = rank(y);
+    return a0 - b0 || a1 - b1 || (a2 < b2 ? -1 : a2 > b2 ? 1 : 0) || a3 - b3;
+  };
+
+  const slots = Math.max(p.daily.length, q.daily.length);
+  const candidates: Candidate[] = [];
+  for (let slot = 0; slot < slots; slot++) {
+    for (const copy of [p, q]) {
+      const m = copy.daily[slot];
+      if (!m) continue;
+      const existing = candidates.find((c) => c.slot === slot && c.id === m.id);
+      if (existing) existing.rerolls = Math.min(existing.rerolls, copy.rerolls);
+      else candidates.push({ slot, id: m.id, rerolls: copy.rerolls, mission: joined.get(key(slot, m.id))! });
+    }
+  }
+  // Placed best first, over every slot at once: a completed mission is always placed (in its slot), and one mission
+  // never fills two slots. A slot whose every candidate went elsewhere keeps its best one.
+  candidates.sort(before);
+  const placed: (Mission | undefined)[] = Array.from({ length: slots });
+  const used = new Set<string>();
+  for (const c of candidates) {
+    if (placed[c.slot] || used.has(c.id)) continue;
+    placed[c.slot] = c.mission;
+    used.add(c.id);
+  }
+  const daily = placed.map((m, slot) => m ?? candidates.find((c) => c.slot === slot)!.mission);
+  return { date: today, daily, rerolls: Math.min(p.rerolls, q.rerolls) };
+}
+
+/** One mission's progress from two copies of it: the copy with more (see `mergeDailyMissions`, rule 2). */
+function joinMission(a: Mission | undefined, b: Mission): Mission {
+  const x = a ?? b;
+  const target = Math.min(x.target, b.target);
+  if (isEventMission(x) && isEventMission(b)) {
+    const norm = (events: readonly string[]) => [...new Set(events)].sort().slice(0, target);
+    const [ex, eb] = [norm(x.events), norm(b.events)];
+    const lower = (p: string[], q: string[]) => p.join('\u0000') <= q.join('\u0000');
+    const events = ex.length !== eb.length ? (ex.length > eb.length ? ex : eb) : lower(ex, eb) ? ex : eb;
+    return { id: b.id, target, events };
+  }
+  // A tally (or a legacy event mission counted as a tally, as `trackTally` converts it)
+  return { id: b.id, target, count: Math.min(target, Math.max(missionProgress(x), missionProgress(b))) };
+}
+
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
 function parseMissionsContent(raw: Record<string, unknown>): MissionsContent | undefined {
