@@ -2,19 +2,19 @@ import type { NostrQuerier } from './nostr-protocol';
 
 import {
   BLOBBONAUT_PROFILE_KINDS,
-  KIND_BLOBBONAUT_PROFILE,
   getBlobbonautQueryDValues,
-  isValidBlobbonautEvent,
-  isLegacyBlobbonautKind,
   parseBlobbonautEvent,
   type BlobbonautProfile,
 } from './blobbi';
+import { pickNewestBlobbonautProfile } from './profile-order';
 
 /**
  * Fetch the freshest Blobbonaut profile (kind 11125) directly from relays,
  * bypassing any local TanStack Query cache.
  *
- * Prefers the current kind (11125) over legacy (31125). Returns a fully-parsed
+ * Prefers the current kind (11125) over legacy (31125), then the newest, then
+ * (NIP-01) the lower event id on equal `created_at`; only the owner's events
+ * count (`pickNewestBlobbonautProfile`). Returns a fully-parsed
  * `BlobbonautProfile` including `.event` (the raw NostrEvent) so callers can
  * pass it as `prev` to `useNostrPublish`.
  *
@@ -36,21 +36,7 @@ export async function fetchFreshBlobbonautProfile(
     '#d': dValues,
   }], { signal });
 
-  const validEvents = events.filter(isValidBlobbonautEvent);
-  if (validEvents.length === 0) return null;
-
-  // Prefer current kind over legacy
-  const currentKindEvents = validEvents.filter(e => e.kind === KIND_BLOBBONAUT_PROFILE);
-  if (currentKindEvents.length > 0) {
-    const sorted = currentKindEvents.sort((a, b) => b.created_at - a.created_at);
-    return parseBlobbonautEvent(sorted[0]) ?? null;
-  }
-
-  const legacyKindEvents = validEvents.filter(e => isLegacyBlobbonautKind(e));
-  if (legacyKindEvents.length > 0) {
-    const sorted = legacyKindEvents.sort((a, b) => b.created_at - a.created_at);
-    return parseBlobbonautEvent(sorted[0]) ?? null;
-  }
-
-  return null;
+  // The canonical order (`profile-order.ts`): the owner's valid events, 11125 before 31125, newest, then the lower id
+  const newest = pickNewestBlobbonautProfile(events, pubkey);
+  return newest ? (parseBlobbonautEvent(newest) ?? null) : null;
 }

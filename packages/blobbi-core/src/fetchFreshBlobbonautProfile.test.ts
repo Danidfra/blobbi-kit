@@ -225,4 +225,11 @@ describe('fetchFreshBlobbonautProfile', () => {
       'relay down',
     );
   });
+
+  it('0.10.0: on equal created_at the lower id wins (NIP-01), whatever the order the relays answered in', async () => {
+    const low = makeProfile({ id: '1'.repeat(64), created_at: 1_700_000_500 });
+    const high = makeProfile({ id: '9'.repeat(64), created_at: 1_700_000_500 });
+    expect((await fetchFreshBlobbonautProfile(querier([high, low]), PUBKEY))?.event.id).toBe(low.id);
+    expect((await fetchFreshBlobbonautProfile(querier([low, high]), PUBKEY))?.event.id).toBe(low.id);
+  });
 });
