@@ -60,6 +60,9 @@ export * from './blobbi-v3-identity';
 // The canonical order of profile events (NIP-01), shared by every reader and writer.
 export * from './profile-order';
 
+// The safe profile write (complete reads, never over an older profile, one per account at a time).
+export * from './safe-profile-write';
+
 // Async Nostr helpers.
 export * from './fetchFreshEvent';
 export * from './fetchFreshBlobbonautProfile';
