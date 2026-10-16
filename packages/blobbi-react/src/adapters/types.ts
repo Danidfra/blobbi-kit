@@ -11,6 +11,7 @@
  */
 
 import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
+import type { ProfileBuild, SafeProfileWriteOutcome } from '@blobbi-kit/core/safe-profile-write';
 import type { CareItemEffect } from '@blobbi-kit/core/blobbi-social-projection';
 
 /**
@@ -46,6 +47,15 @@ export interface PublishEventTemplate {
 export interface PublishAdapter {
   publish(template: PublishEventTemplate): Promise<NostrEvent>;
 }
+
+/**
+ * A safe kind 11125 write, bound by the host to its relays, signer, signature
+ * verifier and active-account check: typically
+ * `(owner, build) => writeProfileSafely({ owner, relays, sign, verify, stillAccount }, build)`
+ * from `@blobbi-kit/core`. Passing one opts a hook into its safe mode (complete
+ * reads, never over an older profile, one write per account at a time).
+ */
+export type ProfileWriter = <R extends string>(owner: string, build: (base: NostrEvent | null) => ProfileBuild<R>) => Promise<SafeProfileWriteOutcome<R>>;
 
 /**
  * Resolves catalog-item metadata the package needs, without embedding any

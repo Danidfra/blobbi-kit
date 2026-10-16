@@ -1,34 +1,57 @@
 /**
- * usePersistDailyProgress - Debounced persistence for daily mission progress.
+ * usePersistDailyProgress - Keeps daily mission progress in the kind 11125
+ * Blobbonaut profile content (`missions`) so it survives a reload and other
+ * apps see it.
  *
- * Daily missions live in the per-user session store (keyed by pubkey).
- * This hook listens for changes and debounce-publishes the updated state to the
- * kind 11125 Blobbonaut profile content JSON so progress survives page refreshes.
+ * Daily missions live in the per-user session store (keyed by pubkey). This
+ * hook listens for `daily-missions-updated` (fired by the tracker when
+ * something is done in the app) and saves the day's progress. It never saves
+ * a finished day (every mission complete): the host's XP award writes that
+ * state together with the XP. It ignores evolution updates (their own hook)
+ * and merges of a copy read from elsewhere (`hydrated`).
  *
- * Design:
- * - Listens to 'daily-missions-updated' CustomEvent (same event the tracker fires)
- * - Only acts on non-evolution events (daily mission tally/event updates)
- * - Debounces by PERSIST_DELAY_MS to batch rapid interactions
- * - Flushes immediately on visibilitychange → hidden (tab close, navigation, lock)
- * - Uses fetchFreshEvent to avoid stale-read overwrites
- * - Writes ONLY to content.missions — does NOT modify XP/level tags
- * - Skips publish if missions haven't changed from the persisted state
- * - Skips if all missions are already complete (host XP-award path handles that)
- * - Pending/dirty flag ensures updates during in-flight publishes are not dropped
+ * TWO MODES.
+ *
+ * Safe mode (0.10.0): the host passes BOTH `storage` (a `StorageAdapter`) and
+ * `writeProfile` (a `ProfileWriter`, e.g. core's `writeProfileSafely` bound to
+ * its relays, signer and verifier):
+ *   - progress is kept as PENDING in the host's storage the moment it
+ *     happens, before any network work, so a reload, a restart, a closed tab
+ *     or relays that are down never lose it; on load it is merged back in;
+ *   - 3 s after something was done in the app, it is written over the NEWEST
+ *     profile (a complete read; never over an older profile, so
+ *     `current_companion`, `has`, unknown tags and other content stay as the
+ *     newest profile has them), with the profile's own progress merged in
+ *     (`mergeDailyMissions`, never lost);
+ *   - pending is cleared only when the write is confirmed (read back), and
+ *     only if no new progress arrived meanwhile;
+ *   - it NEVER saves (so never asks a signer) by itself on load, on a tab
+ *     hide, on unmount or on a timer after a failure: what is pending waits,
+ *     said in `status`, for the player's `save()` (or the next thing done in
+ *     the app).
+ *
+ * Legacy mode (no `storage`/`writeProfile`, as 0.9): progress kept in memory
+ * only, saved 3 s after an update, on a tab hide and on unmount, over a quick
+ * read (`fetchFreshEvent`). One change from 0.9: the content's missions are
+ * MERGED with the profile's instead of replacing them, so another app's
+ * progress for the day is never written over. The legacy write still copies
+ * the tags of what it read; only safe mode guarantees it never builds over an
+ * older profile.
  */
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNostr } from '@nostrify/react';
 import type { NostrEvent } from '@blobbi-kit/core/nostr-protocol';
 
 import { KIND_BLOBBONAUT_PROFILE } from '@blobbi-kit/core/blobbi';
-import { serializeProfileContent } from '@blobbi-kit/core/missions';
+import { mergeDailyMissions, parseProfileContent, serializeProfileContent, type MissionsContent } from '@blobbi-kit/core/missions';
 import { fetchFreshEvent } from '@blobbi-kit/core/fetchFreshEvent';
 
-import { readDailyFromStorage } from '../lib/daily-mission-tracker';
-import { areAllDailyComplete } from '../lib/daily-missions';
+import { mergeIntoDailyStore, readDailyFromStorage } from '../lib/daily-mission-tracker';
+import { areAllDailyComplete, getTodayDateString } from '../lib/daily-missions';
+import { clearPendingDailyIf, loadPendingDaily, savePendingDaily } from '../lib/daily-pending';
 
-import type { PublishAdapter } from '../adapters/types';
+import type { ProfileWriter, PublishAdapter, StorageAdapter } from '../adapters/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -40,15 +63,193 @@ const PERSIST_DELAY_MS = 3_000;
 export interface PersistDailyProgressOptions {
   /** Owner hex pubkey. When absent (logged out), the hook is inert. */
   pubkey: string | undefined;
-  /** Publishes the updated kind 11125 profile event (host `useNostrPublish`). */
+  /** Publishes the updated kind 11125 profile event (host `useNostrPublish`). Legacy mode only. */
   publish: PublishAdapter['publish'];
   /** Optional callback to update the profile event in the host's query cache. */
   updateProfileEvent?: (event: NostrEvent) => void;
+  /** Safe mode (with `writeProfile`): where pending progress is kept (the host's storage). */
+  storage?: StorageAdapter;
+  /** Safe mode (with `storage`): the host's safe profile writer. */
+  writeProfile?: ProfileWriter;
+  /** Safe mode: the profile's content as the host last read it (pending progress it already holds is cleared). */
+  profileContent?: string;
+}
+
+export type DailyProgressStatus =
+  /** Nothing waiting to be saved. */
+  | { kind: 'idle' }
+  /** Saved on this device, not yet in the profile: `save()` (or the next thing done in the app) sends it. */
+  | { kind: 'pending' }
+  | { kind: 'saving' }
+  | { kind: 'saved' }
+  /** Every mission is complete: the XP award saves the day (with the XP), not this hook. */
+  | { kind: 'complete' }
+  /** The last save did not land; the progress is still pending. */
+  | { kind: 'failed'; reason: 'unsafe' | 'stale' | 'no-profile' | 'wrong-account' | 'failed' | 'unconfirmed' | 'storage'; message?: string };
+
+export interface PersistDailyProgressState {
+  /** Whether the hook runs in safe mode (both `storage` and `writeProfile` given). */
+  safe: boolean;
+  /** Safe mode: progress is waiting to be saved to the profile. */
+  pending: boolean;
+  status: DailyProgressStatus;
+  /** Save now (the player's Save / Try again). Safe mode: the only way pending progress is saved without a new action. */
+  save: () => Promise<void>;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function usePersistDailyProgress(options: PersistDailyProgressOptions): void {
+export function usePersistDailyProgress(options: PersistDailyProgressOptions): PersistDailyProgressState {
+  const safe = !!options.storage && !!options.writeProfile;
+  const legacySave = useLegacyPersist(safe ? { ...options, pubkey: undefined } : options);
+  const safeState = useSafePersist(safe ? options : { ...options, pubkey: undefined });
+  if (safe) return safeState;
+  return { safe: false, pending: false, status: { kind: 'idle' }, save: legacySave };
+}
+
+// ─── Safe mode ────────────────────────────────────────────────────────────────
+
+const statusOfPending = (missions: MissionsContent | undefined): DailyProgressStatus => (!missions ? { kind: 'idle' } : areAllDailyComplete(missions) ? { kind: 'complete' } : { kind: 'pending' });
+
+function useSafePersist({ pubkey, storage, writeProfile, updateProfileEvent, profileContent }: PersistDailyProgressOptions): PersistDailyProgressState {
+  const [status, setStatus] = useState<DailyProgressStatus>({ kind: 'idle' });
+  const live = useRef({ pubkey, storage, writeProfile, updateProfileEvent });
+  live.current = { pubkey, storage, writeProfile, updateProfileEvent };
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const running = useRef<Promise<void> | null>(null);
+  const again = useRef(false);
+
+  const write = useCallback(async (): Promise<void> => {
+    const { pubkey: owner, storage: store, writeProfile: writer, updateProfileEvent: onEvent } = live.current;
+    if (!owner || !store || !writer) return;
+    if (running.current) {
+      again.current = true;
+      return running.current;
+    }
+    const today = getTodayDateString();
+    const pending = loadPendingDaily(store, owner, today);
+    if (!pending) {
+      setStatus({ kind: 'idle' });
+      return;
+    }
+    if (areAllDailyComplete(pending.missions)) {
+      setStatus({ kind: 'complete' });
+      return;
+    }
+    setStatus({ kind: 'saving' });
+    running.current = (async () => {
+      let out: Awaited<ReturnType<ProfileWriter>>;
+      try {
+        out = await writer(owner, (base) => {
+          if (!base) return { skip: 'no-profile' };
+          const theirs = parseProfileContent(base.content).missions;
+          const merged = mergeDailyMissions(theirs, pending.missions, today);
+          if (!merged) return { skip: 'not-today' };
+          // The profile holds all of it already: nothing to write
+          if (JSON.stringify(merged) === JSON.stringify(mergeDailyMissions(theirs, undefined, today))) return { skip: 'up-to-date' };
+          if (areAllDailyComplete(merged)) return { skip: 'complete' };
+          return { template: { kind: KIND_BLOBBONAUT_PROFILE, content: serializeProfileContent(base.content, { missions: merged }), tags: base.tags } };
+        });
+      } catch (error) {
+        setStatus({ kind: 'failed', reason: 'failed', message: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+      if (live.current.pubkey !== owner) return;
+      switch (out.kind) {
+        case 'sent':
+          onEvent?.(out.event);
+          if (!out.confirmed) {
+            setStatus({ kind: 'failed', reason: 'unconfirmed' });
+            return;
+          }
+          clearPendingDailyIf(store, owner, pending.updatedAt);
+          setStatus(loadPendingDaily(store, owner) ? { kind: 'pending' } : { kind: 'saved' });
+          return;
+        case 'skipped':
+          if (out.reason === 'complete') return setStatus({ kind: 'complete' });
+          if (out.reason === 'no-profile') return setStatus({ kind: 'failed', reason: 'no-profile' });
+          // Up to date (the profile holds it) or another day: nothing left to save
+          clearPendingDailyIf(store, owner, pending.updatedAt);
+          setStatus(loadPendingDaily(store, owner) ? { kind: 'pending' } : { kind: 'saved' });
+          return;
+        case 'failed':
+          setStatus({ kind: 'failed', reason: 'failed', message: out.message });
+          return;
+        default:
+          setStatus({ kind: 'failed', reason: out.kind });
+      }
+    })();
+    try {
+      await running.current;
+    } finally {
+      running.current = null;
+    }
+    if (again.current) {
+      again.current = false;
+      return write();
+    }
+  }, []);
+
+  // On load and on an account switch: pending progress comes back into the session store (a merge: no save)
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    if (!pubkey || !storage) {
+      setStatus({ kind: 'idle' });
+      return;
+    }
+    const pending = loadPendingDaily(storage, pubkey);
+    if (pending) mergeIntoDailyStore(pending.missions, pubkey);
+    setStatus(statusOfPending(pending?.missions));
+  }, [pubkey, storage]);
+
+  // The profile now holds what was pending (saved here earlier, by another tab, or with the XP award): cleared
+  useEffect(() => {
+    if (!pubkey || !storage || !profileContent) return;
+    const pending = loadPendingDaily(storage, pubkey);
+    if (!pending) return;
+    const today = getTodayDateString();
+    const theirs = parseProfileContent(profileContent).missions;
+    const merged = mergeDailyMissions(theirs, pending.missions, today);
+    if (merged && theirs && JSON.stringify(merged) === JSON.stringify(mergeDailyMissions(theirs, undefined, today)) && clearPendingDailyIf(storage, pubkey, pending.updatedAt)) setStatus({ kind: 'saved' });
+  }, [pubkey, storage, profileContent]);
+
+  // Something done in the app: kept as pending at once (before any network), then saved 3 s later
+  useEffect(() => {
+    if (!pubkey || !storage) return;
+    const onMissionUpdate = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.evolution || detail?.hydrated) return;
+      const missions = readDailyFromStorage(pubkey);
+      if (!missions || missions.daily.length === 0) return;
+      const kept = savePendingDaily(storage, pubkey, missions);
+      if (!kept) {
+        setStatus({ kind: 'failed', reason: 'storage' });
+        return;
+      }
+      setStatus(statusOfPending(kept.missions));
+      if (areAllDailyComplete(kept.missions)) return;
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        timer.current = null;
+        void write();
+      }, PERSIST_DELAY_MS);
+    };
+    window.addEventListener('daily-missions-updated', onMissionUpdate);
+    return () => {
+      window.removeEventListener('daily-missions-updated', onMissionUpdate);
+      // Nothing is saved on unmount: it is pending in the host's storage already
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+    };
+  }, [pubkey, storage, write]);
+
+  return { safe: true, pending: status.kind !== 'idle' && status.kind !== 'saved', status, save: write };
+}
+
+// ─── Legacy mode (0.9 behaviour, with the content's missions merged) ──────────
+
+function useLegacyPersist(options: PersistDailyProgressOptions): () => Promise<void> {
   const { pubkey, publish, updateProfileEvent } = options;
   const { nostr } = useNostr();
 
@@ -112,8 +313,12 @@ export function usePersistDailyProgress(options: PersistDailyProgressOptions): v
       const freshMissions = readDailyFromStorage(pubkey);
       if (!freshMissions || areAllDailyComplete(freshMissions)) return;
 
+      // 0.10.0: the profile's own progress for the day is merged in, never written over
+      const merged = mergeDailyMissions(parseProfileContent(prev.content).missions, freshMissions, freshMissions.date) ?? freshMissions;
+      if (areAllDailyComplete(merged)) return;
+
       // Serialize only the missions field into content, preserving other keys
-      const content = serializeProfileContent(prev.content, { missions: freshMissions });
+      const content = serializeProfileContent(prev.content, { missions: merged });
 
       // Skip publish if content hasn't changed
       if (content === prev.content) {
@@ -151,6 +356,8 @@ export function usePersistDailyProgress(options: PersistDailyProgressOptions): v
   });
 
   useEffect(() => {
+    // Inert without an account (logged out, or safe mode running instead)
+    if (!pubkey) return;
     // ─── Daily mission update handler (debounced) ───
     const onMissionUpdate = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -210,5 +417,7 @@ export function usePersistDailyProgress(options: PersistDailyProgressOptions): v
         });
       }
     };
-  }, []);
+  }, [pubkey]);
+
+  return useCallback(() => persistRef.current(), []);
 }

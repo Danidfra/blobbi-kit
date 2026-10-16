@@ -15,3 +15,5 @@ export * from './evolution-missions';
 // Browser-only: reads/writes `localStorage` and dispatches `window` events.
 export * from './item-cooldown';
 export * from './daily-mission-tracker';
+// Daily progress not saved yet, kept through the host's StorageAdapter (no browser storage of its own).
+export * from './daily-pending';
