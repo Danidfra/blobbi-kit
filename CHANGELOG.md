@@ -10,6 +10,95 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## `@blobbi-kit/core` 0.10.0, `@blobbi-kit/react` 0.10.0: safe daily progress and safe profile writes
+
+The Blobbonaut profile (kind 11125) is replaceable and every Blobbi app
+writes it, so a write built over an older version replaces the newer one
+everywhere: `current_companion`, `has`, xp, unknown tags and content
+included. 0.9's daily-progress and XP writers could do exactly that, kept
+unsaved progress only in memory, and the XP award could replace the whole
+profile after an empty read. 0.10.0 fixes these, mostly behind opt-in
+adapters. No tag format changes and no new event kinds. `@blobbi-kit/renderer`
+and `@blobbi-kit/3d` are not re-released.
+
+**Core: the canonical order of profile events** (`profile-order.ts`).
+`compareBlobbonautProfiles`, `pickNewestBlobbonautProfile`, `replacesProfile`,
+`profileStamp`: the owner's valid events, kind 11125 before 31125, then the
+higher `created_at`, then the lower id (NIP-01), with an optional injected
+signature verifier. `fetchFreshBlobbonautProfile` now uses it: equal
+`created_at` is decided by the lower id, and events by another author are
+ignored.
+
+**Core: a safe profile write** (`safe-profile-write.ts`).
+`writeProfileSafely(deps, build, { create })` over a host-supplied
+`ProfileRelays` (per-relay query and publish), signer and **required**
+verifier (core still depends on no Nostr library): a complete read of the
+required relays (an incomplete read is never taken for "no profile"), the
+caller's change over the newest profile, `created_at` after the base's, a
+profile created only when explicitly allowed and a complete read finds
+none, the active account checked before signing, after signing and right
+before sending, a second complete read after signing (a profile written
+meanwhile: `stale`, nothing sent, the signer asked at most once), then a
+read-back (`confirmed`). Also `readProfileCensus`, `profileFilter`,
+`profileWriteQueue` (one profile write per account at a time for the whole
+page) and `BLOBBI_PROFILE_REQUIRED_RELAYS` (ditto and primal), a default
+the host replaces with its own policy.
+
+**Core: `mergeDailyMissions(a, b, today)`**, a pure merge of two copies of
+the day's missions, and `parseMissionsValue`. Only today's copies; per
+mission (slot and id) the copy with more progress, never added up; the
+lower `rerolls` (a spent reroll is never given back); missions placed best
+first over all slots (completed, then fewer rerolls left, then the lower
+id), so completed work is never replaced and no mission fills two slots.
+Over one line of rerolls with no mission picked twice it is commutative,
+idempotent and associative, and never undoes a reroll unless completed work
+was at stake. **Known limits** of the missions data, which has no reroll
+history (pinned by tests with their counterexamples): two devices
+rerolling independently on the same day (not associative; a replaced
+mission can come back; two spent rerolls can count as one), and a reroll
+picking again a mission replaced earlier the same day (in the same slot its
+earlier progress carries over; in another slot the merge is not always
+associative). Completed work is never lost in either.
+
+**React: the profile's missions are merged in, never written over local
+progress.** `useDailyMissions` merges the profile's missions into the
+session store on load, on an account switch and whenever the profile
+changes (`mergeIntoDailyStore`), instead of replacing local progress once
+per session. A merge notifies with `{ hydrated: true }` and never starts a
+save.
+
+**React: `usePersistDailyProgress` safe mode.** Opted into by passing both
+`storage` (a `StorageAdapter`; the kit touches no browser storage) and
+`writeProfile` (a `ProfileWriter`, the new adapter type): pending progress
+is kept in the host's storage before any network work and merged back on
+load (`daily-pending.ts`); 3 s after something done in the app it is
+written over the newest profile with the profile's progress merged in;
+pending is cleared only on a confirmed write that carried it; nothing is
+ever saved, and no signer asked, by itself on load, on a tab hide, on
+unmount or on a timer after a failure. The hook now returns
+`{ safe, pending, status, save }`. Legacy mode (no adapters) keeps 0.9's
+triggers; its content's missions are now merged instead of replaced.
+
+**React: `useAwardDailyXp` never publishes a partial or empty profile.**
+A read that found nothing writes nothing (0.9 published only xp and level
+tags); with `writeProfile` the read must be complete; a day whose profile
+missions are already complete is never paid again (`isDailyXpPaid`,
+`skipped: 'already-paid'`); the day's missions are merged in.
+
+**Behaviour changes for hosts that do not opt in:** profile reads break
+`created_at` ties by the lower id; the profile's missions are merged into
+local progress instead of replacing it; legacy progress writes merge the
+content's missions; the award throws on an empty read, skips a day already
+paid, and only pays a day whose missions are all complete.
+
+**Migration.** React's peer range on core is `^0.10.0`. For a pre-1.0
+package `^0.9.0` does not match 0.10.0, so hosts move only by bumping
+explicitly. To get the protection, pass `storage` and `writeProfile` to
+`usePersistDailyProgress` and `writeProfile` to `useAwardDailyXp`, and run
+every other profile writer of the host in `profileWriteQueue`.
+
+---
+
 ## `@blobbi-kit/core` 0.9.0, `@blobbi-kit/react` 0.9.0: the production V3 identity contract
 
 This is the V3 contract Blobbis are meant to be created under. It replaces
