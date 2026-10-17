@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NostrEvent } from './nostr-protocol';
 import { DEPARTURE_WINDOW_S, KIND_ACTIVE_PRESENCE, KIND_WORLD_LOCATION, MIN_STAY_MS, PRESENCE_RENEW_S, WORLD_HOME, WORLD_PIXEL, buildPresenceTemplate, buildWorldLocationTemplate, parseWorldLocation, type WorldTravelTemplate } from './world-travel';
 import { FOLLOW_WINDOW_MS } from './world-travel-follow';
-import { AUTO_RESEND_MS, LATE_ANSWER_FACTOR, LOOK_RETRY_MS, MIN_TRAVEL_MS, PENDING_TTL_MS, PRESENCE_SIGN_BUDGET_MS, TRAVEL_COOLDOWN_MS, createWorldTravel, storedWorldLocation, worldLocationStoreKey, type WorldTravelOptions, type WorldTravelSession, type WorldTravelSigner, type WorldTravelStore } from './world-travel-session';
+import { AUTO_RESEND_MS, HEAL_MAX_ATTEMPTS, HEAL_RETRY_MS, HEAL_VERIFY_MS, LATE_ANSWER_FACTOR, LOOK_RETRY_MS, MIN_TRAVEL_MS, PENDING_TTL_MS, RECONCILE_AFTER_MS, PRESENCE_SIGN_BUDGET_MS, TRAVEL_COOLDOWN_MS, createWorldTravel, isPermanentRefusal, storedWorldLocation, worldLocationStoreKey, type WorldTravelOptions, type WorldTravelSession, type WorldTravelSigner, type WorldTravelStore } from './world-travel-session';
 import { A, B, dOf, network, relayAccept, signAs, verify, type Network } from './world-travel.test-helpers';
 
 const D = dOf(A);
@@ -1059,7 +1059,7 @@ describe('future-dated locations: detection and explicit recovery (M16.2)', () =
     expect(del.tags).toEqual(expect.arrayContaining([['e', future.id], ['k', String(KIND_WORLD_LOCATION)]]));
     expect(del.tags.some((t) => t[0] === 'a')).toBe(false); // never by address: that would reach the real location
     expect(net.relays[0].stored.find((e) => e.kind === KIND_WORLD_LOCATION)?.id).toBe(current.id); // resent as signed
-    expect(home.session.snapshot().diagnostics).toEqual({ futureLocations: [], pinnedRelays: [] });
+    expect(home.session.snapshot().diagnostics).toEqual({ futureLocations: [], pinnedRelays: [], laggingRelays: [] });
   });
 
   it('a relay that ignores the deletion stays reported as pinned', async () => {
@@ -1093,5 +1093,272 @@ describe('future-dated locations: detection and explicit recovery (M16.2)', () =
     const home = track(device(net, WORLD_HOME));
     await settle(10);
     expect(home.session.snapshot()).toMatchObject({ place: WORLD_PIXEL, diagnostics: { futureLocations: [], pinnedRelays: [] } });
+  });
+});
+
+describe('relay convergence: a relay that missed a move is healed with the same signed event (0.11.1)', () => {
+  const held = (net: Network, url: string) => net.relay(url).stored.find((e) => e.kind === KIND_WORLD_LOCATION)?.id ?? null;
+  const sentTo = (net: Network, url: string) => net.relay(url).published.filter((e) => e.kind === KIND_WORLD_LOCATION);
+  /** A port whose publishes to some relays fail for now (this device's connection to them), queries untouched. */
+  function flakyPort(net: Network, failing: Set<string>) {
+    const port = net.port();
+    const publish = port.publish.bind(port);
+    port.publish = (url, e, signal) => (failing.has(url) ? Promise.reject(new Error('error: connection lost')) : publish(url, e, signal));
+    return port;
+  }
+
+  it('one relay accepts, the other refuses for now: a later look sends it the very same event; no new signature', async () => {
+    const net = network();
+    const pixel = track(device(net, WORLD_PIXEL));
+    await settle(10);
+    Object.assign(net.relay('wss://two'), { refuse: true, refuseWith: 'rate-limited: slow down' });
+    expect(await pixel.session.travel()).toBe('moved');
+    const move = pixel.session.snapshot().location!.event;
+    expect(held(net, 'wss://two')).toBeNull();
+    await settle(RECONCILE_AFTER_MS + 10); // the look after the move: two lags, one heal, refused for now
+    expect(pixel.session.snapshot().diagnostics.laggingRelays).toEqual(['wss://two']);
+    expect(sentTo(net, 'wss://two')).toHaveLength(2);
+    net.relay('wss://two').refuse = false;
+    await settle(60_000); // the next refresh, past the pause: healed
+    expect(held(net, 'wss://two')).toBe(move.id);
+    await settle(HEAL_VERIFY_MS + 10); // read again: it kept it
+    expect(pixel.session.snapshot().diagnostics.laggingRelays).toEqual([]);
+    expect(pixel.sign.asked).toHaveLength(1);
+    for (const e of sentTo(net, 'wss://two')) expect(e).toEqual(move); // id, created_at, tags, content and sig unchanged
+    const sent = locationsSent(net).length;
+    await settle(10 * 60_000);
+    expect(locationsSent(net)).toHaveLength(sent); // in agreement: nothing more
+  });
+
+  it('a relay that was down during the move gets it once it answers again (a reconnect or a refresh)', async () => {
+    const net = network();
+    const pixel = track(device(net, WORLD_PIXEL));
+    await settle(10);
+    net.relay('wss://two').down = true;
+    expect(await pixel.session.travel()).toBe('moved');
+    await settle(RECONCILE_AFTER_MS + 10);
+    expect(sentTo(net, 'wss://two')).toHaveLength(0); // it answered nothing: nothing is sent blindly
+    net.relay('wss://two').down = false;
+    await pixel.session.refresh();
+    await settle(10);
+    expect(held(net, 'wss://two')).toBe(pixel.session.snapshot().location!.id);
+    expect(pixel.sign.asked).toHaveLength(1);
+  });
+
+  it('a relay that never answers a publish: each heal ends at the timeout, at most HEAL_MAX_ATTEMPTS, spaced out', async () => {
+    const net = network();
+    const pixel = track(device(net, WORLD_PIXEL));
+    await settle(10);
+    net.relay('wss://two').stall = true;
+    expect(await pixel.session.travel()).toBe('moved'); // one relay is enough for a move
+    await settle(RECONCILE_AFTER_MS + 10);
+    expect(sentTo(net, 'wss://two')).toHaveLength(2); // the move, the first heal
+    await settle(HEAL_RETRY_MS - RECONCILE_AFTER_MS - 1_000);
+    await pixel.session.refresh(); // a look before the pause is over sends nothing
+    expect(sentTo(net, 'wss://two')).toHaveLength(2);
+    await settle(60 * 60_000);
+    expect(sentTo(net, 'wss://two')).toHaveLength(1 + HEAL_MAX_ATTEMPTS);
+    expect(pixel.session.snapshot().diagnostics.laggingRelays).toEqual(['wss://two']); // given up on, still reported
+    expect(pixel.session.snapshot()).toMatchObject({ place: WORLD_PIXEL, here: true });
+  });
+
+  it('a relay holding an older location is healed on load with the newer one; nothing older is ever sent, nothing signed', async () => {
+    const net = network();
+    const old = remoteMove(net, WORLD_HOME, START - 120_000);
+    const newer = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: WORLD_PIXEL, latest: parseWorldLocation(old, { verify }), now: START - 60_000 }));
+    relayAccept(net.relay('wss://two'), newer);
+    const home = track(device(net, WORLD_HOME, { sign: signer(A, { mode: 'prompt' }) }));
+    await settle(10);
+    expect(home.session.snapshot().location?.id).toBe(newer.id);
+    expect(held(net, 'wss://one')).toBe(newer.id);
+    expect(locationsSent(net)).toEqual([newer]);
+    expect(home.sign.asked).toHaveLength(0);
+  });
+
+  it('a read-only device heals too: it only carries the owner\'s event, it signs nothing', async () => {
+    const net = network();
+    const move = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: WORLD_PIXEL, latest: null, now: START - 60_000 }));
+    relayAccept(net.relay('wss://one'), move);
+    track(device(net, WORLD_HOME, { sign: null }));
+    await settle(10);
+    expect(held(net, 'wss://two')).toBe(move.id);
+  });
+
+  it('a device whose kept location is newer than the relays\' heals them from it; a lagging relay never undoes it', async () => {
+    const net = network();
+    const store = memoryStore();
+    const old = remoteMove(net, WORLD_HOME, START - 120_000);
+    const newer = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: WORLD_PIXEL, latest: parseWorldLocation(old, { verify }), now: START - 60_000 }));
+    store.set(worldLocationStoreKey(A, D), JSON.stringify(newer)); // signed and kept here; the relays lost it
+    const home = track(device(net, WORLD_HOME, { store }));
+    await settle(10);
+    expect(home.session.snapshot().location?.id).toBe(newer.id);
+    expect([held(net, 'wss://one'), held(net, 'wss://two')]).toEqual([newer.id, newer.id]);
+    expect(locationsSent(net).some((e) => e.id === old.id)).toBe(false);
+  });
+
+  it('relays already in agreement: nothing is ever sent, whatever the looks', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const home = track(device(net, WORLD_HOME));
+    await settle(30 * 60_000);
+    home.session.setVisible(false);
+    home.session.setVisible(true);
+    await home.session.refresh();
+    expect(locationsSent(net)).toEqual([]);
+    expect(home.session.snapshot().diagnostics.laggingRelays).toEqual([]);
+  });
+
+  it('equal created_at: every device keeps the lower id (NIP-01) whatever the relay order, and the other relay is healed with it', async () => {
+    const net = network();
+    const t = START - 30_000;
+    const x = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: WORLD_PIXEL, latest: null, now: t }));
+    const y = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: 'nostr-farm', latest: null, now: t }));
+    const [low, high] = x.id < y.id ? [x, y] : [y, x];
+    relayAccept(net.relay('wss://one'), high);
+    relayAccept(net.relay('wss://two'), low);
+    const a = track(device(net, WORLD_HOME));
+    const b = track(device(net, WORLD_HOME, { relays: net.port({ urls: ['wss://two', 'wss://one'] }) }));
+    await settle(10);
+    expect(a.session.snapshot().location?.id).toBe(low.id);
+    expect(b.session.snapshot().location?.id).toBe(low.id);
+    expect([held(net, 'wss://one'), held(net, 'wss://two')]).toEqual([low.id, low.id]);
+    expect(locationsSent(net).every((e) => e.id === low.id)).toBe(true);
+  });
+
+  it('a relay pinned by a future-dated location is left to the explicit repair; the others are healed', async () => {
+    const net = network(['wss://one', 'wss://two', 'wss://three']);
+    const real = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: WORLD_PIXEL, latest: null, now: START - 60_000 }));
+    relayAccept(net.relay('wss://three'), real);
+    relayAccept(net.relay('wss://one'), signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: 'nostr-farm', latest: null, now: Date.UTC(2100, 0, 1) })));
+    const home = track(device(net, WORLD_HOME));
+    await settle(10 * 60_000);
+    expect(home.session.snapshot().location?.id).toBe(real.id);
+    expect(sentTo(net, 'wss://one')).toHaveLength(0);
+    expect(held(net, 'wss://two')).toBe(real.id);
+    expect(home.session.snapshot().diagnostics).toMatchObject({ pinnedRelays: ['wss://one'], laggingRelays: [] });
+    expect(home.sign.asked).toHaveLength(0);
+  });
+
+  it('an invalid event never counts and is never sent; a relay that keeps it is healed a bounded number of times', async () => {
+    const net = network();
+    const real = remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const forged = { ...signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: WORLD_HOME, latest: parseWorldLocation(real, { verify }), now: START - 1_000 })), sig: 'sig:nope' };
+    relayAccept(net.relay('wss://one'), forged); // this relay checks nothing: the forged one replaced the real one
+    const home = track(device(net, WORLD_HOME));
+    await settle(60 * 60_000);
+    expect(home.session.snapshot().location?.id).toBe(real.id);
+    expect(locationsSent(net).some((e) => e.id === forged.id)).toBe(false);
+    expect(sentTo(net, 'wss://one')).toHaveLength(HEAL_MAX_ATTEMPTS); // accepted, never kept (it holds a "newer" one)
+    expect(home.session.snapshot().diagnostics.laggingRelays).toEqual(['wss://one']);
+  });
+
+  it('two devices moving at once, each reaching one relay: both follow the NIP-01 winner, and both relays end up holding it', async () => {
+    const net = network();
+    const homeFails = new Set(['wss://two']);
+    const pixelFails = new Set(['wss://one']);
+    const home = track(device(net, WORLD_HOME, { relays: flakyPort(net, homeFails) }));
+    const pixel = track(device(net, WORLD_PIXEL, { relays: flakyPort(net, pixelFails) }));
+    await settle(10);
+    remoteMove(net, 'nostr-farm', START - 60_000); // it was elsewhere: both moves are real
+    await home.session.refresh();
+    await pixel.session.refresh();
+    const outs = await Promise.all([home.session.travel({ explicit: true }), pixel.session.travel({ explicit: true })]);
+    expect(outs).toEqual(['moved', 'moved']);
+    homeFails.clear();
+    pixelFails.clear();
+    await settle(RECONCILE_AFTER_MS + HEAL_VERIFY_MS + 100);
+    const [h, p] = [home.session.snapshot().location!, pixel.session.snapshot().location!];
+    expect(h.id).toBe(p.id);
+    expect([held(net, 'wss://one'), held(net, 'wss://two')]).toEqual([h.id, h.id]);
+    const loser = [...new Set(locationsSent(net).map((e) => e.id))].find((id) => id !== h.id)!;
+    expect(locationsSent(net).filter((e) => e.id === loser)).toHaveLength(1); // its own move, to the one relay it reached; never resent over the winner
+    expect(home.sign.asked.length + pixel.sign.asked.length).toBe(2);
+  });
+
+  it('a permanent refusal of the move: the relay is never healed with it; travel through the other relay goes on', async () => {
+    const net = network();
+    const pixel = track(device(net, WORLD_PIXEL));
+    await settle(10);
+    Object.assign(net.relay('wss://two'), { refuse: true, refuseWith: 'blocked: kind 31126 is not allowed here' });
+    expect(await pixel.session.travel()).toBe('moved');
+    await settle(60 * 60_000);
+    expect(sentTo(net, 'wss://two')).toHaveLength(1); // the move only
+    expect(pixel.session.snapshot()).toMatchObject({ place: WORLD_PIXEL, here: true, diagnostics: { laggingRelays: ['wss://two'] } });
+  });
+
+  it('a permanent refusal of a heal: one attempt, never again for that event', async () => {
+    const net = network();
+    const move = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: WORLD_PIXEL, latest: null, now: START - 60_000 }));
+    relayAccept(net.relay('wss://one'), move);
+    Object.assign(net.relay('wss://two'), { refuse: true, refuseWith: 'invalid: unknown kind' });
+    track(device(net, WORLD_HOME));
+    await settle(60 * 60_000);
+    expect(sentTo(net, 'wss://two')).toHaveLength(1);
+  });
+
+  it('accepted is not stored: a relay that accepts and keeps nothing is healed at most HEAL_MAX_ATTEMPTS times, with bounded reads', async () => {
+    const net = network();
+    const port = net.port();
+    let queries = 0;
+    const query = port.query.bind(port);
+    port.query = (url, f, s) => {
+      queries++;
+      return query(url, f, s);
+    };
+    const pixel = track(device(net, WORLD_PIXEL, { relays: port }));
+    await settle(10);
+    net.relay('wss://two').forget = true;
+    expect(await pixel.session.travel()).toBe('moved');
+    await settle(60 * 60_000);
+    expect(sentTo(net, 'wss://two')).toHaveLength(1 + HEAL_MAX_ATTEMPTS);
+    expect(pixel.session.snapshot().diagnostics.laggingRelays).toEqual(['wss://two']);
+    // One look a minute (two relays each), the travel's own and the one after it, one read after each accepted heal
+    expect(queries).toBeLessThanOrEqual(2 * (60 + 2 + HEAL_MAX_ATTEMPTS + 1));
+    expect(pixel.sign.asked).toHaveLength(1);
+  });
+
+  it('offline: nothing is sent while no relay answers; back online, the relay that missed the move is healed', async () => {
+    const net = network();
+    const pixel = track(device(net, WORLD_PIXEL));
+    await settle(10);
+    net.relay('wss://two').down = true;
+    expect(await pixel.session.travel()).toBe('moved');
+    net.relay('wss://one').down = true; // the device goes offline
+    const sent = locationsSent(net).length;
+    await settle(10 * 60_000);
+    expect(locationsSent(net)).toHaveLength(sent);
+    expect(pixel.session.snapshot()).toMatchObject({ place: WORLD_PIXEL, here: true }); // all relays gone: the place stands
+    for (const r of net.relays) r.down = false;
+    await pixel.session.refresh(); // back online
+    await settle(10);
+    expect(held(net, 'wss://two')).toBe(pixel.session.snapshot().location!.id);
+  });
+
+  it('a slow relay\'s late answer is healed too', async () => {
+    const net = network();
+    const move = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: WORLD_PIXEL, latest: null, now: START - 60_000 }));
+    relayAccept(net.relay('wss://one'), move);
+    net.relay('wss://two').queryDelay = 6_000;
+    track(device(net, WORLD_HOME, { timeoutMs: 4_000 }));
+    await settle(4_100);
+    expect(held(net, 'wss://two')).toBeNull();
+    await settle(2_000);
+    expect(held(net, 'wss://two')).toBe(move.id);
+  });
+
+  it('never while the account changed, and never during a move under way', async () => {
+    const net = network();
+    const move = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: WORLD_PIXEL, latest: null, now: START - 60_000 }));
+    relayAccept(net.relay('wss://one'), move);
+    track(device(net, WORLD_HOME, { stillAccount: () => false }));
+    await settle(10 * 60_000);
+    expect(sentTo(net, 'wss://two')).toHaveLength(0);
+  });
+
+  it('isPermanentRefusal: blocked, invalid, restricted, pow and auth-required are final; rate-limited and errors are not', () => {
+    for (const m of ['blocked: no', 'invalid: bad', 'restricted: paid', 'pow: 20 bits', 'auth-required: login']) expect(isPermanentRefusal(new Error(m))).toBe(true);
+    for (const m of ['rate-limited: slow', 'error: db', 'unreachable', 'aborted', '']) expect(isPermanentRefusal(new Error(m))).toBe(false);
+    expect(isPermanentRefusal(undefined)).toBe(false);
   });
 });

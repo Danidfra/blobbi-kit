@@ -1,8 +1,9 @@
 # World travel (M16): World Location and Active Presence
 
 **Status: EXPERIMENTAL, released in `@blobbi-kit/core` /
-`@blobbi-kit/react` 0.11.0.** Kinds 31126 and 21124 are the experimental
-identifiers of the Blobbi World Travel protocol
+`@blobbi-kit/react` 0.11.0; relay convergence (§8a) since 0.11.1.** Kinds
+31126 and 21124 are the experimental identifiers of the Blobbi World Travel
+protocol
 (`WORLD_TRAVEL_KINDS_STATUS = 'experimental'`). They were chosen after a
 collision search (§7). They are **not** a NIP and have **not** been
 standardized or registered by the Nostr community. The schema is versioned
@@ -17,8 +18,9 @@ publication behind a switch that is off by default.
 - **A location is owner-authorized.** Only the owner's key signs it, on the
   player's act. **Autonomous Blobbi travel is not implemented** (§10).
 - **Clients must handle disagreement.** Relays may disagree or be unreachable
-  (§8). A relay pinned by a future-dated location may need an explicit
-  recovery (§7b).
+  (§8). A relay that missed a move is healed with the same signed event
+  (§8a, 0.11.1). A relay pinned by a future-dated location may need an
+  explicit recovery (§7b).
 
 A Blobbi belongs to a Nostr account and can travel between **Worlds**. Worlds
 are Blobbi-compatible experiences: Blobbi Standalone (`blobbi-home`), Blobbi
@@ -200,7 +202,8 @@ Ephemeral. Relays forward it and do not store it.
    6. store the signed event, publish it to every relay, and count acceptances;
    7. if at least one relay accepted (`moved`), wait the departure window
       (§5), then arrive, and re-read 2 s later to follow any simultaneous
-      winner;
+      winner. A relay that refused or timed out is healed from that read on
+      (§8a);
    8. if no relay accepted (`unreachable`), send the same signed event once
       more after 5 s, automatically and with no new signature. A reload within
       30 s sends it again. After 30 s, or once a newer location exists, it is
@@ -460,6 +463,82 @@ used only by this explicit recovery.
   session looks again. Periodic looks run every 60 s while visible (5 minutes
   while hidden), and on `online` and on visibility.
 
+## 8a. Relay convergence (0.11.1)
+
+**The rule.** The World Location is the newest *valid* World Location known
+across the configured relays (and the stream, and this device's kept copy),
+never what one relay says. A relay carries and stores events; it decides
+nothing. Valid means: kind 31126, the owner's key and signature, this Blobbi's
+`d` and `a`, a known schema, and dated no more than `MAX_LOCATION_SKEW_S`
+(900 s) ahead of this clock (§7a). Newest is NIP-01 order: the later
+`created_at`, and on a tie the **lower id** (lexical order of the hex id),
+which is the rule relays apply to addressable events. The order in which
+relays answer never matters: every look resolves over everything known.
+
+**Why healing is needed.** A move counts as made once one relay accepted it
+(a slow or failing relay must not hold the player's move back). Another relay
+may have refused it, timed out or been down, and a device reading only that
+relay would see the old World.
+
+**Healing.** Every look notes, for each relay that answered, the newest valid
+location it holds. A relay whose answer lacks the canonical location, holding
+an older one or none, is sent the canonical event again:
+- **the same signed event**: the same id, `created_at`, tags, content and
+  signature. Healing never signs, never asks the signer, and never builds an
+  event; a read-only device (no signer) heals too, since it only carries the
+  owner's event;
+- **never over a newer one**: a relay holding a newer valid location is not
+  sent anything (the session would already follow that one), and neither is a
+  relay pinned by a future-dated location (§7b: NIP-01 would keep the pinned
+  event, and only the explicit `repairFutureLocations()` can help);
+- **only when the relay answered**: a relay that is unreachable is never
+  written to blindly. It is healed once it answers a later look;
+- **on looks the session already makes**: loading, the 60 s refresh, a
+  visible page, `online`, a stream's reconnection, the read 2 s after a move,
+  and a relay's late answer. There is no timer of its own, except **one** read
+  `HEAL_VERIFY_MS` (5 s) after a heal a relay accepted;
+- **not during a move**: while a move, a resend or a repair is under way, its
+  looks heal nothing.
+
+**Acceptance is not storage.** A relay that accepted a heal counts as healed
+only when a later answer holds the event. Until then it stays in
+`snapshot.diagnostics.laggingRelays`.
+
+**Bounds.** Per relay and per event, per session:
+- at most `HEAL_MAX_ATTEMPTS` (3) heals, at least `HEAL_RETRY_MS` (30 s)
+  apart, then 60 s, then 120 s;
+- a **permanent refusal** ends healing for that event at once. A permanent
+  refusal is a NIP-01 `OK false` whose reason starts with `blocked:`,
+  `invalid:`, `restricted:`, `pow:` or `auth-required:` (`isPermanentRefusal`).
+  A move a relay refused that way is never healed onto it either.
+  `rate-limited:`, `error:`, a timeout or a dropped connection may pass later
+  and are retried within the bound;
+- a new canonical event (a later move) starts a new budget.
+A relay that keeps refusing therefore costs at most three small writes per
+move per open session, and none at all after a permanent refusal.
+
+**Idempotent.** Two devices healing the same relay send the same event; the
+relay keeps one (`duplicate:` counts as accepted).
+
+**What it does not guarantee.** There is no global consensus. Two devices that
+have seen the same set of valid events select the same location. During a
+partition (a device that reaches only one relay, another that reaches only the
+other), they may disagree until a look reaches a relay that holds both
+events, or until healing has copied the winner across. Healing shortens
+disagreement; it cannot rule it out. A relay may also drop events later
+(retention, spam rules); the next look finds and heals that too, within the
+same bounds.
+
+**Local storage** stays a cache of a signed relay event. A device whose kept
+location is newer than every relay's (the relays lost it) heals the relays
+with it, as it would with any valid event; it is never a separate location
+protocol.
+
+**The pinned-relay recovery (§7b) is unchanged.** Healing skips pinned relays.
+`repairFutureLocations()` still signs one deletion request and resends the
+current location to every relay. Once a relay is unpinned, the next look
+heals it like any other.
+
 ## 9. Privacy
 
 A World Location is a public, durable fact ("this Blobbi was last in Blobbi
@@ -610,7 +689,10 @@ scope.
   (§8).
 - **Relays can disagree, lag or be unreachable.** The newest valid event from
   any source wins. `snapshot.resolution` tells a World how much it knows
-  (`pending`, `cached`, `confirmed`, `unreachable`).
+  (`pending`, `cached`, `confirmed`, `unreachable`). Since 0.11.1 a lagging
+  relay is healed with the same signed event, within bounds (§8a). A relay
+  that refuses kind 31126 for good stays behind (`laggingRelays`), and a
+  device that can reach only that relay sees the old World.
 - **A pinned relay** keeps a far-future location and drops real moves. The
   reader is protected automatically. The relay itself is repaired only by the
   owner's explicit `repairFutureLocations()`. NIP-09 deletion is a request

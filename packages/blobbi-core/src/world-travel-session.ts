@@ -25,6 +25,24 @@
  *             in this page, and with `lock`, across tabs.
  *   presence optional Active Presence while the Blobbi is played here (see
  *             "Presence" below). It never changes the location.
+ *   heal     a relay that answered a look with an older location, or none,
+ *             is sent the canonical one again: the SAME signed event (no new
+ *             signature, no new id), never over a newer one, a few times at
+ *             most per relay and event, backing off, and never to a relay that
+ *             refused it for good (see "Convergence" below).
+ *
+ * CONVERGENCE (0.11.1). The location is the newest valid World Location known
+ * across the relays (NIP-01: the later created_at; on a tie, the lower id),
+ * never what one relay says: a relay stores and carries events, it decides
+ * nothing. A move counts as made once one relay accepted it, so another relay
+ * may miss it (it refused, timed out, was down). Each look notes what every
+ * relay that answered holds, and one that lags behind is healed with the
+ * canonical event as it was signed; acceptance is not taken as storage, so a
+ * relay is healed only once a later look sees it hold the event. Healing
+ * happens only on the looks the session already makes (load, refresh,
+ * visibility, reconnect, after a move) and one read soon after an accepted
+ * heal; it skips a relay pinned by a future-dated location (that needs the
+ * explicit `repairFutureLocations`) and never runs while a move is under way.
  *
  * WHAT IT NEVER DOES
  *
@@ -46,6 +64,7 @@ import type { NostrEvent, NostrFilter } from './nostr-protocol';
 import type { EventVerifier } from './profile-order';
 import { createFollowCounter, FOLLOW_INTERACTIONS, FOLLOW_WINDOW_MS, type FollowCounter } from './world-travel-follow';
 import {
+  KIND_WORLD_LOCATION,
   MAX_TRANSITION_S,
   PRESENCE_RENEW_S,
   activePresenceFilter,
@@ -223,8 +242,10 @@ export interface WorldTravelSnapshot {
    *   pinnedRelays     relays whose newest stored location is such an event: by NIP-01 they keep it over any newer
    *                    real move, so moves do not stick there until it is deleted (`repairFutureLocations`) or the
    *                    clock passes it.
+   *   laggingRelays    relays whose last answer did not hold the canonical location (an older one, or none), pinned
+   *                    ones aside: being healed, or given up on for this event (see "Convergence").
    */
-  diagnostics: { futureLocations: string[]; pinnedRelays: string[] };
+  diagnostics: { futureLocations: string[]; pinnedRelays: string[]; laggingRelays: string[] };
   presence: {
     status: PresenceStatus;
     /** When this session last sent one (ms), or null. */
@@ -321,6 +342,21 @@ export const LOOK_RETRY_MS = 5_000;
 export const LATE_ANSWER_FACTOR = 3;
 /** The shortest time from the player's act to the Blobbi forming here, by default (ms). A UX target, not protocol. */
 export const MIN_TRAVEL_MS = 1_500;
+/** A relay found lagging is sent the same canonical event at most this many times (per relay and event, per session). */
+export const HEAL_MAX_ATTEMPTS = 3;
+/** Between two heals of one relay with one event, at least this long, doubling each time (ms). */
+export const HEAL_RETRY_MS = 30_000;
+/** After a relay accepted a heal, it is read again this soon: acceptance is not storage (ms). */
+export const HEAL_VERIFY_MS = 5_000;
+
+/**
+ * A relay's refusal that sending the same event again cannot change (NIP-01 OK reasons): blocked, invalid, restricted,
+ * a proof of work it wants, or a login (NIP-42) this session does not do. `rate-limited` and `error` may pass later.
+ */
+export function isPermanentRefusal(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  return /^(blocked|invalid|restricted|pow|auth-required):/i.test(message);
+}
 
 /** Where a session keeps the last signed World Location of a Blobbi in the host's store. */
 export const worldLocationStoreKey = (owner: string, d: string) => `blobbi-kit:world-location:v1:${owner}:${d}`;
@@ -392,6 +428,13 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
   const observed = new Map<string, number>();
   /** Relays whose answer held a future-dated location (pinned), as of their last answer. */
   const pinned = new Set<string>();
+  /** The newest valid location each relay held, as of its last answer (null: none). */
+  const holds = new Map<string, WorldLocation | null>();
+  /** Heals per relay: of which event, how many sent, and not again before when (ms). */
+  const heals = new Map<string, { id: string; attempts: number; nextAt: number }>();
+  /** Relays a heal is being sent to now. */
+  const healing = new Set<string>();
+  let healVerifyTimer: unknown = null;
   let lookFailures = 0;
   const presences = new Map<string, NostrEvent>();
   let location: WorldLocation | null = null;
@@ -426,7 +469,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     change: { kind: 'historical', key: 0 },
     travel: { phase: 'idle' },
     follow: { count: 0, needed: counter.needed, suspended: false },
-    diagnostics: { futureLocations: [], pinnedRelays: [] },
+    diagnostics: { futureLocations: [], pinnedRelays: [], laggingRelays: [] },
     presence: { status: 'off', lastSentAt: null, there: null },
   };
 
@@ -439,7 +482,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     if (disposed) return;
     const place = currentWorld(location);
     const follow = { count: counter.count(now()), needed: counter.needed, suspended: followSuspended };
-    const diagnostics = { futureLocations: futureIds(), pinnedRelays: [...pinned].sort() };
+    const diagnostics = { futureLocations: futureIds(), pinnedRelays: [...pinned].sort(), laggingRelays: laggingRelays() };
     snap = { ...snap, ...patch, location, place, here: place === world && arrivalAt === null, follow, diagnostics, presence: presenceView() };
     for (const l of [...listeners]) l(snap);
   };
@@ -512,16 +555,31 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     }
     return out.sort();
   };
-  /** Whether one relay's answer shows it pinned: the newest location it holds is dated beyond the skew. */
-  const notePinned = (url: string, events: NostrEvent[]) => {
+  /**
+   * What one relay's answer holds: its newest valid location (kept for healing), and whether it is pinned (that
+   * newest location is dated beyond the skew).
+   */
+  const noteRelay = (url: string, events: NostrEvent[]) => {
     let newest: ReturnType<typeof parseWorldLocation> = null;
     for (const e of events) {
       const loc = parseWorldLocation(e, { verify });
       if (!loc || loc.owner !== owner || loc.d !== d) continue;
       if (!newest || replacesLocation(loc, newest)) newest = loc;
     }
+    holds.set(url, newest);
     if (newest && isFutureLocation(newest, now())) pinned.add(url);
     else pinned.delete(url);
+  };
+
+  /** Relays whose last answer lacked the canonical location (older or none), pinned ones aside. */
+  const laggingRelays = (): string[] => {
+    if (!location) return [];
+    const out: string[] = [];
+    for (const [url, held] of holds) {
+      if (pinned.has(url) || held?.id === location.id) continue;
+      if (!held || replacesLocation(location, held)) out.push(url);
+    }
+    return out.sort();
   };
 
   /**
@@ -529,7 +587,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
    * still listened to, up to `LATE_ANSWER_FACTOR` timeouts: its late answer is learned when it comes (a slow relay is
    * not an empty one), as part of the look it belongs to.
    */
-  const census = async (): Promise<{ answered: number; events: NostrEvent[] }> => {
+  const census = async (): Promise<{ answered: number; urls: string[]; events: NostrEvent[] }> => {
     const filter = worldLocationFilter(owner, d);
     const answers = await Promise.all(
       relays.urls.map(async (url) => {
@@ -547,8 +605,8 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
         const asked = relays.query(url, filter, controller.signal).then(
           (events) => {
             clearTimer(hard);
-            notePinned(url, events);
-            if (!inTime && !disposed) lateAnswer(events);
+            noteRelay(url, events);
+            if (!inTime && !disposed) lateAnswer(url, events);
             return events;
           },
           () => {
@@ -563,26 +621,29 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
         }
       }),
     );
+    const urls = relays.urls.filter((_, i) => Array.isArray(answers[i]));
     const ok = answers.filter((a): a is NostrEvent[] => Array.isArray(a));
-    return { answered: ok.length, events: ok.flat() };
+    return { answered: ok.length, urls, events: ok.flat() };
   };
 
   /** A relay answered after the look gave up on it: what it holds still counts, and the place is now confirmed. */
-  const lateAnswer = (events: NostrEvent[]) => {
+  const lateAnswer = (url: string, events: NostrEvent[]) => {
     learn(events, 'look');
     lookFailures = 0;
     if (snap.resolution !== 'confirmed') {
       emit({ status: 'ready', resolution: 'confirmed' });
       scheduleRefresh();
     } else emit();
+    heal([url]);
   };
 
   const look = async (): Promise<number> => {
-    const { answered, events } = await census();
+    const { answered, urls, events } = await census();
     if (disposed) return answered;
     const failedBefore = lookFailures;
     lookFailures = answered > 0 ? 0 : lookFailures + 1;
     learn(events, 'look');
+    heal(urls);
     if (!firstLookDone) {
       firstLookDone = true;
       emit({ status: answered > 0 ? 'ready' : 'unreachable', resolution: answered > 0 ? 'confirmed' : 'unreachable' });
@@ -595,6 +656,32 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
 
   // ── Publishing ──
 
+  /** Send to one relay within the timeout: accepted, refused for good (`isPermanentRefusal`), or failed (may pass later). */
+  const publishOne = async (url: string, event: NostrEvent): Promise<'accepted' | 'refused' | 'failed'> => {
+    const controller = new AbortController();
+    let timer: unknown;
+    const late = new Promise<'failed'>((resolve) => {
+      timer = setTimer(() => {
+        controller.abort();
+        resolve('failed');
+      }, timeoutMs);
+    });
+    try {
+      return await Promise.race([
+        relays.publish(url, event, controller.signal).then(
+          () => 'accepted' as const,
+          (error: unknown) => (isPermanentRefusal(error) ? ('refused' as const) : ('failed' as const)),
+        ),
+        late,
+      ]);
+    } finally {
+      clearTimer(timer);
+    }
+  };
+
+  /** A relay refused this location for good: it is not healed with it (a new move is still sent to it). */
+  const giveUpHealing = (url: string, id: string) => heals.set(url, { id, attempts: HEAL_MAX_ATTEMPTS, nextAt: Number.POSITIVE_INFINITY });
+
   /**
    * Send to every relay, each within the timeout. `first` settles as soon as one relay accepted (true) or every relay
    * failed (false), so a slow relay does not hold the arrival back; `all` counts acceptances once every relay is done.
@@ -604,27 +691,11 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     const first = new Promise<boolean>((resolve) => (settleFirst = resolve));
     const all = Promise.all(
       relays.urls.map(async (url) => {
-        const controller = new AbortController();
-        let timer: unknown;
-        const late = new Promise<false>((resolve) => {
-          timer = setTimer(() => {
-            controller.abort();
-            resolve(false);
-          }, timeoutMs);
-        });
-        try {
-          const ok = await Promise.race([
-            relays.publish(url, event, controller.signal).then(
-              () => true,
-              () => false,
-            ),
-            late,
-          ]);
-          if (ok) settleFirst(true);
-          return ok;
-        } finally {
-          clearTimer(timer);
-        }
+        const result = await publishOne(url, event);
+        if (result === 'refused' && event.kind === KIND_WORLD_LOCATION) giveUpHealing(url, event.id);
+        const ok = result === 'accepted';
+        if (ok) settleFirst(true);
+        return ok;
       }),
     ).then((results) => {
       const n = results.filter(Boolean).length;
@@ -632,6 +703,51 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       return n;
     });
     return { first, all };
+  };
+
+  /**
+   * HEALING (see "Convergence"): each relay that just answered without the canonical location, holding an older one
+   * or none, is sent that very event again (as signed: same id, created_at, tags and content). Never a relay that
+   * holds a newer one or is pinned, never while a move is under way, at most `HEAL_MAX_ATTEMPTS` times per relay and
+   * event with a doubling pause, and never again after a permanent refusal. A relay counts as healed only when a later
+   * answer holds the event; an accepted heal is followed by one read `HEAL_VERIFY_MS` later.
+   */
+  const heal = (urls: readonly string[]) => {
+    if (disposed || inFlight || !location || !stillAccount()) return;
+    const canonical = location;
+    const t = now();
+    for (const url of urls) {
+      if (!holds.has(url) || pinned.has(url) || healing.has(url)) continue;
+      const held = holds.get(url) ?? null;
+      if (held?.id === canonical.id) {
+        heals.delete(url);
+        continue;
+      }
+      if (held && !replacesLocation(canonical, held)) continue;
+      let h = heals.get(url);
+      if (!h || h.id !== canonical.id) {
+        h = { id: canonical.id, attempts: 0, nextAt: 0 };
+        heals.set(url, h);
+      }
+      if (h.attempts >= HEAL_MAX_ATTEMPTS || t < h.nextAt) continue;
+      const entry = h;
+      entry.attempts++;
+      entry.nextAt = t + HEAL_RETRY_MS * 2 ** (entry.attempts - 1);
+      healing.add(url);
+      void publishOne(url, canonical.event).then((result) => {
+        healing.delete(url);
+        if (disposed) return;
+        if (result === 'refused') giveUpHealing(url, canonical.id);
+        else if (result === 'accepted') scheduleHealVerify();
+      });
+    }
+  };
+  const scheduleHealVerify = () => {
+    if (healVerifyTimer !== null) return;
+    healVerifyTimer = setTimer(() => {
+      healVerifyTimer = null;
+      if (!disposed) void look();
+    }, HEAL_VERIFY_MS);
   };
 
   const clearArrival = () => {
@@ -1057,6 +1173,8 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       stopPresenceTimer();
       if (refreshTimer !== null) clearTimer(refreshTimer);
       refreshTimer = null;
+      if (healVerifyTimer !== null) clearTimer(healVerifyTimer);
+      healVerifyTimer = null;
       try {
         unsubscribe?.();
       } catch {

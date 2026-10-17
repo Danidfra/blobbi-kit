@@ -36,8 +36,13 @@ export interface FakeRelay {
   url: string;
   stored: NostrEvent[];
   down: boolean;
-  /** Refuse every publish (OK false). */
+  /** Refuse every publish (OK false), with `refuseWith` as the reason. */
   refuse: boolean;
+  refuseWith: string;
+  /** Accept every publish (OK true) and keep nothing: acceptance is not storage. */
+  forget: boolean;
+  /** Never answer a publish (only the session's timeout ends it). */
+  stall: boolean;
   /** Delay before a query answers (ms, the session's timers). */
   queryDelay: number;
   /** Do not deliver live events to subscribers (a dropped stream). */
@@ -61,7 +66,7 @@ export function matches(e: NostrEvent, f: NostrFilter): boolean {
 }
 
 export function fakeRelay(url: string): FakeRelay {
-  return { url, stored: [], down: false, refuse: false, queryDelay: 0, mute: false, subs: new Set(), published: [] };
+  return { url, stored: [], down: false, refuse: false, refuseWith: 'blocked: no', forget: false, stall: false, queryDelay: 0, mute: false, subs: new Set(), published: [] };
 }
 
 /** Store an event the way a relay does: ephemeral never, addressable newest-per-address (NIP-01), else append. */
@@ -118,12 +123,13 @@ export function network(urls: string[] = ['wss://one', 'wss://two']): Network {
           if (r.down) throw new Error('unreachable');
           return r.stored.filter((e) => matches(e, filter)).map((e) => structuredClone(e));
         },
-        async publish(url, event) {
+        async publish(url, event, signal) {
           const r = relay(url);
           if (r.down) throw new Error('unreachable');
           r.published.push(event);
-          if (r.refuse) throw new Error('blocked: no');
-          relayAccept(r, structuredClone(event));
+          if (r.stall) await new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(new Error('aborted'))));
+          if (r.refuse) throw new Error(r.refuseWith);
+          if (!r.forget) relayAccept(r, structuredClone(event));
         },
         subscribe(filters, on) {
           const subs = mine.map((url) => {
