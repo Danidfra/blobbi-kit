@@ -10,6 +10,32 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## `@blobbi-kit/core` 0.11.0-m16.0, `@blobbi-kit/react` 0.11.0-m16.0: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
+
+A local build for integrating M16 into Blobbi Standalone and Blobbi Pixel
+(installed there from tarballs, `file:../blobbi-kit-m16-packs/…`). The version
+and publication are for the owner to decide; the two new kinds are
+provisional. Nothing in 0.10.0 changes.
+
+**Core: world travel** (`world-travel.ts`, `world-travel-session.ts`,
+`world-travel-sync.ts`; specification in `packages/blobbi-core/WORLD-TRAVEL.md`).
+World Location (kind 31126, addressable: where a Blobbi last is, one event
+per move, NIP-01 order, never expires) and Active Presence (kind 21124,
+ephemeral, NIP-40, optional: recent play in a World, never moves the
+Blobbi). World identifiers (`isWorldId`, `registerWorld`), validation,
+`resolveWorldLocation`, `planTransfer` (already here, contended, transfer),
+transition timing (`arrival_after`, historical versus live), presence
+freshness, and `createWorldTravel`, a session with relays, signer, store and
+lock injected: re-read before signing, a check after a slow signature, one
+automatic resend of the same signed event, stale moves never sent, optional
+presence that pauses with a signer that prompts. `syncTravel` drives a
+World's own on-screen Blobbi (settle on load, depart, arrive).
+
+**React:** `useWorldTravel`, `useWorldTravelSync`, `poolWorldTravelRelays`
+(over any Nostrify-style pool, no Nostrify import).
+
+---
+
 ## `@blobbi-kit/core` 0.10.0, `@blobbi-kit/react` 0.10.0: safe daily progress and safe profile writes
 
 The Blobbonaut profile (kind 11125) is replaceable and every Blobbi app
