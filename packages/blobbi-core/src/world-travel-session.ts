@@ -50,9 +50,11 @@ import {
   PRESENCE_RENEW_S,
   activePresenceFilter,
   arrivalDelayMs,
+  buildLocationDeletionTemplate,
   buildPresenceTemplate,
   currentWorld,
   freshPresence,
+  isFutureLocation,
   isPresenceFresh,
   parseActivePresence,
   parseWorldLocation,
@@ -214,6 +216,15 @@ export interface WorldTravelSnapshot {
   travel: TravelPhase;
   /** Following the player here by interacting (`interact`). */
   follow: FollowState;
+  /**
+   * What this session noticed about the relays (diagnostics; nothing here moves the Blobbi):
+   *   futureLocations  ids of valid World Locations dated more than `MAX_LOCATION_SKEW_S` ahead of this clock
+   *                    (ignored until the clock reaches them);
+   *   pinnedRelays     relays whose newest stored location is such an event: by NIP-01 they keep it over any newer
+   *                    real move, so moves do not stick there until it is deleted (`repairFutureLocations`) or the
+   *                    clock passes it.
+   */
+  diagnostics: { futureLocations: string[]; pinnedRelays: string[] };
   presence: {
     status: PresenceStatus;
     /** When this session last sent one (ms), or null. */
@@ -238,6 +249,14 @@ export type TravelOutcome =
   | 'read-only'
   | TravelFailure
   | 'disposed';
+
+/** What an explicit `repairFutureLocations()` came to. */
+export type RepairOutcome =
+  /** No future-dated location is known: nothing was signed. */
+  | { outcome: 'nothing' }
+  /** One deletion request (kind 5, by id) signed and sent; the current location resent; `stillPinned` after a look. */
+  | { outcome: 'requested'; deleted: string[]; stillPinned: string[] }
+  | { outcome: 'declined' | 'unreachable' | 'read-only' | 'wrong-account' | 'busy' | 'disposed' };
 
 export type InteractOutcome =
   /** Counted; not enough yet to bring the Blobbi over. */
@@ -268,6 +287,14 @@ export interface WorldTravelSession {
    * an auto-repeat of a held key, never counted; inputs closer together than `FOLLOW_GAP_MS` count once.
    */
   interact(o?: { repeat?: boolean }): Promise<InteractOutcome>;
+  /**
+   * EXPLICIT RECOVERY, never automatic (the player's or an operator's deliberate act; it signs one event): ask every
+   * relay pinned by a future-dated location (`diagnostics.pinnedRelays`) to delete it with a NIP-09 deletion request
+   * naming its id (`e`; an `a` deletion cannot reach an event dated after the request), then resend the current
+   * location (the same signed event: no second signature) and look again. NIP-09 deletion is a request: a relay
+   * may ignore it, and `stillPinned` says which still hold the event.
+   */
+  repairFutureLocations(): Promise<RepairOutcome>;
   setPresenceEnabled(on: boolean): void;
   dispose(): void;
 }
@@ -288,6 +315,10 @@ export const AUTO_RESEND_MS = 5_000;
 export const PRESENCE_TICK_MS = 15_000;
 /** After a move is published, the relays are read again this soon (a simultaneous move elsewhere shows up) (ms). */
 export const RECONCILE_AFTER_MS = 2_000;
+/** After a look no relay answered, the next one comes this soon, doubling each time up to `refreshMs` (ms). */
+export const LOOK_RETRY_MS = 5_000;
+/** A relay slower than the timeout is still listened to for this many timeouts: its late answer still counts. */
+export const LATE_ANSWER_FACTOR = 3;
 /** The shortest time from the player's act to the Blobbi forming here, by default (ms). A UX target, not protocol. */
 export const MIN_TRAVEL_MS = 1_500;
 
@@ -359,6 +390,9 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
   const known = new Map<string, NostrEvent>();
   /** When this session first saw each location (ms): a stay is measured from it when the event is dated ahead. */
   const observed = new Map<string, number>();
+  /** Relays whose answer held a future-dated location (pinned), as of their last answer. */
+  const pinned = new Set<string>();
+  let lookFailures = 0;
   const presences = new Map<string, NostrEvent>();
   let location: WorldLocation | null = null;
   let firstLookDone = false;
@@ -392,6 +426,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     change: { kind: 'historical', key: 0 },
     travel: { phase: 'idle' },
     follow: { count: 0, needed: counter.needed, suspended: false },
+    diagnostics: { futureLocations: [], pinnedRelays: [] },
     presence: { status: 'off', lastSentAt: null, there: null },
   };
 
@@ -404,7 +439,8 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     if (disposed) return;
     const place = currentWorld(location);
     const follow = { count: counter.count(now()), needed: counter.needed, suspended: followSuspended };
-    snap = { ...snap, ...patch, location, place, here: place === world && arrivalAt === null, follow, presence: presenceView() };
+    const diagnostics = { futureLocations: futureIds(), pinnedRelays: [...pinned].sort() };
+    snap = { ...snap, ...patch, location, place, here: place === world && arrivalAt === null, follow, diagnostics, presence: presenceView() };
     for (const l of [...listeners]) l(snap);
   };
 
@@ -430,7 +466,9 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     if (currentWorld(next) !== before) {
       // A change of place starts any count of interactions over: they were for where it was
       counter.reset();
-      const kind = transitionKind({ initial: !firstLookDone && how === 'look', createdAt: next.createdAt, now: now() });
+      // Until a relay has answered, whatever is learned was already true: shown as it is, never as a journey
+      const initial = how === 'look' && (!firstLookDone || snap.resolution !== 'confirmed');
+      const kind = transitionKind({ initial, createdAt: next.createdAt, now: now() });
       emit({ change: { kind, key: snap.change.key + 1 } });
     } else emit();
     if (next.world !== world) stopPresenceTimer();
@@ -464,23 +502,64 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     }
   };
 
-  /** Every relay on its own, within the timeout: what answered, and every event returned. */
+  /** Valid known locations dated beyond `MAX_LOCATION_SKEW_S` of this clock. */
+  const futureIds = (): string[] => {
+    const t = now();
+    const out: string[] = [];
+    for (const e of known.values()) {
+      const loc = parseWorldLocation(e);
+      if (loc && isFutureLocation(loc, t)) out.push(loc.id);
+    }
+    return out.sort();
+  };
+  /** Whether one relay's answer shows it pinned: the newest location it holds is dated beyond the skew. */
+  const notePinned = (url: string, events: NostrEvent[]) => {
+    let newest: ReturnType<typeof parseWorldLocation> = null;
+    for (const e of events) {
+      const loc = parseWorldLocation(e, { verify });
+      if (!loc || loc.owner !== owner || loc.d !== d) continue;
+      if (!newest || replacesLocation(loc, newest)) newest = loc;
+    }
+    if (newest && isFutureLocation(newest, now())) pinned.add(url);
+    else pinned.delete(url);
+  };
+
+  /**
+   * Every relay on its own: what answered within the timeout, and every event returned. A relay slower than that is
+   * still listened to, up to `LATE_ANSWER_FACTOR` timeouts: its late answer is learned when it comes (a slow relay is
+   * not an empty one), as part of the look it belongs to.
+   */
   const census = async (): Promise<{ answered: number; events: NostrEvent[] }> => {
     const filter = worldLocationFilter(owner, d);
     const answers = await Promise.all(
       relays.urls.map(async (url) => {
         const controller = new AbortController();
-        let timer: unknown;
+        let soft: unknown;
+        let hard: unknown;
+        let inTime = true;
         const late = new Promise<null>((resolve) => {
-          timer = setTimer(() => {
-            controller.abort();
+          soft = setTimer(() => {
+            inTime = false;
             resolve(null);
           }, timeoutMs);
         });
+        hard = setTimer(() => controller.abort(), timeoutMs * LATE_ANSWER_FACTOR);
+        const asked = relays.query(url, filter, controller.signal).then(
+          (events) => {
+            clearTimer(hard);
+            notePinned(url, events);
+            if (!inTime && !disposed) lateAnswer(events);
+            return events;
+          },
+          () => {
+            clearTimer(hard);
+            return null;
+          },
+        );
         try {
-          return await Promise.race([relays.query(url, filter, controller.signal).catch(() => null), late]);
+          return await Promise.race([asked, late]);
         } finally {
-          clearTimer(timer);
+          clearTimer(soft);
         }
       }),
     );
@@ -488,14 +567,29 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     return { answered: ok.length, events: ok.flat() };
   };
 
+  /** A relay answered after the look gave up on it: what it holds still counts, and the place is now confirmed. */
+  const lateAnswer = (events: NostrEvent[]) => {
+    learn(events, 'look');
+    lookFailures = 0;
+    if (snap.resolution !== 'confirmed') {
+      emit({ status: 'ready', resolution: 'confirmed' });
+      scheduleRefresh();
+    } else emit();
+  };
+
   const look = async (): Promise<number> => {
     const { answered, events } = await census();
     if (disposed) return answered;
+    const failedBefore = lookFailures;
+    lookFailures = answered > 0 ? 0 : lookFailures + 1;
     learn(events, 'look');
     if (!firstLookDone) {
       firstLookDone = true;
       emit({ status: answered > 0 ? 'ready' : 'unreachable', resolution: answered > 0 ? 'confirmed' : 'unreachable' });
     } else if (answered > 0 && snap.status !== 'ready') emit({ status: 'ready', resolution: 'confirmed' });
+    else emit();
+    // No relay answered: look again soon (backing off), rather than at the next minute's refresh
+    if ((answered === 0) !== (failedBefore > 0) || answered === 0) scheduleRefresh();
     return answered;
   };
 
@@ -824,7 +918,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
         if (disposed) return;
         void look().finally(scheduleRefresh);
       },
-      visible ? refreshMs : refreshMs * 5,
+      lookFailures > 0 ? Math.min(LOOK_RETRY_MS * 2 ** (lookFailures - 1), refreshMs) : visible ? refreshMs : refreshMs * 5,
     );
   };
 
@@ -888,6 +982,43 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       if (disposed) return;
       void presenceTick(true);
     },
+    async repairFutureLocations(): Promise<RepairOutcome> {
+      if (disposed) return { outcome: 'disposed' };
+      if (inFlight) return { outcome: 'busy' };
+      const signer = signerNow();
+      if (!signer) return { outcome: 'read-only' };
+      inFlight = true;
+      try {
+        return await lock(`blobbi-world-travel:${owner}:${d}`, async (): Promise<RepairOutcome> => {
+          const answered = await look();
+          if (disposed) return { outcome: 'disposed' };
+          if (answered === 0) return { outcome: 'unreachable' };
+          const ids = futureIds();
+          if (!ids.length) return { outcome: 'nothing' };
+          if (!stillAccount()) return { outcome: 'wrong-account' };
+          let signed: NostrEvent;
+          try {
+            signed = await signer.sign(buildLocationDeletionTemplate({ ids, now: now() }));
+          } catch {
+            return disposed ? { outcome: 'disposed' } : { outcome: 'declined' };
+          }
+          if (disposed) return { outcome: 'disposed' };
+          if (signed.pubkey !== owner || signed.kind !== 5 || !safeVerifyEvent(verify, signed) || !stillAccount()) return { outcome: 'wrong-account' };
+          await publishAll(signed).all;
+          // Forgotten here (the owner asked them deleted); a relay that ignores the request brings them back on the look
+          for (const id of ids) {
+            known.delete(id);
+            observed.delete(id);
+          }
+          // The real place, resent as it was signed (no second signature): a relay that dropped the future event takes it now
+          if (location) await publishAll(location.event).all;
+          await look();
+          return { outcome: 'requested', deleted: ids, stillPinned: [...pinned].sort() };
+        });
+      } finally {
+        inFlight = false;
+      }
+    },
     async interact({ repeat = false } = {}) {
       if (disposed) return 'disposed';
       void presenceTick(true);
@@ -934,6 +1065,14 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       listeners.clear();
     },
   };
+}
+
+function safeVerifyEvent(verify: EventVerifier, e: NostrEvent): boolean {
+  try {
+    return verify(e);
+  } catch {
+    return false;
+  }
 }
 
 function safeBool(fn: () => boolean): boolean {

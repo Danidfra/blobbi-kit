@@ -103,7 +103,7 @@ Since `core-v0.10.0` (7220ca6), the only other changes in `packages/` are:
   Nostrify-style pool by structure and imports no Nostrify.
 - `npm run smoke` passes: every entry resolves under raw Node ESM.
 
-## 5. Tarball contents (checked on 0.11.0-m16.3)
+## 5. Tarball contents (checked on 0.11.0-m16.4)
 
 - **core:** 82 files.
   - It contains `dist/` (`.js`, `.js.map`, `.d.ts` for every module,
@@ -116,9 +116,9 @@ Since `core-v0.10.0` (7220ca6), the only other changes in `packages/` are:
 ## 6. Exact changes to make at release time (not done)
 
 1. Versions:
-   - `packages/blobbi-core/package.json`: `0.11.0-m16.3` → `0.11.0`;
-   - `packages/blobbi-react/package.json`: `0.11.0-m16.3` → `0.11.0`, and the
-     peer `@blobbi-kit/core` `^0.11.0-m16.3` → `^0.11.0`;
+   - `packages/blobbi-core/package.json`: `0.11.0-m16.4` → `0.11.0`;
+   - `packages/blobbi-react/package.json`: `0.11.0-m16.4` → `0.11.0`, and the
+     peer `@blobbi-kit/core` `^0.11.0-m16.4` → `^0.11.0`;
    - the two `package-manifest.test.ts` files, and `package-lock.json`.
 2. `CHANGELOG.md`: merge the m16.0–m16.3 notes into one 0.11.0 entry, and
    drop "LOCAL PRERELEASE".

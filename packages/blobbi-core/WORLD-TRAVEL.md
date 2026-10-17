@@ -328,12 +328,7 @@ a kind is unused.
     every later move to be dated after it;
   - timestamp inflation is bounded: `latest` is at most 900 s ahead, so a move
     is at most 901 s ahead;
-  - known limit: a relay that *accepted* a far-future event keeps it as the
-    newest for its address, and so drops the newer real-time events until
-    its clock passes. The other relays, the stream and the store still carry
-    the real moves. A NIP-09 deletion of the bad event would clean such a
-    relay. It is not automated: it is another signature, and it is for the
-    owner to approve.
+  - the remaining limit, and its recovery, are in §7b.
 - **The stay** ("just moved", `MIN_STAY_MS`) is measured from the earlier of
   `created_at` and when this session first saw the location (`observedAt`).
   A location dated a few minutes ahead therefore cannot stretch the no-reclaim
@@ -353,6 +348,71 @@ a kind is unused.
   and old events stay valid. The only wire-visible change in M16.1 is the
   shorter default window (`arrival_after` = `created_at + 2`), which readers
   only honour.
+
+## 7b. A relay pinned by a future-dated location (reviewed for M16.2)
+
+**The problem.**
+- NIP-01: "for each combination of `kind`, `pubkey` and the `d` tag value,
+  only the latest event MUST be stored by relays".
+- A relay that once accepted a location dated far ahead (a device whose clock
+  was years ahead) therefore keeps that event. It drops every later real move
+  for the address, because those are older by `created_at`, until real time
+  passes that date. The relay is **pinned**.
+- Readers ignore the event (§7a), so they never show the wrong place. But such
+  a relay cannot carry a new move to another device.
+
+**How likely it is.** Many relays refuse such events on arrival. strfry's
+default `rejectEventsNewerThanSeconds = 900`, and NIP-01 itself shows the
+rejection "invalid: event creation date is too far off from the current
+time". So it takes an owner's device with a badly wrong clock *and* a relay
+without that check. Only the owner's key can write the address, so a third
+party cannot cause it.
+
+**What clients cannot do.**
+- **Outrank it without inflating timestamps.** A move dated after the bad
+  event would itself be far-future: readers would ignore it, and careful
+  relays would reject it.
+- **Delete it by address.** NIP-09: for an `a` deletion, relays "delete all
+  versions … up to the `created_at` timestamp" *of the request*. A request
+  dated now can never reach an event dated in 2100, and it would delete the
+  real current location instead.
+- **Be sure of anything.** NIP-09 deletion is a SHOULD. "It is impossible to
+  delete events from all relays", and relays "should not be treated as
+  authoritative".
+
+**What M16.2 does (deterministic parts, automatic):**
+1. Readers ignore any location beyond the skew (§7a), so the place shown is
+   always the newest *believable* one, the same on every reader whose clock is
+   right.
+2. Every relay answer is checked. A relay whose newest stored location is
+   future-dated is reported in `snapshot.diagnostics.pinnedRelays`, and the
+   event id in `diagnostics.futureLocations`.
+3. Other devices still learn moves through every non-pinned relay. The device
+   that made a move also keeps its signed copy (§8).
+
+**The explicit recovery** (`session.repairFutureLocations()`, never
+automatic):
+- **When:** only on a person's deliberate request (a diagnostic button, or an
+  operator acting for the owner). No World calls it by itself. It signs one
+  event.
+- **Steps:**
+  1. Look again; with no future-dated location known, sign nothing
+     (`nothing`).
+  2. Sign one NIP-09 deletion request **by id**: `["e", <id>]` for each
+     future location, plus `["k", "31126"]`. It has no `a` tag.
+  3. Send it to every travel relay.
+  4. Resend the current location as it was signed (no second signature), so
+     a relay that dropped the bad event takes the real one.
+  5. Look again, and report `stillPinned`: the relays that ignored the request.
+- **If relays still pin** after this, the manual procedure is:
+  1. fix the device clock that produced the event;
+  2. ask that relay's operator to delete the event id, or drop the relay from
+     the travel set;
+  3. otherwise wait for real time to pass its date;
+  4. meanwhile the other relays carry the truth.
+
+**Compatibility.** No event format or kind changed. Kind 5 is plain NIP-09,
+used only by this explicit recovery.
 
 ## 8. Concurrency and its limits
 
@@ -374,6 +434,13 @@ a kind is unused.
   from any relay, the stream or the store wins. A relay that lags behind can
   never undo a newer event this device has seen, because the store keeps the
   signed event.
+- **Slow relays** (M16.2). A relay slower than the timeout is still listened
+  to, for up to 3 timeouts. Its late answer is learned when it comes, and
+  shown as history if no relay had answered before it. After a look that no
+  relay answered, the next one comes 5 s later, then 10, 20, 40 and 60 s,
+  rather than at the next minute's refresh. `pending` still ends within one
+  timeout, and `unreachable` turns into `confirmed` by itself once a relay
+  answers.
 - **Reconnection.** A dropped stream is subscribed again with backoff, and the
   session looks again. Periodic looks run every 60 s while visible (5 minutes
   while hidden), and on `online` and on visibility.

@@ -516,3 +516,24 @@ export function buildPresenceTemplate(o: { owner: string; d: string; world: stri
 export function activePresenceFilter(owner: string, d: string, since: number): NostrFilter {
   return { kinds: [KIND_ACTIVE_PRESENCE], authors: [owner], '#a': [buildBlobbiAddress(owner, d)], since };
 }
+
+// ─── Recovery from a future-dated location (explicit only) ──────────────────
+
+/** NIP-09 deletion request (kind 5). */
+export const KIND_DELETION = 5;
+
+/**
+ * The NIP-09 deletion request that asks relays to drop future-dated World Locations, by id. By id (`e`), never by
+ * address (`a`): an `a` deletion removes the versions dated up to the request's own `created_at`, so it can never
+ * reach an event dated after it, and it would remove the real, current location instead. Only ever signed on an
+ * explicit request (`session.repairFutureLocations`). Relays MAY ignore it: deletion is not guaranteed.
+ */
+export function buildLocationDeletionTemplate(o: { ids: readonly string[]; now: number }): WorldTravelTemplate {
+  const ids = [...new Set(o.ids)].filter((id) => /^[0-9a-f]{64}$/.test(id)).sort();
+  return {
+    kind: KIND_DELETION,
+    created_at: Math.floor(o.now / 1000),
+    tags: [...ids.map((id) => ['e', id]), ['k', String(KIND_WORLD_LOCATION)], ['alt', 'Deletion request: Blobbi world locations dated in the future']],
+    content: 'Blobbi world location dated in the future',
+  };
+}

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NostrEvent } from './nostr-protocol';
 import { DEPARTURE_WINDOW_S, KIND_ACTIVE_PRESENCE, KIND_WORLD_LOCATION, MIN_STAY_MS, PRESENCE_RENEW_S, WORLD_HOME, WORLD_PIXEL, buildPresenceTemplate, buildWorldLocationTemplate, parseWorldLocation, type WorldTravelTemplate } from './world-travel';
 import { FOLLOW_WINDOW_MS } from './world-travel-follow';
-import { AUTO_RESEND_MS, MIN_TRAVEL_MS, PENDING_TTL_MS, PRESENCE_SIGN_BUDGET_MS, TRAVEL_COOLDOWN_MS, createWorldTravel, storedWorldLocation, worldLocationStoreKey, type WorldTravelOptions, type WorldTravelSession, type WorldTravelSigner, type WorldTravelStore } from './world-travel-session';
+import { AUTO_RESEND_MS, LATE_ANSWER_FACTOR, LOOK_RETRY_MS, MIN_TRAVEL_MS, PENDING_TTL_MS, PRESENCE_SIGN_BUDGET_MS, TRAVEL_COOLDOWN_MS, createWorldTravel, storedWorldLocation, worldLocationStoreKey, type WorldTravelOptions, type WorldTravelSession, type WorldTravelSigner, type WorldTravelStore } from './world-travel-session';
 import { A, B, dOf, network, relayAccept, signAs, verify, type Network } from './world-travel.test-helpers';
 
 const D = dOf(A);
@@ -956,5 +956,142 @@ describe('the arrival schedule (M16.1)', () => {
     await settle(50);
     expect(await pending).toBe('moved');
     expect(home.session.snapshot()).toMatchObject({ place: WORLD_HOME, here: true });
+  });
+});
+
+// ─── M16.2 ─────────────────────────────────────────────────────────────────
+
+describe('slow relays and late answers (M16.2)', () => {
+  it('a relay slower than the timeout: unreachable at first, then its late answer confirms the place (shown as history)', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    for (const r of net.relays) r.queryDelay = 6_000;
+    const home = track(device(net, WORLD_HOME, { timeoutMs: 4_000 }));
+    await settle(4_010);
+    expect(home.session.snapshot()).toMatchObject({ resolution: 'unreachable', place: WORLD_HOME });
+    await settle(2_100);
+    expect(home.session.snapshot()).toMatchObject({ resolution: 'confirmed', status: 'ready', place: WORLD_PIXEL, here: false, change: { kind: 'historical' } });
+    expect(home.sign.asked).toHaveLength(0);
+  });
+
+  it('an answer later than LATE_ANSWER_FACTOR timeouts is given up on (aborted), and the next look tries again', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    for (const r of net.relays) r.queryDelay = 4_000 * LATE_ANSWER_FACTOR + 1_000;
+    const home = track(device(net, WORLD_HOME, { timeoutMs: 4_000 }));
+    await settle(4_000 * LATE_ANSWER_FACTOR + 100);
+    expect(home.session.snapshot().resolution).toBe('unreachable');
+    for (const r of net.relays) r.queryDelay = 0;
+    await settle(LOOK_RETRY_MS * 4);
+    expect(home.session.snapshot()).toMatchObject({ resolution: 'confirmed', place: WORLD_PIXEL });
+  });
+
+  it('no relay answering: looks again soon and backs off (5 s, 10 s, 20 s…), never waits a whole minute first', async () => {
+    const net = network();
+    for (const r of net.relays) r.down = true;
+    let asked = 0;
+    const port = net.port();
+    const counting = { ...port, query: (url: string, f: Parameters<typeof port.query>[1], sig: AbortSignal) => (asked++, port.query(url, f, sig)) };
+    const s = createWorldTravel({ owner: A, d: D, world: WORLD_HOME, relays: counting, verify, signer: () => signer(), minTravelMs: 0 });
+    sessions.push(s);
+    await settle(10);
+    expect(asked).toBe(2);
+    await settle(LOOK_RETRY_MS);
+    expect(asked).toBe(4);
+    await settle(LOOK_RETRY_MS * 2);
+    expect(asked).toBe(6);
+    await settle(LOOK_RETRY_MS * 4 - 100);
+    expect(asked).toBe(6); // the third retry is 20 s after the second
+    for (const r of net.relays) r.down = false;
+    await settle(200); // the 20 s retry
+    expect(s.snapshot().resolution).toBe('confirmed');
+  });
+
+  it('a late answer while the player is away does not play a journey, and a later live move still does', async () => {
+    const net = network();
+    const first = remoteMove(net, WORLD_PIXEL, START - 60_000);
+    for (const r of net.relays) r.queryDelay = 5_000;
+    const home = track(device(net, WORLD_HOME, { timeoutMs: 4_000 }));
+    await settle(5_100);
+    expect(home.session.snapshot().change.kind).toBe('historical');
+    for (const r of net.relays) r.queryDelay = 0;
+    remoteMove(net, 'nostr-farm', Date.now(), parseWorldLocation(first, { verify }));
+    expect(home.session.snapshot()).toMatchObject({ place: 'nostr-farm', change: { kind: 'live' } });
+  });
+});
+
+describe('future-dated locations: detection and explicit recovery (M16.2)', () => {
+  /** Relay one has stored a location dated in 2100; relay two holds the real one. */
+  async function pinnedSetup(extra: Parameters<typeof device>[2] = {}) {
+    const net = network();
+    const real = remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const future = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: 'nostr-farm', latest: null, now: Date.UTC(2100, 0, 1) }));
+    relayAccept(net.relays[0], future);
+    const home = track(device(net, WORLD_HOME, extra));
+    await settle(10);
+    return { net, real, future, home };
+  }
+
+  it('the pinned relay and the future event are reported; the real location decides; nothing is signed by itself', async () => {
+    const { home, real, future } = await pinnedSetup();
+    expect(home.session.snapshot()).toMatchObject({ place: WORLD_PIXEL, location: { id: real.id }, diagnostics: { futureLocations: [future.id], pinnedRelays: ['wss://one'] } });
+    await settle(10 * 60_000);
+    expect(home.sign.asked).toHaveLength(0);
+  });
+
+  it('a move publishes everywhere, but the pinned relay keeps the future event (NIP-01): it stays pinned', async () => {
+    const { home, net } = await pinnedSetup();
+    expect(await home.session.travel({ explicit: true })).toBe('moved');
+    const one = net.relays[0].stored.filter((e) => e.kind === KIND_WORLD_LOCATION);
+    expect(one.map((e) => e.created_at)).toEqual([Math.floor(Date.UTC(2100, 0, 1) / 1000)]);
+    await home.session.refresh();
+    expect(home.session.snapshot().diagnostics.pinnedRelays).toEqual(['wss://one']);
+  });
+
+  it('repairFutureLocations (explicit): one deletion request by id, the current location resent, the relay unpinned', async () => {
+    const { home, net, future } = await pinnedSetup();
+    await home.session.travel({ explicit: true });
+    const current = home.session.snapshot().location!;
+    const out = await home.session.repairFutureLocations();
+    expect(out).toEqual({ outcome: 'requested', deleted: [future.id], stillPinned: [] });
+    expect(home.sign.asked.map((t) => t.kind)).toEqual([KIND_WORLD_LOCATION, 5]);
+    const del = home.sign.asked[1];
+    expect(del.tags).toEqual(expect.arrayContaining([['e', future.id], ['k', String(KIND_WORLD_LOCATION)]]));
+    expect(del.tags.some((t) => t[0] === 'a')).toBe(false); // never by address: that would reach the real location
+    expect(net.relays[0].stored.find((e) => e.kind === KIND_WORLD_LOCATION)?.id).toBe(current.id); // resent as signed
+    expect(home.session.snapshot().diagnostics).toEqual({ futureLocations: [], pinnedRelays: [] });
+  });
+
+  it('a relay that ignores the deletion stays reported as pinned', async () => {
+    const { home, net } = await pinnedSetup();
+    const port = home.port as unknown as { publish: (url: string, e: NostrEvent, s: AbortSignal) => Promise<void> };
+    const original = port.publish.bind(port);
+    port.publish = (url, e, sig) => (e.kind === 5 ? Promise.resolve() : original(url, e, sig)); // accepted, not honoured
+    const out = await home.session.repairFutureLocations();
+    expect(out).toMatchObject({ outcome: 'requested', stillPinned: ['wss://one'] });
+    expect(net.relays[0].stored.some((e) => e.kind === KIND_WORLD_LOCATION && e.created_at > Date.now() / 1000 + 900)).toBe(true);
+  });
+
+  it('nothing to repair: nothing signed; read-only and a refusal are reported, never retried', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const clean = track(device(net, WORLD_HOME));
+    await settle(10);
+    expect(await clean.session.repairFutureLocations()).toEqual({ outcome: 'nothing' });
+    expect(clean.sign.asked).toHaveLength(0);
+    const ro = await pinnedSetup({ sign: null });
+    expect(await ro.home.session.repairFutureLocations()).toEqual({ outcome: 'read-only' });
+    const s = signer(A, { refuse: true });
+    const refused = await pinnedSetup({ sign: s });
+    expect(await refused.home.session.repairFutureLocations()).toEqual({ outcome: 'declined' });
+    expect(s.asked).toHaveLength(1);
+  });
+
+  it('within the skew allowed, an event slightly ahead is not "future": nothing is reported', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START + 600_000);
+    const home = track(device(net, WORLD_HOME));
+    await settle(10);
+    expect(home.session.snapshot()).toMatchObject({ place: WORLD_PIXEL, diagnostics: { futureLocations: [], pinnedRelays: [] } });
   });
 });

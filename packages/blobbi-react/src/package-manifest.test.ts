@@ -59,13 +59,13 @@ const HOST_FACING_FIELDS = [
 describe('@blobbi-kit/react package manifest', () => {
   it('is the expected package at the expected version', () => {
     expect(manifest.name).toBe('@blobbi-kit/react');
-    expect(manifest.version).toBe('0.11.0-m16.3');
+    expect(manifest.version).toBe('0.11.0-m16.4');
   });
 
   describe('peer dependency set', () => {
     it('declares exactly the expected peers and ranges', () => {
       expect(manifest.peerDependencies).toEqual({
-        '@blobbi-kit/core': '^0.11.0-m16.3',
+        '@blobbi-kit/core': '^0.11.0-m16.4',
         '@nostrify/react': '^0.6.3',
         '@tanstack/react-query': '^5.56.2',
         react: '^18.0.0 || ^19.0.0',

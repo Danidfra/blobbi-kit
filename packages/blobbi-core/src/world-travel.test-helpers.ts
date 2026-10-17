@@ -66,6 +66,13 @@ export function fakeRelay(url: string): FakeRelay {
 
 /** Store an event the way a relay does: ephemeral never, addressable newest-per-address (NIP-01), else append. */
 export function relayAccept(r: FakeRelay, e: NostrEvent): void {
+  if (e.kind === 5) {
+    // NIP-09 by id: the author's own events named in `e` tags are dropped (this relay honours requests)
+    const ids = new Set(e.tags.filter((t) => t[0] === 'e').map((t) => t[1]));
+    r.stored = r.stored.filter((x) => !(ids.has(x.id) && x.pubkey === e.pubkey));
+    r.stored.push(e);
+    return;
+  }
   if (e.kind >= 20000 && e.kind < 30000) {
     // ephemeral: delivered, never stored
   } else if (e.kind >= 30000 && e.kind < 40000) {

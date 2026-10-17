@@ -10,7 +10,25 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
-## `@blobbi-kit/core` 0.11.0-m16.3, `@blobbi-kit/react` 0.11.0-m16.3: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
+## `@blobbi-kit/core` 0.11.0-m16.4, `@blobbi-kit/react` 0.11.0-m16.4: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
+
+**m16.4 (M16.2 hardening).**
+- **Slow relays.**
+  - A relay slower than the timeout is still heard for up to
+    `LATE_ANSWER_FACTOR` (3) timeouts. Its late answer confirms the place, and
+    is shown as history while nothing was confirmed.
+  - After an unanswered look, retries back off from `LOOK_RETRY_MS` (5 s) up
+    to `refreshMs`.
+- **Future-dated locations.**
+  - `snapshot.diagnostics` (`futureLocations`, `pinnedRelays`).
+  - The explicit `session.repairFutureLocations()`: one NIP-09 deletion
+    request by id, the current location resent, then a look. It is never
+    called automatically.
+  - `buildLocationDeletionTemplate` and `KIND_DELETION`.
+  - The analysis is in `WORLD-TRAVEL.md` §7b.
+
+All of it is additive; there are no format or kind changes.
+
 
 **m16.3** (found in the cross-device browser run): while a move here is under
 way (`travelView` = `coming`), `syncTravel` leaves a Blobbi the World is
