@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WORLD_HOME, WORLD_PIXEL } from './world-travel';
 import type { WorldTravelSnapshot } from './world-travel-session';
-import { ACTIVE_MS, VISIBLE_GRACE_MS, isMeaningfulInput, isPlayedNow, reconcileTravel, syncTravel, type ShownBlobbi, type ShownState, type TravelView } from './world-travel-sync';
+import { ACTIVE_MS, VISIBLE_GRACE_MS, isMeaningfulInput, isPlayedNow, reconcileTravel, syncTravel, travelView, type ShownBlobbi, type ShownState, type TravelView } from './world-travel-sync';
 
 const view = (v: Partial<TravelView>): TravelView => ({ here: true, shown: 'present', visible: true, visibleFor: 10_000, busy: false, change: 'live', ...v });
 
@@ -70,6 +70,23 @@ describe('syncTravel', () => {
     expect(b.log).toEqual(['settle-absent']);
     expect(journeys).toEqual([]);
     sync.dispose();
+  });
+
+  it('pending (nothing known yet): nothing is asked of the Blobbi; the first answer is settled, never a journey (no flash)', () => {
+    const src = source({ resolution: 'pending', status: 'loading', place: WORLD_HOME, here: true });
+    const b = blobbi('absent'); // the World shows its "looking" cue, not the Blobbi
+    const sync = syncTravel({ source: src, blobbi: b });
+    vi.advanceTimersByTime(3_000);
+    expect(b.log).toEqual([]);
+    src.set({ resolution: 'confirmed', status: 'ready', place: WORLD_PIXEL, here: false, change: { kind: 'historical', key: 1 } });
+    expect(b.log).toEqual([]); // already absent: in line, nothing to do, no departure
+    sync.dispose();
+    const home = source({ resolution: 'pending', status: 'loading' });
+    const b2 = blobbi('absent');
+    const sync2 = syncTravel({ source: home, blobbi: b2 });
+    home.set({ resolution: 'confirmed', status: 'ready' });
+    expect(b2.log).toEqual(['settle-present']); // home all along: it simply is there, no arrival replayed
+    sync2.dispose();
   });
 
   it('a live move away departs once the World’s moment ends; the journey is reported with its place', () => {
@@ -166,5 +183,18 @@ describe('syncTravel while the World drives its Blobbi', () => {
     sync.check();
     expect(log).toEqual(['settle-absent']);
     sync.dispose();
+  });
+});
+
+describe('travelView', () => {
+  const snap = (p: Partial<WorldTravelSnapshot>) => ({ resolution: 'confirmed', here: true, place: WORLD_HOME, world: WORLD_HOME, travel: { phase: 'idle' }, ...p }) as WorldTravelSnapshot;
+  it('keeps unknown, here, away, coming and unreachable apart', () => {
+    expect(travelView(snap({ resolution: 'pending' }))).toEqual({ kind: 'looking', unreachable: false });
+    expect(travelView(snap({}))).toEqual({ kind: 'here', unreachable: false });
+    expect(travelView(snap({ here: false, place: WORLD_PIXEL }))).toEqual({ kind: 'away', unreachable: false });
+    expect(travelView(snap({ here: false, place: WORLD_PIXEL, travel: { phase: 'signing' } })).kind).toBe('coming');
+    expect(travelView(snap({ here: false, travel: { phase: 'arriving', at: 1, formAt: 2 } })).kind).toBe('coming');
+    expect(travelView(snap({ resolution: 'unreachable', here: false, place: WORLD_PIXEL }))).toEqual({ kind: 'away', unreachable: true });
+    expect(travelView(snap({ here: false, place: WORLD_PIXEL, travel: { phase: 'failed', reason: 'declined' } })).kind).toBe('away');
   });
 });

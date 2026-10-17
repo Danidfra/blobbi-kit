@@ -44,7 +44,9 @@
  */
 import type { NostrEvent, NostrFilter } from './nostr-protocol';
 import type { EventVerifier } from './profile-order';
+import { createFollowCounter, FOLLOW_INTERACTIONS, FOLLOW_WINDOW_MS, type FollowCounter } from './world-travel-follow';
 import {
+  MAX_TRANSITION_S,
   PRESENCE_RENEW_S,
   activePresenceFilter,
   arrivalDelayMs,
@@ -122,6 +124,21 @@ export interface WorldTravelOptions {
   timeoutMs?: number;
   /** How often the relays are read again while visible (ms); five times as long while hidden. */
   refreshMs?: number;
+  /**
+   * How long this World's own arrival plays before the Blobbi has formed (ms): its teleport's "incoming" part. The
+   * arrival is started that much before the moment the Blobbi may be seen here (`arrival_after`), so the wait and
+   * the effect overlap instead of adding up. 0 (the default): the arrival starts at that moment.
+   */
+  arrivalLeadMs?: number;
+  /**
+   * The shortest time from the player's act to the Blobbi forming here (ms), so a move from a World nobody is playing
+   * (no departure window) still reads as a journey rather than a pop. Default `MIN_TRAVEL_MS`; 0 turns it off.
+   */
+  minTravelMs?: number;
+  /** How many interactions with this World bring the Blobbi over by themselves (`interact`). Default `FOLLOW_INTERACTIONS`. */
+  followAfter?: number;
+  /** The rolling window those interactions must fall in (ms). Default `FOLLOW_WINDOW_MS`. */
+  followWindowMs?: number;
 }
 
 // ─── Snapshot ───────────────────────────────────────────────────────────────
@@ -131,8 +148,11 @@ export type TravelPhase =
   | { phase: 'checking' }
   | { phase: 'signing' }
   | { phase: 'publishing' }
-  /** Published: the arrival plays at `at` (the clock's ms), after the departure window. */
-  | { phase: 'arriving'; at: number }
+  /**
+   * Published: the arrival starts at `at` (the clock's ms; `here` turns true then), so that the Blobbi has formed by
+   * `formAt` (after the departure window, and no sooner than `MIN_TRAVEL_MS` after the player's act).
+   */
+  | { phase: 'arriving'; at: number; formAt: number }
   | { phase: 'failed'; reason: TravelFailure };
 
 export type TravelFailure = 'declined' | 'unreachable' | 'stale' | 'wrong-account' | 'failed';
@@ -149,6 +169,27 @@ export type PresenceStatus =
   /** No signer here (read-only). */
   | 'unavailable';
 
+/**
+ * How sure the session is of the place:
+ *   pending      nothing known yet: the first look is under way, and this device kept no signed location. A World
+ *                shows neither "here" nor "away" (it does not know), and asks nothing of its Blobbi.
+ *   cached       the first look is under way; the last signed location this device kept is shown meanwhile.
+ *   confirmed    at least one relay answered.
+ *   unreachable  the first look ended with no relay answering: the kept location stands, or none (then the
+ *                Blobbi's place is the default, as for a Blobbi that never travelled).
+ * The first look always ends within the relay timeout: `pending` never lasts.
+ */
+export type TravelResolution = 'pending' | 'cached' | 'confirmed' | 'unreachable';
+
+export interface FollowState {
+  /** Interactions counted toward bringing the Blobbi over (within the rolling window). */
+  count: number;
+  /** How many bring it over. */
+  needed: number;
+  /** Casual following is off for this session (the signer refused); only an explicit request moves it. */
+  suspended: boolean;
+}
+
 export interface WorldTravelSnapshot {
   owner: string;
   d: string;
@@ -156,6 +197,8 @@ export interface WorldTravelSnapshot {
   world: string;
   /** 'loading' until the relays were read once; 'unreachable' when none answered (the store's last location stands). */
   status: 'loading' | 'ready' | 'unreachable';
+  /** How sure the place is (see `TravelResolution`). */
+  resolution: TravelResolution;
   /** The canonical location known now (null: none, the Blobbi is at `DEFAULT_WORLD`). */
   location: WorldLocation | null;
   /** Where the Blobbi is (`currentWorld(location)`). */
@@ -168,6 +211,8 @@ export interface WorldTravelSnapshot {
    */
   change: { kind: 'historical' | 'live'; key: number };
   travel: TravelPhase;
+  /** Following the player here by interacting (`interact`). */
+  follow: FollowState;
   presence: {
     status: PresenceStatus;
     /** When this session last sent one (ms), or null. */
@@ -193,6 +238,15 @@ export type TravelOutcome =
   | TravelFailure
   | 'disposed';
 
+export type InteractOutcome =
+  /** Counted; not enough yet to bring the Blobbi over. */
+  | 'counted'
+  /** Not counted: a repeat or part of the same gesture, the Blobbi is here or on its way, the place is not known yet,
+   * there is no signer, or following is suspended. */
+  | 'ignored'
+  /** The interaction that completed the count: what the move it started came to. */
+  | TravelOutcome;
+
 export interface WorldTravelSession {
   snapshot(): WorldTravelSnapshot;
   subscribe(listener: (s: WorldTravelSnapshot) => void): () => void;
@@ -206,6 +260,13 @@ export interface WorldTravelSession {
   setVisible(visible: boolean): void;
   /** A real input here: presence may be renewed (the first presence with a prompting signer waits for one). */
   noteActivity(): void;
+  /**
+   * The player interacting with this World (a real, trusted input the World judged meaningful; never a load, a
+   * timer, focus or visibility). It is activity (`noteActivity`), and while the Blobbi is elsewhere it counts toward
+   * bringing it over: the `followAfter`-th interaction within `followWindowMs` starts a casual `travel()`. `repeat`:
+   * an auto-repeat of a held key, never counted; inputs closer together than `FOLLOW_GAP_MS` count once.
+   */
+  interact(o?: { repeat?: boolean }): Promise<InteractOutcome>;
   setPresenceEnabled(on: boolean): void;
   dispose(): void;
 }
@@ -226,6 +287,8 @@ export const AUTO_RESEND_MS = 5_000;
 export const PRESENCE_TICK_MS = 15_000;
 /** After a move is published, the relays are read again this soon (a simultaneous move elsewhere shows up) (ms). */
 export const RECONCILE_AFTER_MS = 2_000;
+/** The shortest time from the player's act to the Blobbi forming here, by default (ms). A UX target, not protocol. */
+export const MIN_TRAVEL_MS = 1_500;
 
 /** Where a session keeps the last signed World Location of a Blobbi in the host's store. */
 export const worldLocationStoreKey = (owner: string, d: string) => `blobbi-kit:world-location:v1:${owner}:${d}`;
@@ -239,7 +302,7 @@ const pendingKey = pendingMoveStoreKey;
  * first frame, before any session answers. Untrusted like any event: checked, and null when absent or invalid. A
  * newer location on the relays always replaces it once the session looks.
  */
-export function storedWorldLocation(store: WorldTravelStore | null | undefined, o: { owner: string; d: string; verify: EventVerifier }): WorldLocation | null {
+export function storedWorldLocation(store: WorldTravelStore | null | undefined, o: { owner: string; d: string; verify: EventVerifier; now?: number }): WorldLocation | null {
   if (!store) return null;
   try {
     const raw = store.get(worldLocationStoreKey(o.owner, o.d));
@@ -276,8 +339,16 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
   const isActive = () => (o.isActive ? safeBool(o.isActive) : false);
   const lock = o.lock ?? pageLock;
   const store = o.store ?? null;
+  const clampMs = (v: number | undefined, fallback: number) => Math.min(Math.max(Number.isFinite(v) ? (v as number) : fallback, 0), MAX_TRANSITION_S * 1000);
+  const arrivalLeadMs = clampMs(o.arrivalLeadMs, 0);
+  const minTravelMs = clampMs(o.minTravelMs, MIN_TRAVEL_MS);
+  const counter: FollowCounter = createFollowCounter({ needed: o.followAfter ?? FOLLOW_INTERACTIONS, windowMs: o.followWindowMs ?? FOLLOW_WINDOW_MS });
+  let followSuspended = false;
+  let followTimer: unknown = null;
 
   const known = new Map<string, NostrEvent>();
+  /** When this session first saw each location (ms): a stay is measured from it when the event is dated ahead. */
+  const observed = new Map<string, number>();
   const presences = new Map<string, NostrEvent>();
   let location: WorldLocation | null = null;
   let firstLookDone = false;
@@ -304,11 +375,13 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     d,
     world,
     status: 'loading',
+    resolution: 'pending',
     location: null,
     place: currentWorld(null),
     here: currentWorld(null) === world,
     change: { kind: 'historical', key: 0 },
     travel: { phase: 'idle' },
+    follow: { count: 0, needed: counter.needed, suspended: false },
     presence: { status: 'off', lastSentAt: null, there: null },
   };
 
@@ -320,7 +393,8 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
   const emit = (patch: Partial<WorldTravelSnapshot> = {}) => {
     if (disposed) return;
     const place = currentWorld(location);
-    snap = { ...snap, ...patch, location, place, here: place === world && arrivalAt === null, presence: presenceView() };
+    const follow = { count: counter.count(now()), needed: counter.needed, suspended: followSuspended };
+    snap = { ...snap, ...patch, location, place, here: place === world && arrivalAt === null, follow, presence: presenceView() };
     for (const l of [...listeners]) l(snap);
   };
 
@@ -332,8 +406,10 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       const loc = parseWorldLocation(e, { verify });
       if (!loc || loc.owner !== owner || loc.d !== d) continue;
       known.set(loc.id, loc.event);
+      if (!observed.has(loc.id)) observed.set(loc.id, now());
     }
-    const next = resolveWorldLocation(known.values(), { owner, d, verify });
+    // An event dated too far ahead stays known, and counts once this clock reaches it (re-resolved on every look)
+    const next = resolveWorldLocation(known.values(), { owner, d, verify, now: now() });
     if (!next || (location && next.id === location.id)) return false;
     if (location && !replacesLocation(next, location)) return false;
     const before = currentWorld(location);
@@ -342,6 +418,8 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     // A move elsewhere ends a wait for our own arrival: it is no longer coming here
     if (next.world !== world) clearArrival();
     if (currentWorld(next) !== before) {
+      // A change of place starts any count of interactions over: they were for where it was
+      counter.reset();
       const kind = transitionKind({ initial: !firstLookDone && how === 'look', createdAt: next.createdAt, now: now() });
       emit({ change: { kind, key: snap.change.key + 1 } });
     } else emit();
@@ -406,15 +484,21 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     learn(events, 'look');
     if (!firstLookDone) {
       firstLookDone = true;
-      emit({ status: answered > 0 ? 'ready' : 'unreachable' });
-    } else if (answered > 0 && snap.status !== 'ready') emit({ status: 'ready' });
+      emit({ status: answered > 0 ? 'ready' : 'unreachable', resolution: answered > 0 ? 'confirmed' : 'unreachable' });
+    } else if (answered > 0 && snap.status !== 'ready') emit({ status: 'ready', resolution: 'confirmed' });
     return answered;
   };
 
   // ── Publishing ──
 
-  const publishAll = async (event: NostrEvent): Promise<number> => {
-    const results = await Promise.all(
+  /**
+   * Send to every relay, each within the timeout. `first` settles as soon as one relay accepted (true) or every relay
+   * failed (false), so a slow relay does not hold the arrival back; `all` counts acceptances once every relay is done.
+   */
+  const publishAll = (event: NostrEvent): { first: Promise<boolean>; all: Promise<number> } => {
+    let settleFirst: (v: boolean) => void = () => {};
+    const first = new Promise<boolean>((resolve) => (settleFirst = resolve));
+    const all = Promise.all(
       relays.urls.map(async (url) => {
         const controller = new AbortController();
         let timer: unknown;
@@ -425,19 +509,25 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
           }, timeoutMs);
         });
         try {
-          return await Promise.race([
+          const ok = await Promise.race([
             relays.publish(url, event, controller.signal).then(
               () => true,
               () => false,
             ),
             late,
           ]);
+          if (ok) settleFirst(true);
+          return ok;
         } finally {
           clearTimer(timer);
         }
       }),
-    );
-    return results.filter(Boolean).length;
+    ).then((results) => {
+      const n = results.filter(Boolean).length;
+      if (n === 0) settleFirst(false);
+      return n;
+    });
+    return { first, all };
   };
 
   const clearArrival = () => {
@@ -446,8 +536,12 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     arrivalAt = null;
   };
 
-  /** Our move was accepted: the Blobbi is ours; it arrives after the departure window. */
-  const arrive = (mine: WorldLocation) => {
+  /**
+   * Our move was accepted: the Blobbi is ours; it arrives after the departure window. The arrival is scheduled so
+   * the Blobbi forms at `formAt` = the latest of: the departure window's end, `minTravelMs` after the player's act
+   * (`startedAt`), and `arrivalLeadMs` from now; it starts `arrivalLeadMs` before that.
+   */
+  const arrive = (mine: WorldLocation, startedAt: number) => {
     known.set(mine.id, mine.event);
     const before = currentWorld(location);
     if (!location || replacesLocation(mine, location)) {
@@ -459,13 +553,14 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       emit({ travel: { phase: 'idle' } });
       return;
     }
-    const delay = arrivalDelayMs(mine);
-    if (delay === 0) {
+    const t = now();
+    const formAt = Math.max(t + arrivalDelayMs(mine), startedAt + minTravelMs, t + arrivalLeadMs);
+    const at = Math.max(formAt - arrivalLeadMs, t);
+    if (at <= t) {
       emit({ travel: { phase: 'idle' }, change: before !== world ? { kind: 'live', key: snap.change.key + 1 } : snap.change });
       schedulePresence(0);
       return;
     }
-    const at = now() + delay;
     arrivalAt = at;
     arrivalTimer = setTimer(() => {
       arrivalTimer = null;
@@ -473,7 +568,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       emit({ travel: { phase: 'idle' } });
       schedulePresence(0);
     }, at - now());
-    emit({ travel: { phase: 'arriving', at }, change: before !== world ? { kind: 'live', key: snap.change.key + 1 } : snap.change });
+    emit({ travel: { phase: 'arriving', at, formAt }, change: before !== world ? { kind: 'live', key: snap.change.key + 1 } : snap.change });
   };
 
   const fail = (reason: TravelFailure): TravelOutcome => {
@@ -505,7 +600,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
   };
 
   /** Send a signed move (fresh, or stored); never one a newer location already replaced. */
-  const send = async (mine: WorldLocation): Promise<TravelOutcome> => {
+  const send = async (mine: WorldLocation, startedAt: number): Promise<TravelOutcome> => {
     if (location && location.id !== mine.id && replacesLocation(location, mine)) {
       dropPending();
       return currentWorld(location) === world ? 'already-here' : fail('stale');
@@ -515,9 +610,9 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     clearArrival();
     arrivalAt = Number.POSITIVE_INFINITY;
     emit({ travel: { phase: 'publishing' } });
-    const accepted = await publishAll(mine.event);
+    const accepted = await publishAll(mine.event).first;
     if (disposed) return 'disposed';
-    if (accepted === 0) {
+    if (!accepted) {
       clearArrival();
       // One automatic resend of this very event (no new signature), while it is recent and still the newest
       if (!autoResent.has(mine.id)) {
@@ -529,7 +624,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       return fail('unreachable');
     }
     dropPending();
-    arrive(mine);
+    arrive(mine, startedAt);
     // Someone else may have moved it at the same moment: look again soon, and follow the NIP-01 winner
     setTimer(() => {
       if (!disposed) void look();
@@ -543,8 +638,9 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     if (!explicit && now() < cooldownUntil) return 'cooldown';
     if (!signerNow()) return 'read-only';
     inFlight = true;
+    const actAt = now();
     try {
-      return await lock(`blobbi-world-travel:${owner}:${d}`, async () => {
+      const out = await lock(`blobbi-world-travel:${owner}:${d}`, async (): Promise<TravelOutcome> => {
         if (disposed) return 'disposed';
         emit({ travel: { phase: 'checking' } });
         const answered = await look();
@@ -553,7 +649,8 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
         const latest = location;
         const previous = currentWorld(latest);
         const recent = presenceSupports(freshPresence(presences.values(), { owner, d, world: previous, now: now(), verify }), latest);
-        const plan = planTransfer({ owner, d, world, latest, now: now(), explicit, previousRecentlyActive: recent });
+        const observedAt = latest ? observed.get(latest.id) : undefined;
+        const plan = planTransfer({ owner, d, world, latest, now: now(), explicit, previousRecentlyActive: recent, observedAt });
         if (plan.kind === 'already-here') {
           emit({ travel: { phase: 'idle' } });
           return 'already-here';
@@ -592,11 +689,35 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
           return fail('stale');
         }
         keepPending(mine.event, now());
-        return await send(mine);
+        return await send(mine, actAt);
       });
+      afterTravel(out, explicit);
+      return out;
     } finally {
       inFlight = false;
     }
+  };
+
+  /** The count decays as the window rolls on: the snapshot is updated as each interaction leaves it. */
+  const scheduleFollowDecay = () => {
+    if (followTimer !== null) clearTimer(followTimer);
+    followTimer = null;
+    const t = now();
+    if (disposed || counter.count(t) === 0) return;
+    followTimer = setTimer(() => {
+      followTimer = null;
+      emit();
+      scheduleFollowDecay();
+    }, Math.max(counter.expiresIn(t), 1));
+  };
+
+  /** A move's end resets the count (whatever it came to); a refusal suspends casual following, an explicit move resumes it. */
+  const afterTravel = (out: TravelOutcome, explicit: boolean) => {
+    if (disposed) return;
+    counter.reset();
+    if (out === 'declined') followSuspended = true;
+    else if (explicit && (out === 'moved' || out === 'already-here')) followSuspended = false;
+    emit();
   };
 
   const retry = async (): Promise<TravelOutcome> => {
@@ -614,7 +735,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
         if (disposed) return 'disposed';
         if (answered === 0) return fail('unreachable');
         const mine = parseWorldLocation(pending.event, { verify });
-        return mine ? await send(mine) : 'stale';
+        return mine ? await send(mine, now()) : 'stale';
       });
     } finally {
       inFlight = false;
@@ -662,7 +783,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       }
       emit();
       // Ephemeral: sent once, never confirmed, never retried
-      void publishAll(signed);
+      void publishAll(signed).all;
     } catch {
       if (!disposed) {
         presenceStatus = 'declined';
@@ -700,6 +821,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
 
   // The store's last signed location first (it is an event like any other: a newer one always wins)
   learn([readStore(storeKey(owner, d))], 'look');
+  if (location) snap = { ...snap, resolution: 'cached' };
   if (relays.subscribe) {
     try {
       unsubscribe = relays.subscribe([worldLocationFilter(owner, d), activePresenceFilter(owner, d, Math.floor(now() / 1000) - 300)], (event) => {
@@ -755,6 +877,25 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       if (disposed) return;
       void presenceTick(true);
     },
+    async interact({ repeat = false } = {}) {
+      if (disposed) return 'disposed';
+      void presenceTick(true);
+      const s = snap;
+      const underWay = inFlight || s.travel.phase === 'checking' || s.travel.phase === 'signing' || s.travel.phase === 'publishing' || s.travel.phase === 'arriving';
+      if (repeat || s.resolution === 'pending' || s.place === world || underWay || followSuspended || !signerNow()) return 'ignored';
+      const t = now();
+      if (!counter.note(t)) return 'ignored';
+      if (!counter.ready(t)) {
+        emit();
+        scheduleFollowDecay();
+        return 'counted';
+      }
+      const out = await travel({ explicit: false });
+      // Whatever it came to (even a cooldown or a busy session), the next move needs a whole new count
+      counter.reset();
+      emit();
+      return out;
+    },
     setPresenceEnabled(on) {
       if (disposed) return;
       presenceEnabled = on;
@@ -769,6 +910,8 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       if (disposed) return;
       disposed = true;
       clearArrival();
+      if (followTimer !== null) clearTimer(followTimer);
+      followTimer = null;
       stopPresenceTimer();
       if (refreshTimer !== null) clearTimer(refreshTimer);
       refreshTimer = null;

@@ -4,6 +4,9 @@ import {
   DEPARTURE_WINDOW_S,
   KIND_ACTIVE_PRESENCE,
   KIND_WORLD_LOCATION,
+  MAX_CLOCK_SKEW_S,
+  MAX_LOCATION_SKEW_S,
+  MAX_PRESENCE_TTL_S,
   MAX_TRANSITION_S,
   MIN_STAY_MS,
   PRESENCE_TTL_S,
@@ -16,6 +19,7 @@ import {
   compareLocations,
   currentWorld,
   freshPresence,
+  isFutureLocation,
   isPresenceFresh,
   isTravelBlobbiD,
   isWorldId,
@@ -32,7 +36,7 @@ import {
   worldLocationFilter,
   type WorldLocation,
 } from './world-travel';
-import { A, B, dOf, signAs, verify, type Template } from './world-travel.test-helpers';
+import { A, B, dOf, eventId, signAs, verify, type Template } from './world-travel.test-helpers';
 
 const T0 = 1_800_000_000; // seconds
 const D = dOf(A);
@@ -330,5 +334,74 @@ describe('Active Presence', () => {
     expect(currentWorld(home)).toBe(WORLD_HOME); // the location is untouched by any presence
     expect(presenceSupports(pixelPresence, location({ world: WORLD_PIXEL, at: T0 }))).toBe(true);
     expect(presenceSupports(null, home)).toBe(false);
+  });
+});
+
+describe('timestamps (M16.1)', () => {
+  const T = Date.UTC(2027, 0, 1, 12);
+  const at = (world: string, ms: number, latest: WorldLocation | null = null) => parseWorldLocation(signAs(A, buildWorldLocationTemplate({ owner: A, d: dOf(A), world, latest, now: ms })), { verify })!;
+
+  it('a location dated beyond MAX_LOCATION_SKEW_S ahead is ignored with a clock, and counts once the clock reaches it', () => {
+    const now = at(WORLD_PIXEL, T);
+    const future = at(WORLD_HOME, T + (MAX_LOCATION_SKEW_S + 60) * 1000);
+    const events = [now.event, future.event];
+    expect(resolveWorldLocation(events, { owner: A, d: dOf(A), verify, now: T })?.id).toBe(now.id);
+    expect(isFutureLocation(future, T)).toBe(true);
+    // Pure NIP-01 without a clock (as before 0.11), and with the clock once it is there
+    expect(resolveWorldLocation(events, { owner: A, d: dOf(A), verify })?.id).toBe(future.id);
+    expect(resolveWorldLocation(events, { owner: A, d: dOf(A), verify, now: T + (MAX_LOCATION_SKEW_S + 60) * 1000 })?.id).toBe(future.id);
+  });
+
+  it('within the skew allowed, a location ahead still wins (a clock a few minutes fast is normal), and moves stay bounded', () => {
+    const ahead = at(WORLD_PIXEL, T + 600_000);
+    const latest = resolveWorldLocation([ahead.event], { owner: A, d: dOf(A), verify, now: T })!;
+    expect(latest.id).toBe(ahead.id);
+    const t = buildWorldLocationTemplate({ owner: A, d: dOf(A), world: WORLD_HOME, latest, now: T });
+    expect(t.created_at).toBe(ahead.createdAt + 1);
+    expect(t.created_at - T / 1000).toBeLessThanOrEqual(MAX_LOCATION_SKEW_S + 1);
+  });
+
+  it('a far-future event can never block travel: the next move is dated by the reader’s clock, not after it', () => {
+    const year2100 = at(WORLD_PIXEL, Date.UTC(2100, 0, 1));
+    const latest = resolveWorldLocation([year2100.event], { owner: A, d: dOf(A), verify, now: T });
+    expect(latest).toBeNull();
+    const plan = planTransfer({ owner: A, d: dOf(A), world: WORLD_PIXEL, latest, now: T, explicit: false, previousRecentlyActive: false });
+    expect(plan.kind).toBe('transfer');
+    if (plan.kind === 'transfer') expect(plan.template.created_at).toBe(T / 1000);
+  });
+
+  it('the stay is measured from when the reader saw a location ahead of its clock, not from its date', () => {
+    const ahead = at(WORLD_HOME, T + 600_000);
+    const casual = (now: number, observedAt?: number) => planTransfer({ owner: A, d: dOf(A), world: WORLD_PIXEL, latest: ahead, now, explicit: false, previousRecentlyActive: false, observedAt }).kind;
+    expect(casual(T + 1_000)).toBe('contended'); // without observedAt: its date, 10 min of contention
+    expect(casual(T + 1_000, T)).toBe('contended');
+    expect(casual(T + MIN_STAY_MS, T)).toBe('transfer');
+    // An old event seen just now (a fresh device) is not "just moved"
+    const old = at(WORLD_HOME, T - 3_600_000);
+    expect(planTransfer({ owner: A, d: dOf(A), world: WORLD_PIXEL, latest: old, now: T, explicit: false, previousRecentlyActive: false, observedAt: T }).kind).toBe('transfer');
+  });
+
+  it('a replayed old location never replaces a newer one, from any relay', () => {
+    const first = at(WORLD_PIXEL, T);
+    const second = at(WORLD_HOME, T + 60_000, first);
+    expect(resolveWorldLocation([second.event, first.event, structuredClone(first.event)], { owner: A, d: dOf(A), verify, now: T + 60_000 })?.id).toBe(second.id);
+  });
+
+  it('malformed timestamps are rejected: negative, fractional, beyond safe integers', () => {
+    const base = signAs(A, buildWorldLocationTemplate({ owner: A, d: dOf(A), world: WORLD_HOME, latest: null, now: T }));
+    for (const created_at of [-1, 1.5, Number.MAX_SAFE_INTEGER + 2, Number.NaN]) {
+      const e = { ...base, created_at };
+      expect(parseWorldLocation({ ...e, id: eventId(A, e), sig: `sig:${eventId(A, e)}` }, { verify })).toBeNull();
+    }
+  });
+
+  it('presence: expired, dated too far ahead, or claiming too long a life is never fresh', () => {
+    const p = parseActivePresence(signAs(A, buildPresenceTemplate({ owner: A, d: dOf(A), world: WORLD_PIXEL, now: T })), { verify })!;
+    expect(isPresenceFresh(p, T)).toBe(true);
+    expect(isPresenceFresh(p, T + PRESENCE_TTL_S * 1000)).toBe(false);
+    const ahead = parseActivePresence(signAs(A, buildPresenceTemplate({ owner: A, d: dOf(A), world: WORLD_PIXEL, now: T + (MAX_CLOCK_SKEW_S + 5) * 1000 })), { verify })!;
+    expect(isPresenceFresh(ahead, T)).toBe(false);
+    const long = signAs(A, { ...buildPresenceTemplate({ owner: A, d: dOf(A), world: WORLD_PIXEL, now: T }), tags: [['a', `31124:${A}:${dOf(A)}`], ['v', '1'], ['world', WORLD_PIXEL], ['expiration', String(T / 1000 + MAX_PRESENCE_TTL_S + 1)]] });
+    expect(parseActivePresence(long, { verify })).toBeNull();
   });
 });

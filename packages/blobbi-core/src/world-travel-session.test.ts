@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NostrEvent } from './nostr-protocol';
-import { KIND_ACTIVE_PRESENCE, KIND_WORLD_LOCATION, MIN_STAY_MS, PRESENCE_RENEW_S, WORLD_HOME, WORLD_PIXEL, buildPresenceTemplate, buildWorldLocationTemplate, parseWorldLocation, type WorldTravelTemplate } from './world-travel';
-import { AUTO_RESEND_MS, PENDING_TTL_MS, PRESENCE_SIGN_BUDGET_MS, TRAVEL_COOLDOWN_MS, createWorldTravel, storedWorldLocation, worldLocationStoreKey, type WorldTravelOptions, type WorldTravelSession, type WorldTravelSigner, type WorldTravelStore } from './world-travel-session';
+import { DEPARTURE_WINDOW_S, KIND_ACTIVE_PRESENCE, KIND_WORLD_LOCATION, MIN_STAY_MS, PRESENCE_RENEW_S, WORLD_HOME, WORLD_PIXEL, buildPresenceTemplate, buildWorldLocationTemplate, parseWorldLocation, type WorldTravelTemplate } from './world-travel';
+import { FOLLOW_WINDOW_MS } from './world-travel-follow';
+import { AUTO_RESEND_MS, MIN_TRAVEL_MS, PENDING_TTL_MS, PRESENCE_SIGN_BUDGET_MS, TRAVEL_COOLDOWN_MS, createWorldTravel, storedWorldLocation, worldLocationStoreKey, type WorldTravelOptions, type WorldTravelSession, type WorldTravelSigner, type WorldTravelStore } from './world-travel-session';
 import { A, B, dOf, network, relayAccept, signAs, verify, type Network } from './world-travel.test-helpers';
 
 const D = dOf(A);
@@ -35,7 +36,7 @@ function device(net: Network, world: string, extra: Partial<WorldTravelOptions> 
   const sign = extra.sign === undefined ? signer() : extra.sign;
   const store = (extra.store as ReturnType<typeof memoryStore>) ?? memoryStore();
   const port = net.port();
-  const session = createWorldTravel({ owner: A, d: D, world, relays: port, verify, signer: () => sign, store, ...extra });
+  const session = createWorldTravel({ owner: A, d: D, world, relays: port, verify, signer: () => sign, store, minTravelMs: 0, ...extra });
   const changes: string[] = [];
   session.subscribe((s) => changes.push(`${s.place}:${s.change.kind}:${s.change.key}`));
   return { session, sign: sign!, store, port, changes };
@@ -255,7 +256,7 @@ describe('travelling', () => {
     expect(snap).toMatchObject({ place: WORLD_HOME, here: false, travel: { phase: 'arriving' } });
     // Pixel departs at once on the event
     expect(pixel.session.snapshot()).toMatchObject({ place: WORLD_HOME, here: false, change: { kind: 'live' } });
-    await settle(2_999);
+    await settle(DEPARTURE_WINDOW_S * 1000 - 1);
     expect(home.session.snapshot().here).toBe(false);
     await settle(2);
     expect(home.session.snapshot()).toMatchObject({ here: true, travel: { phase: 'idle' } });
@@ -381,7 +382,7 @@ describe('several devices at once', () => {
     const net = network();
     const a = track(device(net, WORLD_HOME));
     const bSigner = signer(B);
-    const b = track({ session: createWorldTravel({ owner: B, d: dOf(B), world: WORLD_PIXEL, relays: net.port(), verify, signer: () => bSigner }) });
+    const b = track({ session: createWorldTravel({ owner: B, d: dOf(B), world: WORLD_PIXEL, relays: net.port(), verify, signer: () => bSigner, minTravelMs: 0 }) });
     await settle(10);
     expect(await b.session.travel()).toBe('moved');
     expect(a.session.snapshot()).toMatchObject({ place: WORLD_HOME, here: true });
@@ -496,7 +497,7 @@ describe('failures and retries', () => {
   it('with no store at all, the automatic resend still has the signed move (kept in memory)', async () => {
     const net = network();
     const sign = signer();
-    const pixel = track({ session: createWorldTravel({ owner: A, d: D, world: WORLD_PIXEL, relays: net.port(), verify, signer: () => sign }) });
+    const pixel = track({ session: createWorldTravel({ owner: A, d: D, world: WORLD_PIXEL, relays: net.port(), verify, signer: () => sign, minTravelMs: 0 }) });
     await settle(10);
     for (const r of net.relays) r.refuse = true;
     expect(await pixel.session.travel()).toBe('unreachable');
@@ -677,5 +678,271 @@ describe('lifecycle', () => {
     await bambu.session.travel();
     expect(bambu.session.snapshot().place).toBe(WORLD_PIXEL);
     expect(brook.session.snapshot().place).toBe(WORLD_HOME);
+  });
+});
+
+// ─── M16.1 ─────────────────────────────────────────────────────────────────
+
+describe('following the player: three interactions (M16.1)', () => {
+  /** Bambu in Pixel (moved a minute ago), Home open on another device. */
+  async function awayInPixel(extra: Parameters<typeof device>[2] = {}) {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const home = track(device(net, WORLD_HOME, extra));
+    await settle(10);
+    return { net, home };
+  }
+
+  it('the first and second interactions sign nothing; the third moves it, once, and the count starts over', async () => {
+    const { net, home } = await awayInPixel();
+    expect(await home.session.interact()).toBe('counted');
+    expect(home.session.snapshot().follow).toEqual({ count: 1, needed: 3, suspended: false });
+    await settle(1_500);
+    expect(await home.session.interact()).toBe('counted');
+    expect(home.sign.asked).toHaveLength(0);
+    await settle(1_500);
+    expect(await home.session.interact()).toBe('moved');
+    expect(home.sign.asked).toHaveLength(1);
+    expect(locationsSent(net)).toHaveLength(2); // one event, two relays
+    expect(home.session.snapshot()).toMatchObject({ place: WORLD_HOME, follow: { count: 0 } });
+    // Here now: more interactions count for nothing and sign nothing
+    await settle(1_500);
+    expect(await home.session.interact()).toBe('ignored');
+    expect(home.sign.asked).toHaveLength(1);
+  });
+
+  it('the window rolls: two interactions, a pause, and the third is only the first of a new count', async () => {
+    const { home } = await awayInPixel();
+    await home.session.interact();
+    await settle(1_500);
+    await home.session.interact();
+    await settle(FOLLOW_WINDOW_MS);
+    expect(home.session.snapshot().follow.count).toBe(0); // the count decays, and the snapshot says so
+    expect(await home.session.interact()).toBe('counted');
+    expect(home.session.snapshot().follow.count).toBe(1);
+    expect(home.sign.asked).toHaveLength(0);
+  });
+
+  it('a held key (repeats) and a burst from one gesture are one interaction at most', async () => {
+    const { home } = await awayInPixel();
+    expect(await home.session.interact()).toBe('counted');
+    for (let i = 0; i < 30; i++) expect(await home.session.interact({ repeat: true })).toBe('ignored');
+    for (let i = 0; i < 5; i++) {
+      await settle(100);
+      expect(await home.session.interact()).toBe('ignored');
+    }
+    expect(home.session.snapshot().follow.count).toBe(1);
+    expect(home.sign.asked).toHaveLength(0);
+  });
+
+  it('continuous movement (an interaction every animation frame for a second) never transfers at once', async () => {
+    const { home } = await awayInPixel();
+    for (let t = 0; t < 1_000; t += 16) {
+      await home.session.interact();
+      await settle(16);
+    }
+    expect(home.sign.asked).toHaveLength(0);
+    expect(home.session.snapshot().place).toBe(WORLD_PIXEL);
+  });
+
+  it('nothing counts while the place is not known yet (the first look is still under way)', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    for (const r of net.relays) r.queryDelay = 3_000;
+    const home = track(device(net, WORLD_HOME));
+    expect(home.session.snapshot().resolution).toBe('pending');
+    expect(await home.session.interact()).toBe('ignored');
+    await settle(3_010);
+    expect(home.session.snapshot().resolution).toBe('confirmed');
+    expect(await home.session.interact()).toBe('counted');
+  });
+
+  it('an explicit call moves it at once, with no interaction at all', async () => {
+    const { home } = await awayInPixel();
+    expect(await home.session.travel({ explicit: true })).toBe('moved');
+    expect(home.sign.asked).toHaveLength(1);
+  });
+
+  it('a change of place starts the count over (the interactions were for where it was)', async () => {
+    const { net, home } = await awayInPixel();
+    await home.session.interact();
+    await settle(1_500);
+    await home.session.interact();
+    const latest = home.session.snapshot().location;
+    remoteMove(net, 'nostr-farm', Date.now(), latest);
+    expect(home.session.snapshot()).toMatchObject({ place: 'nostr-farm', follow: { count: 0 } });
+  });
+
+  it('no ping-pong: three quick interactions right after another device moved it are contended, nothing signed', async () => {
+    const net = network();
+    const home = track(device(net, WORLD_HOME));
+    await settle(10);
+    remoteMove(net, WORLD_PIXEL, Date.now(), null);
+    expect(home.session.snapshot().place).toBe(WORLD_PIXEL);
+    await home.session.interact();
+    await settle(1_000);
+    await home.session.interact();
+    await settle(1_000);
+    expect(await home.session.interact()).toBe('contended');
+    expect(home.sign.asked).toHaveLength(0);
+    expect(home.session.snapshot().follow.count).toBe(0);
+  });
+
+  it('a refusal suspends following: no more prompts from interactions; an explicit call asks once and resumes it', async () => {
+    const s = signer(A, { mode: 'prompt', refuse: true });
+    const { home } = await awayInPixel({ sign: s });
+    for (let i = 0; i < 3; i++) {
+      await home.session.interact();
+      await settle(1_100);
+    }
+    expect(s.asked).toHaveLength(1);
+    expect(home.session.snapshot().follow.suspended).toBe(true);
+    for (let i = 0; i < 12; i++) {
+      expect(await home.session.interact()).toBe('ignored');
+      await settle(TRAVEL_COOLDOWN_MS / 4);
+    }
+    expect(s.asked).toHaveLength(1); // three minutes of play: still one prompt
+    s.refuse = false;
+    expect(await home.session.travel({ explicit: true })).toBe('moved');
+    expect(s.asked).toHaveLength(2);
+    expect(home.session.snapshot().follow.suspended).toBe(false);
+  });
+
+  it('read-only (no signer): interactions are not counted toward anything', async () => {
+    const { home } = await awayInPixel({ sign: null });
+    expect(await home.session.interact()).toBe('ignored');
+    expect(home.session.snapshot().follow.count).toBe(0);
+  });
+
+  it('the threshold is configurable (followAfter)', async () => {
+    const { home } = await awayInPixel({ followAfter: 1 });
+    expect(await home.session.interact()).toBe('moved');
+  });
+
+  it('account and Blobbi changes start over: a new session never inherits a count', async () => {
+    const { net, home } = await awayInPixel();
+    await home.session.interact();
+    await settle(1_500);
+    await home.session.interact();
+    home.session.dispose();
+    const next = track(device(net, WORLD_HOME));
+    await settle(10);
+    expect(next.session.snapshot().follow.count).toBe(0);
+    expect(await next.session.interact()).toBe('counted');
+    expect(next.sign.asked).toHaveLength(0);
+  });
+});
+
+describe('loading resolution (M16.1)', () => {
+  it('pending on a fresh device, confirmed once a relay answers; no signature either way', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    for (const r of net.relays) r.queryDelay = 500;
+    const home = track(device(net, WORLD_HOME));
+    expect(home.session.snapshot()).toMatchObject({ resolution: 'pending', status: 'loading' });
+    await settle(510);
+    expect(home.session.snapshot()).toMatchObject({ resolution: 'confirmed', place: WORLD_PIXEL, here: false, change: { kind: 'historical' } });
+    expect(home.sign.asked).toHaveLength(0);
+  });
+
+  it('cached: a device that kept a signed location shows it at once, before any relay', async () => {
+    const net = network();
+    const e = remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const store = memoryStore();
+    store.set(worldLocationStoreKey(A, D), JSON.stringify(e));
+    for (const r of net.relays) r.queryDelay = 500;
+    const home = track(device(net, WORLD_HOME, { store }));
+    expect(home.session.snapshot()).toMatchObject({ resolution: 'cached', place: WORLD_PIXEL, here: false });
+    await settle(510);
+    expect(home.session.snapshot().resolution).toBe('confirmed');
+  });
+
+  it('relays that never answer: unreachable within the timeout, never an endless wait', async () => {
+    const net = network();
+    for (const r of net.relays) r.queryDelay = 60_000;
+    const home = track(device(net, WORLD_HOME, { timeoutMs: 4_000 }));
+    await settle(4_010);
+    expect(home.session.snapshot()).toMatchObject({ resolution: 'unreachable', status: 'unreachable', place: WORLD_HOME });
+    expect(home.sign.asked).toHaveLength(0);
+  });
+
+  it('relays down and a kept location: unreachable, and the kept place stands', async () => {
+    const net = network();
+    const e = remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const store = memoryStore();
+    store.set(worldLocationStoreKey(A, D), JSON.stringify(e));
+    for (const r of net.relays) r.down = true;
+    const home = track(device(net, WORLD_HOME, { store }));
+    await settle(10);
+    expect(home.session.snapshot()).toMatchObject({ resolution: 'unreachable', place: WORLD_PIXEL });
+  });
+
+  it('a relay holding a far-future location: ignored, the real one decides, and the next move is not inflated', async () => {
+    const net = network();
+    const real = remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const future = signAs(A, buildWorldLocationTemplate({ owner: A, d: D, world: 'nostr-farm', latest: null, now: Date.UTC(2100, 0, 1) }));
+    relayAccept(net.relays[0], future); // relay one replaced the real one with it
+    const home = track(device(net, WORLD_HOME));
+    await settle(10);
+    expect(home.session.snapshot()).toMatchObject({ place: WORLD_PIXEL, location: { id: real.id } });
+    expect(await home.session.travel({ explicit: true })).toBe('moved');
+    expect(home.sign.asked[0].created_at).toBe(Math.floor(Date.now() / 1000));
+  });
+
+  it('reconnecting looks again and again: the same location never plays a second change', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const home = track(device(net, WORLD_HOME));
+    await settle(10);
+    const key = home.session.snapshot().change.key;
+    for (let i = 0; i < 5; i++) await home.session.refresh();
+    // The same event delivered again on the stream, from every relay
+    for (const r of net.relays) for (const s of r.subs) s.on(structuredClone(r.stored[0]));
+    expect(home.session.snapshot().change.key).toBe(key);
+  });
+});
+
+describe('the arrival schedule (M16.1)', () => {
+  it('an origin nobody plays: the Blobbi forms MIN_TRAVEL_MS after the act, its arrival started arrivalLeadMs before', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const home = track(device(net, WORLD_HOME, { minTravelMs: MIN_TRAVEL_MS, arrivalLeadMs: 500 }));
+    await settle(10);
+    const act = Date.now();
+    expect(await home.session.travel({ explicit: true })).toBe('moved');
+    const t = home.session.snapshot().travel;
+    expect(t).toMatchObject({ phase: 'arriving', formAt: act + MIN_TRAVEL_MS, at: act + MIN_TRAVEL_MS - 500 });
+    await settle(MIN_TRAVEL_MS - 500 - 1);
+    expect(home.session.snapshot().here).toBe(false);
+    await settle(2);
+    expect(home.session.snapshot()).toMatchObject({ here: true, travel: { phase: 'idle' } });
+  });
+
+  it('a recently active origin: the Blobbi forms at the end of the departure window; the arrival overlaps the wait', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const home = track(device(net, WORLD_HOME, { minTravelMs: MIN_TRAVEL_MS, arrivalLeadMs: 500 }));
+    await settle(10);
+    const p = signAs(A, buildPresenceTemplate({ owner: A, d: D, world: WORLD_PIXEL, now: Date.now() }));
+    for (const r of net.relays) relayAccept(r, p);
+    const act = Date.now();
+    await home.session.travel({ explicit: true });
+    const t = home.session.snapshot().travel;
+    expect(t).toMatchObject({ phase: 'arriving', formAt: act + DEPARTURE_WINDOW_S * 1000, at: act + DEPARTURE_WINDOW_S * 1000 - 500 });
+  });
+
+  it('a slow relay does not hold the arrival back: the first acceptance is enough', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    const home = track(device(net, WORLD_HOME, { timeoutMs: 4_000 }));
+    await settle(10);
+    // Relay two takes the event but never answers in time
+    const port = home.port as unknown as { publish: (url: string, e: NostrEvent, s: AbortSignal) => Promise<void> };
+    const original = port.publish.bind(port);
+    port.publish = (url, e, s) => (url === 'wss://two' ? new Promise<void>(() => {}) : original(url, e, s));
+    const pending = home.session.travel({ explicit: true });
+    await settle(50);
+    expect(await pending).toBe('moved');
+    expect(home.session.snapshot()).toMatchObject({ place: WORLD_HOME, here: true });
   });
 });

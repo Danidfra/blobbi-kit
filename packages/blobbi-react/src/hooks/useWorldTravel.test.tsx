@@ -28,7 +28,7 @@ describe('useWorldTravel', () => {
     const net = network();
     const s = counting();
     const port = net.port();
-    const opts = (owner: string): WorldTravelOptions => ({ owner, d: dOf(owner), world: WORLD_PIXEL, relays: port, verify, signer: () => s.signer });
+    const opts = (owner: string): WorldTravelOptions => ({ owner, d: dOf(owner), world: WORLD_PIXEL, relays: port, verify, signer: () => s.signer, minTravelMs: 0 });
     const { result, rerender, unmount } = renderHook(({ owner }) => useWorldTravel(opts(owner)), { initialProps: { owner: A } });
     await flush();
     const first = result.current.session;
@@ -60,7 +60,7 @@ describe('useWorldTravel', () => {
     const net = network();
     const s = counting();
     const port = net.port();
-    const { result } = renderHook(() => useWorldTravel({ owner: A, d: dOf(A), world: WORLD_HOME, relays: port, verify, signer: () => s.signer }));
+    const { result } = renderHook(() => useWorldTravel({ owner: A, d: dOf(A), world: WORLD_HOME, relays: port, verify, signer: () => s.signer, minTravelMs: 0 }));
     await flush();
     const away = signAs(A, buildWorldLocationTemplate({ owner: A, d: dOf(A), world: WORLD_PIXEL, latest: null, now: Date.now() - 60_000 }));
     act(() => {
@@ -80,7 +80,7 @@ describe('useWorldTravel', () => {
     const net = network();
     const s = counting();
     const port = net.port();
-    const { result, rerender } = renderHook(({ on }) => useWorldTravel({ owner: A, d: dOf(A), world: WORLD_HOME, relays: port, verify, signer: () => s.signer, presenceEnabled: on, isActive: () => true }), { initialProps: { on: false } });
+    const { result, rerender } = renderHook(({ on }) => useWorldTravel({ owner: A, d: dOf(A), world: WORLD_HOME, relays: port, verify, signer: () => s.signer, minTravelMs: 0, presenceEnabled: on, isActive: () => true }), { initialProps: { on: false } });
     await flush();
     const session = result.current.session;
     expect(result.current.snapshot?.presence.status).toBe('off');
@@ -117,7 +117,7 @@ describe('useWorldTravelSync', () => {
     const journeys: string[] = [];
     const { result, rerender } = renderHook(
       ({ busy }) => {
-        const travel = useWorldTravel({ owner: A, d: dOf(A), world: WORLD_HOME, relays: port, verify, signer: () => counting().signer });
+        const travel = useWorldTravel({ owner: A, d: dOf(A), world: WORLD_HOME, relays: port, verify, signer: () => counting().signer, minTravelMs: 0 });
         useWorldTravelSync({ session: travel.session, blobbi: () => t.b, busy, paused: false, onJourney: (k, p) => journeys.push(`${k}:${p}`) });
         return travel;
       },

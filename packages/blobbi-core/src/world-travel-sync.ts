@@ -17,7 +17,12 @@
  *   - a departure waits while the World is busy (care in flight, a bath, a
  *     ceremony, a timed action): a remote move never interrupts a moment;
  *   - a hidden page waits until it is seen, and a page just made visible
- *     waits `VISIBLE_GRACE_MS` before anything leaves.
+ *     waits `VISIBLE_GRACE_MS` before anything leaves;
+ *   - while the place is not known at all (`resolution: 'pending'`: the
+ *     first look is under way and this device kept no location), nothing is
+ *     asked of the Blobbi and nothing is taken as shown. The World shows its
+ *     own "looking for it" state (`travelView`); the first answer is then
+ *     settled as history, never played as a journey.
  *
  * DOM-free: the host says whether the page is visible and since when.
  */
@@ -113,11 +118,11 @@ export function syncTravel({
   const check = () => {
     timer = null;
     if (disposed) return;
-    if (paused()) {
+    const s = source.snapshot();
+    if (paused() || s.resolution === 'pending') {
       timer = setTimer(check, checkMs);
       return;
     }
-    const s = source.snapshot();
     const p = page();
     const shown = blobbi.state();
     const historical = s.change.kind === 'historical' && s.change.key !== settledKey;
@@ -178,4 +183,25 @@ export function isMeaningfulInput(e: { trusted: boolean; visible: boolean; focus
 /** Whether the World is being played now: visible, and a real input within `ACTIVE_MS`. */
 export function isPlayedNow(o: { visible: boolean; lastInputAt: number | null; now: number }): boolean {
   return o.visible && o.lastInputAt !== null && o.now - o.lastInputAt < ACTIVE_MS;
+}
+
+/**
+ * What a World shows of its Blobbi's place, the four cases kept apart:
+ *   looking      the place is not known yet (`pending`): neither here nor away; a small "looking for it" cue, never
+ *                the Blobbi standing here (it may be elsewhere) and never a departure. Ends within the relay timeout.
+ *   here         it is here (known, from the relays or this device's kept location).
+ *   away         it is in another World (`place`).
+ *   coming       a move here is under way: checking, signing, publishing, or waiting for its arrival to start.
+ * `unreachable`: no relay answered the first look, so the place shown is the kept one, or the default for a Blobbi
+ * that never travelled; a World may say so.
+ */
+export type TravelViewKind = 'looking' | 'here' | 'away' | 'coming';
+
+export function travelView(s: Pick<WorldTravelSnapshot, 'resolution' | 'here' | 'place' | 'world' | 'travel'>): { kind: TravelViewKind; unreachable: boolean } {
+  const unreachable = s.resolution === 'unreachable';
+  if (s.resolution === 'pending') return { kind: 'looking', unreachable };
+  const phase = s.travel.phase;
+  if (!s.here && (phase === 'checking' || phase === 'signing' || phase === 'publishing' || phase === 'arriving')) return { kind: 'coming', unreachable };
+  if (s.here) return { kind: 'here', unreachable };
+  return { kind: s.place === s.world ? 'coming' : 'away', unreachable };
 }

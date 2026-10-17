@@ -52,8 +52,12 @@ export const BLOBBI_WORLD_TRAVEL_RELAYS: readonly string[] = ['wss://relay.ditto
 
 /** `arrival_after` may ask a destination to wait at most this long after the event (s); more is clamped. */
 export const MAX_TRANSITION_S = 6;
-/** The departure window a destination asks for when the previous World was recently active (s). */
-export const DEPARTURE_WINDOW_S = 3;
+/**
+ * The departure window a destination asks for when the previous World was recently active (s): long enough for the
+ * origin to see the move on its live stream (well under a second) and play its departure (about a second) before
+ * the arrival starts, so the Blobbi is never shown arriving here while still standing there.
+ */
+export const DEPARTURE_WINDOW_S = 2;
 /** The departure window when the previous World shows no recent activity (s): arrive at once. */
 export const NO_DEPARTURE_WINDOW_S = 0;
 
@@ -65,6 +69,14 @@ export const MAX_PRESENCE_TTL_S = 300;
 export const PRESENCE_RENEW_S = 60;
 /** A presence dated this far ahead of the reader's clock is not believed (s). */
 export const MAX_CLOCK_SKEW_S = 60;
+/**
+ * A World Location dated this far ahead of the reader's clock is ignored, until the reader's clock reaches it (s).
+ * The same bound common relays put on `created_at` (strfry's default rejects events more than 15 minutes ahead), so
+ * an event a relay would refuse anyway never decides a place. Without it, one event from a device whose clock is
+ * years ahead would win every NIP-01 comparison, and every later move would have to be dated after it (timestamp
+ * inflation), or be refused by the relays.
+ */
+export const MAX_LOCATION_SKEW_S = 900;
 
 // ─── World identifiers ──────────────────────────────────────────────────────
 
@@ -246,6 +258,16 @@ export interface ResolveOptions {
   d: string;
   /** Required: an event is trusted for its signature, never for the relay it came from. */
   verify: EventVerifier;
+  /**
+   * The reader's clock (ms). With it, a location dated more than `MAX_LOCATION_SKEW_S` ahead is ignored (it is not
+   * a place yet). Without it, every valid event counts (pure NIP-01, as before 0.11).
+   */
+  now?: number;
+}
+
+/** Whether a location is dated too far ahead of `now` (ms) to be believed yet (`MAX_LOCATION_SKEW_S`). */
+export function isFutureLocation(loc: Pick<WorldLocation, 'createdAt'>, now: number): boolean {
+  return loc.createdAt > Math.floor(now / 1000) + MAX_LOCATION_SKEW_S;
 }
 
 /**
@@ -253,11 +275,12 @@ export interface ResolveOptions {
  * relays, a cache, a live stream, in any order): the newest valid one by its
  * owner for its d (NIP-01), or null when there is none.
  */
-export function resolveWorldLocation(events: Iterable<unknown>, { owner, d, verify }: ResolveOptions): WorldLocation | null {
+export function resolveWorldLocation(events: Iterable<unknown>, { owner, d, verify, now }: ResolveOptions): WorldLocation | null {
   let best: WorldLocation | null = null;
   for (const e of events) {
     const loc = parseWorldLocation(e, { verify });
     if (!loc || loc.owner !== owner || loc.d !== d) continue;
+    if (now !== undefined && isFutureLocation(loc, now)) continue;
     if (!best || replacesLocation(loc, best)) best = loc;
   }
   return best;
@@ -298,6 +321,9 @@ export interface LocationTemplateInput {
  * The World Location event a World signs to move the Blobbi to itself.
  * `created_at` is after the location it replaces even when this clock is
  * behind (NIP-01 would otherwise keep the old one), so the newest act wins.
+ * `latest` must come from a resolution with `now` (no location beyond
+ * `MAX_LOCATION_SKEW_S`), which bounds the result to `now + MAX_LOCATION_SKEW_S
+ * + 1`: a run of moves never inflates timestamps further than that.
  */
 export function buildWorldLocationTemplate({ owner, d, world, latest, now, departureWindowS = NO_DEPARTURE_WINDOW_S }: LocationTemplateInput): WorldTravelTemplate {
   const createdAt = Math.max(Math.floor(now / 1000), latest ? latest.createdAt + 1 : 0);
@@ -338,13 +364,22 @@ export interface TransferPlanInput {
   explicit: boolean;
   /** The previous World showed recent Active Presence: give its departure a moment. */
   previousRecentlyActive: boolean;
+  /**
+   * When this reader first saw `latest` (ms). The stay is measured from the earlier of this and its `created_at`, so
+   * an event dated ahead of the reader's clock does not stretch `MIN_STAY_MS` (a move is "just made" for 5 s,
+   * whatever its date says).
+   */
+  observedAt?: number;
 }
 
 /** Whether, and how, a World moves the Blobbi to itself (the rules in `WORLD-TRAVEL.md`, "Transfer rules"). */
 export function planTransfer(input: TransferPlanInput): TransferPlan {
   const { latest, world, now, explicit } = input;
   if (currentWorld(latest) === world) return { kind: 'already-here', location: latest };
-  if (latest && !explicit && now - latest.createdAt * 1000 < MIN_STAY_MS) return { kind: 'contended', location: latest };
+  if (latest && !explicit) {
+    const since = Math.min(latest.createdAt * 1000, input.observedAt ?? Number.POSITIVE_INFINITY);
+    if (now - since < MIN_STAY_MS) return { kind: 'contended', location: latest };
+  }
   return {
     kind: 'transfer',
     from: currentWorld(latest),

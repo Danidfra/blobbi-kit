@@ -67,6 +67,7 @@ export * from './safe-profile-write';
 export * from './world-travel';
 export * from './world-travel-session';
 export * from './world-travel-sync';
+export * from './world-travel-follow';
 
 // Async Nostr helpers.
 export * from './fetchFreshEvent';
