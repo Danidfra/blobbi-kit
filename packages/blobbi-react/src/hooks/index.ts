@@ -30,6 +30,7 @@ export * from './usePersistDailyProgress';
 export * from './usePersistEvolutionProgress';
 export * from './useProjectedBlobbiState';
 export * from './useRerollMission';
+export * from './useWorldTravel';
 
 // Canonical source of `TaskType`, `HatchTask`, `filterPersistentTasks`, and the
 // hatch KIND_* constants. `HATCH_REQUIRED_INTERACTIONS` is intentionally NOT

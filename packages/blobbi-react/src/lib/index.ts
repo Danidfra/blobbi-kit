@@ -17,3 +17,6 @@ export * from './item-cooldown';
 export * from './daily-mission-tracker';
 // Daily progress not saved yet, kept through the host's StorageAdapter (no browser storage of its own).
 export * from './daily-pending';
+
+// World travel's relays over a Nostrify-style pool (structural; no Nostrify import).
+export * from './world-travel-relays';

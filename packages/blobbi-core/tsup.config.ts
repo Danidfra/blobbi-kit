@@ -68,6 +68,7 @@ function entries(): string[] {
       else if (
         /\.tsx?$/.test(e.name) &&
         !/\.test\.tsx?$/.test(e.name) &&
+        !/\.test-helpers\.ts$/.test(e.name) &&
         !/\.d\.ts$/.test(e.name)
       ) {
         out.push(full);
