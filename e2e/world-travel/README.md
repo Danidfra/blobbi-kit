@@ -56,7 +56,7 @@ the way a developer would, which only works on a dev server:
 
 A build switches it on with `VITE_BLOBBI_WORLD_TRAVEL=nostr`.
 
-## What it checks (63 checks)
+## What it checks (68 checks)
 
 1. **Loading:** loading either World signs nothing and publishes nothing.
 2. **Home to Pixel:** NEW ADVENTURE WITH BAMBU starts a birth intro that
@@ -94,8 +94,12 @@ A build switches it on with `VITE_BLOBBI_WORLD_TRAVEL=nostr`.
     - A fresh laptop shows the "looking" cue. Bambu is never shown present
       and never departs. It ends away within the delay, and nothing is
       signed.
-    - A fresh phone (relays 1.2 s late, inside Pixel's own Blobbi-loading
-      budget) never enters or shows Bambu while its place is unknown.
+    - A fresh phone with the same 2.5 s relays never enters or shows Bambu
+      while its place is unknown, and walks the account's own Bambu, never a
+      new local Blobbi (M16.2: an empty relay no longer cuts the slow ones
+      off).
+    - A screen reader hears where Bambu is, through one polite live region
+      that has no `aria-hidden` ancestor (M16.2).
 12. **Three interactions on the Standalone (M16.1):**
     - Synthetic events and held-key repeats never count.
     - The third interaction shows the calling cue and publishes one World
@@ -103,6 +107,10 @@ A build switches it on with `VITE_BLOBBI_WORLD_TRAVEL=nostr`.
     - The Blobbi forms 1.5 s after the act.
     - There is exactly one arrival, and dropping both relays replays
       nothing.
+13. **Relays slower than the timeout (M16.2):** relays answer 6 s late.
+    - The page shows unreachable first, then confirmed by the late answer.
+    - The real place is shown as history, with no journey.
+    - Nothing is signed.
 
 **Safety checks:**
 

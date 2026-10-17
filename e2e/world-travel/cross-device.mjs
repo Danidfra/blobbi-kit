@@ -364,6 +364,11 @@ await step('11. M16.1 loading: a fresh device with slow relays never shows Bambu
   check('fresh laptop: Bambu never shown present before (or after) the answer: no flash, no departure', !t.includes('present') && !t.includes('depart') && !pendingStates.some((x) => x.includes('|present|')), `trail=${t.join(' → ')}`);
   check('fresh laptop: resolved within the slow relays’ delay plus a little, then away in Pixel', resolvedIn < 8_000 && (await homeStatus(visitor)).travelPlace === 'blobbi-pixel', `${resolvedIn}ms`);
   check('fresh laptop signed and published nothing while loading', (await locationsLogged()).filter((e) => e.at >= t0).length === 0);
+  const said = await visitor.page.evaluate(() => {
+    const r = document.querySelector('[data-testid="world-travel-announcer"]');
+    return r ? { text: r.textContent, role: r.getAttribute('role'), live: r.getAttribute('aria-live'), hiddenAncestor: !!r.closest('[aria-hidden="true"]') } : null;
+  });
+  check('fresh laptop: a screen reader hears where Bambu is (one polite live region, no aria-hidden ancestor)', said && said.role === 'status' && said.live === 'polite' && !said.hiddenAncestor && said.text === 'Bambu is in Blobbi Pixel.', JSON.stringify(said));
   await visitor.context.close();
 
   // A fresh phone, Bambu already in Pixel: the entry waits for the answer, then Bambu arrives (never present, then gone)
@@ -377,8 +382,8 @@ await step('11. M16.1 loading: a fresh device with slow relays never shows Bambu
       if (window.__res.at(-1) !== v) window.__res.push(v);
     }, 30);
   });
-  // Pixel resolves the account's own Blobbi from the relays first (its own 6 s budget): slow, but within it
-  for (const r of ['ditto', 'primal']) await control(`/delay?relay=${r}&ms=1200`);
+  // M16.2: the same 2.5 s relays. Pixel reads the account's own Blobbi first; an empty relay answering at once (dreamith,
+  // which never saw this player) no longer cuts the slow ones off, so the fresh phone gets Bambu, not a new local Blobbi
   await enterPixelPlay(phone2);
   await sleep(1_500);
   await phone2.page.keyboard.press('Escape'); // skip the birth intro (any key does)
@@ -386,6 +391,8 @@ await step('11. M16.1 loading: a fresh device with slow relays never shows Bambu
   const r2 = await phone2.page.evaluate(() => window.__res);
   check('fresh phone: the Blobbi is never entered or present while the place is unknown', !r2.some((x) => (x.startsWith('pending') || x.startsWith('none')) && (x.endsWith('|present') || x.endsWith('|arriving'))), r2.join(' , '));
   check('fresh phone: nothing signed (Bambu was already here)', phone2.signs.length === 0, `signs=${phone2.signs.length}`);
+  const walking = await phone2.page.evaluate(() => window.__blobbi?.live?.()?.blobbi?.source ?? null);
+  check('fresh phone with slow relays: the walking Blobbi is the account’s own Bambu (never a new local one)', walking?.d === acct.d && walking?.pubkey === acct.pk, JSON.stringify(walking));
   check('no page errors on the fresh devices', phone2.errors.length === 0, phone2.errors.join(' | ').slice(0, 200));
   await phone2.context.close();
   for (const r of ['ditto', 'primal']) await control(`/delay?relay=${r}&ms=0`);
@@ -442,6 +449,31 @@ await step('12. M16.1 three interactions on the Standalone: repeats and syntheti
   await sleep(8_000);
   const t2 = await trail(laptop);
   check('relays dropping and reconnecting replay no animation', t2.filter((x) => x === 'arrive').length === 1 && t2.at(-1) === 'present', t2.join(' → '));
+});
+
+await step('13. M16.2 relays slower than the timeout: unreachable at first, then their late answer confirms the place (no journey, nothing signed)', async () => {
+  await sleep(1_000);
+  const where = (await pixel(phone)).place;
+  for (const r of ['ditto', 'primal']) await control(`/delay?relay=${r}&ms=6000`);
+  const late = await device({ acct, app: 'home', label: 'laptop behind slow relays' });
+  await late.context.addInitScript(TRAIL);
+  await late.context.addInitScript(() => {
+    window.__res = [];
+    setInterval(() => {
+      const v = document.querySelector('[data-testid="world-travel-status"]')?.getAttribute('data-travel-resolution') ?? 'none';
+      if (window.__res.at(-1) !== v) window.__res.push(v);
+    }, 50);
+  });
+  const t0 = Date.now();
+  await late.page.goto(HOME_URL);
+  await until(async () => (await homeStatus(late)).travelResolution === 'confirmed', 'late answer confirms', 20_000);
+  const res = await late.page.evaluate(() => window.__res);
+  const st = await homeStatus(late);
+  check('slow relays: unreachable first, then confirmed by the late answer, within about 6 s', res.includes('unreachable') && Date.now() - t0 < 12_000, `${res.join(' → ')} in ${Date.now() - t0}ms`);
+  check('the late answer shows the real place, as history (no journey)', st.travelPlace === where && st.travelChange.startsWith('historical') && !(await trail(late)).includes('depart'), `${st.travelPlace} vs ${where}, ${st.travelChange}, trail=${(await trail(late)).join(' → ')}`);
+  check('nothing signed or published by the slow load', (await locationsLogged()).filter((e) => e.at >= t0).length === 0);
+  for (const r of ['ditto', 'primal']) await control(`/delay?relay=${r}&ms=0`);
+  await late.context.close();
 });
 
 await step('Safety: nothing left the machine, nothing unexpected was signed, no page errors', async () => {
