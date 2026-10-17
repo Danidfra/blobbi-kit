@@ -63,7 +63,7 @@ export * from './profile-order';
 // The safe profile write (complete reads, never over an older profile, one per account at a time).
 export * from './safe-profile-write';
 
-// World travel (M16, provisional kinds): World Location (31126), Active Presence (21124), the session and the sync.
+// World travel (M16, experimental kinds): World Location (31126), Active Presence (21124), the session and the sync.
 export * from './world-travel';
 export * from './world-travel-session';
 export * from './world-travel-sync';

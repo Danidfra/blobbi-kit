@@ -25,7 +25,7 @@ the [CHANGELOG](../../CHANGELOG.md).
   owner, Blobbi and World), `useWorldTravelSync` (keeps the World's own
   Blobbi on screen in line with it) and `poolWorldTravelRelays` (the
   session's relays over any Nostrify-style pool). The protocol is in
-  `@blobbi-kit/core` (`WORLD-TRAVEL.md`).
+  `@blobbi-kit/core` (`WORLD-TRAVEL.md`); its kinds are experimental.
 
 Runtime dependencies are React, TanStack Query, `@nostrify/react` and
 `@blobbi-kit/core`, all peers. Nothing here imports a host application.

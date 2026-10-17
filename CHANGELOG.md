@@ -10,7 +10,77 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
-## `@blobbi-kit/core` 0.11.0-m16.4, `@blobbi-kit/react` 0.11.0-m16.4: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
+## `@blobbi-kit/core` 0.11.0, `@blobbi-kit/react` 0.11.0: world travel (experimental)
+
+**Additive over 0.10.0.**
+- No export was removed, renamed or changed.
+- The declarations of every 0.10.0 module are byte-identical.
+- No existing kind or tag changed meaning.
+- React's peer range on core is `^0.11.0`.
+- Publish core first.
+
+**The World Travel protocol (experimental).** A Blobbi's World, across
+Blobbi apps and devices. The specification is
+`packages/blobbi-core/WORLD-TRAVEL.md`, which ships in the core package.
+- **World Location, kind 31126** (addressable):
+  - where a Blobbi last is: one event per move, in NIP-01 order;
+  - it never expires, and it persists when the player disconnects;
+  - it is signed only by the owner, on the player's act.
+- **Active Presence, kind 21124** (ephemeral, NIP-40):
+  - optional and opt-in: recent play in a World;
+  - its expiry never moves, removes or invalidates the Blobbi.
+- **Status of the kinds.** They are the *experimental* identifiers of the
+  protocol (`WORLD_TRAVEL_KINDS_STATUS = 'experimental'`). They are not a NIP
+  and not standardized by the Nostr community. The schema is versioned
+  (`v` = `1`).
+- **Not in this release:** autonomous Blobbi travel (§10 of the spec,
+  design only).
+
+**Added: core.**
+- Protocol (`world-travel`):
+  - kinds, World ids and registry;
+  - parse, validate and resolve (`resolveWorldLocation`, NIP-01 order,
+    future-dated locations ignored beyond `MAX_LOCATION_SKEW_S`);
+  - `planTransfer` (already here, contended, transfer);
+  - the location, presence and NIP-09 deletion templates;
+  - transition timing.
+- Session (`world-travel-session`, `createWorldTravel`): relays, signer, store
+  and lock are injected.
+  - `travel`, `interact` (three-interaction follow), `retry` and `refresh`;
+  - `repairFutureLocations` (explicit only), presence controls;
+  - `snapshot.resolution`, `follow`, `travel` and `diagnostics`;
+  - late relay answers, backoff retries, one automatic resend of the same
+    signed event.
+- Sync (`world-travel-sync`): `syncTravel`, `reconcileTravel` and
+  `travelView`.
+- Follow (`world-travel-follow`): `createFollowCounter`.
+
+**Added: react.** `useWorldTravel`, `useWorldTravelSync`, and
+`poolWorldTravelRelays` (any Nostrify-style pool, no Nostrify import).
+
+**Migration.**
+- **From 0.10.0:** none. Upgrade both packages together:
+  `@blobbi-kit/react@0.11.0` needs `@blobbi-kit/core@^0.11.0`.
+- **From the local `0.11.0-m16.x` tarballs**:
+  - replace `file:…/blobbi-kit-*-0.11.0-m16.4.tgz` with `^0.11.0`;
+  - `WORLD_TRAVEL_KINDS_STATUS` is now typed `'experimental' | 'stable'`, and
+    `'provisional'` is gone;
+  - nothing else differs from m16.4.
+
+**Known limitations.** See `WORLD-TRAVEL.md` §14:
+- no global compare-and-swap;
+- pinned relays need the owner's explicit recovery, and deletion is never
+  guaranteed;
+- `useWorldTravel` returns `snapshot: null` on its first render;
+- not validated on physical devices, with real NIP-07/NIP-46 signers, or
+  against public relays for writing.
+
+### Local prerelease history (m16.0–m16.4, never published)
+
+The notes below were written for the local tarballs the two apps consumed
+while integrating. They are kept for those apps. 0.11.0 contains all of it.
+
+#### 0.11.0-m16.2 – m16.4
 
 **m16.4 (M16.2 hardening).**
 - **Slow relays.**
@@ -81,7 +151,7 @@ defaults marked *behaviour*.
   - future Worlds (§11);
   - the shared-effects decision (§12).
 
-## `@blobbi-kit/core` 0.11.0-m16.1, `@blobbi-kit/react` 0.11.0-m16.1: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
+#### 0.11.0-m16.0 – m16.1
 
 **m16.1** (found while integrating): `storedWorldLocation(store, { owner, d, verify })`
 and `worldLocationStoreKey` / `pendingMoveStoreKey`, so a World reads the last

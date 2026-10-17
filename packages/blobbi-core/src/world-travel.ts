@@ -15,10 +15,11 @@
  * freshness and transition timing. No clock, no relay, no signer, no DOM. The
  * operations that use them (`world-travel-session.ts`) take them injected.
  *
- * PROVISIONAL KINDS. 31126 and 21124 were chosen after a collision search
- * (no NIP, no public registry entry, no public code found, no events on the
- * relays probed, 2026-10-17), which is evidence, not a registry. They stay
- * provisional until the owner approves them for release.
+ * EXPERIMENTAL KINDS. 31126 and 21124 are the experimental identifiers of the
+ * Blobbi World Travel protocol, approved by the owner for 0.11.0. They were
+ * chosen after a collision search (no NIP, no public registry entry, no public
+ * code found, no events on the relays probed, 2026-10-17), which is evidence,
+ * not a registry: they are not standardized by the Nostr community.
  */
 import { BLOBBI_ECOSYSTEM_NAMESPACE, KIND_BLOBBI_STATE, buildBlobbiAddress, getPubkeyPrefix12, isCanonicalBlobbiD } from './blobbi';
 import type { NostrEvent, NostrFilter } from './nostr-protocol';
@@ -26,12 +27,15 @@ import type { EventVerifier } from './profile-order';
 
 // ─── Kinds and constants ──────────────────────────────────────────────────────
 
-/** World Location: addressable (30000–39999), beside 31124 (pet state) and 31125 (the legacy profile). Provisional. */
+/** World Location: addressable (30000–39999), beside 31124 (pet state) and 31125 (the legacy profile). Experimental. */
 export const KIND_WORLD_LOCATION = 31126;
-/** Active Presence: ephemeral (20000–29999), the 1124 / 31124 family. Provisional. */
+/** Active Presence: ephemeral (20000–29999), the 1124 / 31124 family. Experimental. */
 export const KIND_ACTIVE_PRESENCE = 21124;
-/** Whether the two kinds above are approved for release (they are not yet). */
-export const WORLD_TRAVEL_KINDS_STATUS: 'provisional' | 'approved' = 'provisional';
+/**
+ * The two kinds above are experimental: approved for this release, not standardized by the Nostr community, and
+ * their schema may still change in a later minor version (readers ignore any `v` other than `WORLD_TRAVEL_VERSION`).
+ */
+export const WORLD_TRAVEL_KINDS_STATUS: 'experimental' | 'stable' = 'experimental';
 
 /** The schema version both events carry (`["v", "1"]`); any other version is ignored, never guessed at. */
 export const WORLD_TRAVEL_VERSION = '1';
@@ -260,7 +264,7 @@ export interface ResolveOptions {
   verify: EventVerifier;
   /**
    * The reader's clock (ms). With it, a location dated more than `MAX_LOCATION_SKEW_S` ahead is ignored (it is not
-   * a place yet). Without it, every valid event counts (pure NIP-01, as before 0.11).
+   * a place yet). Without it, every valid event counts (pure NIP-01).
    */
   now?: number;
 }

@@ -1,9 +1,24 @@
 # World travel (M16): World Location and Active Presence
 
-**Status: implemented in `@blobbi-kit/core` / `@blobbi-kit/react`, kinds
-PROVISIONAL.** The two kinds below were chosen after a collision search
-(§7), and they stay provisional until the owner approves them. The apps keep
-live publication behind a switch that is off by default.
+**Status: EXPERIMENTAL, released in `@blobbi-kit/core` /
+`@blobbi-kit/react` 0.11.0.** Kinds 31126 and 21124 are the experimental
+identifiers of the Blobbi World Travel protocol
+(`WORLD_TRAVEL_KINDS_STATUS = 'experimental'`). They were chosen after a
+collision search (§7). They are **not** a NIP and have **not** been
+standardized or registered by the Nostr community. The schema is versioned
+(`["v", "1"]`) and may change in a later minor version. The apps keep live
+publication behind a switch that is off by default.
+
+**In short (0.11.0):**
+- **World Location (31126) is persistent.** The Blobbi stays in its last World
+  when the player disconnects, closes the app or goes offline.
+- **Active Presence (21124) is optional and ephemeral.** When it expires, the
+  Blobbi does not move, is not removed and stays valid.
+- **A location is owner-authorized.** Only the owner's key signs it, on the
+  player's act. **Autonomous Blobbi travel is not implemented** (§10).
+- **Clients must handle disagreement.** Relays may disagree or be unreachable
+  (§8). A relay pinned by a future-dated location may need an explicit
+  recovery (§7b).
 
 A Blobbi belongs to a Nostr account and can travel between **Worlds**. Worlds
 are Blobbi-compatible experiences: Blobbi Standalone (`blobbi-home`), Blobbi
@@ -552,3 +567,63 @@ controller) is already engine-free, and its own plan proposes a
 (`src/features/teleport/KIT_EXTRACTION.md`). That is worth doing when a third
 World (Rumble, on Babylon.js) needs the same journey. It is out of M16.1's
 scope.
+
+## 13. Security considerations (0.11.0)
+
+- **Trust comes from signatures, never from a relay.**
+  - `resolveWorldLocation` and `freshPresence` require a `verify` function.
+  - `parseWorldLocation` and `parseActivePresence` check the signature only
+    when given one, so do not use them on untrusted input without it.
+  - A verifier that throws counts as "invalid".
+- **Ownership.**
+  - A location counts only for its author and its `d`.
+  - A canonical `d` must carry the author's own pubkey prefix, and the `a` tag
+    must be exactly the author's 31124 address. Nobody else can move, or
+    claim, another account's Blobbi.
+  - The session refuses a signed location for another key, Blobbi or World
+    (`wrong-account`). It refuses a signed presence for another key or World,
+    and a deletion request for another key or with an invalid signature.
+- **Signing is always the player's act** (§6):
+  - a location is signed only by `travel()`;
+  - presence is signed only when the player enabled it;
+  - a deletion request is signed only by `repairFutureLocations()`;
+  - nothing signs on load, on a subscription, on focus, on a re-render or on
+    a timer;
+  - no key is stored, and no delegation is introduced.
+- **Timestamps** (§7a):
+  - a location more than `MAX_LOCATION_SKEW_S` (900 s) ahead of the reader's
+    clock is ignored;
+  - a presence more than `MAX_CLOCK_SKEW_S` (60 s) ahead is not fresh;
+  - `arrival_after` is a visual hint, clamped to `MAX_TRANSITION_S`.
+- **Abuse limits.** One move at a time per Blobbi (`busy`, and `lock` across
+  tabs). A casual input never undoes a move younger than `MIN_STAY_MS`.
+  After a refusal, following is suspended for the session.
+- **Privacy** (§9). A location is public and durable, and it names a World,
+  never a position. Presence is opt-in.
+
+## 14. Known limitations (0.11.0)
+
+- **Experimental kinds.** They are not standardized, and a later version may
+  change the schema (readers ignore any other `v`).
+- **No global compare-and-swap.** Two devices moving the same Blobbi at the
+  same moment both publish. Every reader converges on the same NIP-01 winner
+  (§8).
+- **Relays can disagree, lag or be unreachable.** The newest valid event from
+  any source wins. `snapshot.resolution` tells a World how much it knows
+  (`pending`, `cached`, `confirmed`, `unreachable`).
+- **A pinned relay** keeps a far-future location and drops real moves. The
+  reader is protected automatically. The relay itself is repaired only by the
+  owner's explicit `repairFutureLocations()`. NIP-09 deletion is a request
+  that relays may ignore (`stillPinned`) (§7b).
+- **Presence is best effort.** Relays do not store it and may drop it. Its
+  absence means "activity unknown".
+- **`useWorldTravel` returns `snapshot: null` on its first render.** The
+  session is created in an effect, so the host shows "looking" for that
+  render.
+- **`interact()` returns `'ignored'` while `pending`.** A host that wants the
+  press counted must queue it itself.
+- **Not validated:**
+  - no physical-device run;
+  - no real NIP-07 extension or NIP-46 bunker (the browser checks use a NIP-07
+    shim);
+  - no public relay used for writing.

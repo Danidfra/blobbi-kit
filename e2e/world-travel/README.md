@@ -1,8 +1,8 @@
 # Cross-device world travel checks (M16)
 
 These checks drive real browsers through world travel with the real apps. The
-travel layer is `@blobbi-kit/core` 0.11.0-m16.4, installed from local
-tarballs. The two apps each run on their own dev server. A local relay stands
+travel layer is `@blobbi-kit/core` 0.11.0 (the m16.4 prerelease before
+it), installed from local tarballs. The two apps each run on their own dev server. A local relay stands
 in for the public ones.
 
 - **Two independent browser contexts.** Each context has its own cookies,

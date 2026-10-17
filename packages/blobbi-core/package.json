@@ -1,6 +1,6 @@
 {
   "name": "@blobbi-kit/core",
-  "version": "0.11.0-m16.4",
+  "version": "0.11.0",
   "description": "Portable, framework-agnostic core domain logic for Blobbi.",
   "type": "module",
   "license": "MIT",
