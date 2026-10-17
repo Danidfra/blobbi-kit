@@ -1,0 +1,15 @@
+{
+  "name": "blobbi-world-travel-e2e",
+  "private": true,
+  "type": "module",
+  "description": "M16 cross-device world travel checks: a local NIP-01 relay and two independent browser contexts running Blobbi Standalone and Blobbi Pixel dev servers. Dev-only; not a package; never talks to public relays.",
+  "scripts": {
+    "relay": "node relay.mjs",
+    "test": "node cross-device.mjs"
+  },
+  "dependencies": {
+    "nostr-tools": "2.25.2",
+    "playwright": "1.64.1",
+    "ws": "8.18.3"
+  }
+}
