@@ -10,6 +10,52 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## `@blobbi-kit/core` 0.11.1, `@blobbi-kit/react` 0.11.1: world travel relay convergence (fix)
+
+**A backward-compatible patch.**
+- The fix is in core. React's code is unchanged; it is released in lockstep
+  (the kit's manifest contract), with its core peer at `^0.11.1`, so the
+  hooks are never paired with a core without the fix.
+- No event format, kind, tag or filter changed.
+- Publish core first.
+
+**Fixed: a relay that missed a move stayed behind.**
+- **Before.** A move counted once the first relay accepted it. A relay that
+  refused it, timed out or was down never received that event again, so a
+  device reading only that relay saw the old World.
+- **Now.** Every look notes what each relay that answered holds. A relay
+  lacking the canonical location (older or none) is sent the **same signed
+  event** again. Healing never signs, never prompts, never changes the id,
+  `created_at`, tags or content, and never sends anything over a newer
+  location or to a relay pinned by a future-dated one.
+- **Bounds.** Per relay and event, per session:
+  - at most `HEAL_MAX_ATTEMPTS` (3) heals, 30 s, 60 s and 120 s apart;
+  - none after a permanent refusal (`blocked:`, `invalid:`, `restricted:`,
+    `pow:`, `auth-required:`; `isPermanentRefusal`);
+  - healing runs only on the looks the session already makes, plus one read
+    5 s after an accepted heal (acceptance is not taken as storage).
+- No new timers sign or publish by themselves. A relay that answers nothing
+  is never written to blindly.
+- The spec is `WORLD-TRAVEL.md` §8a.
+
+**Added: core** (all additive).
+- `HEAL_MAX_ATTEMPTS`, `HEAL_RETRY_MS`, `HEAL_VERIFY_MS`, `isPermanentRefusal`
+  (`world-travel-session`).
+- `WorldTravelSnapshot.diagnostics.laggingRelays`: the relays whose last
+  answer lacked the canonical location, pinned ones aside.
+
+**Unchanged.**
+- The NIP-01 order, ties to the lower id, the future-date rule (900 s), the
+  pinned-relay recovery (`repairFutureLocations`), the pending-move resend,
+  and every other export and declaration of 0.11.0.
+
+**Behaviour an app may notice.** A session may now publish its owner's
+already-signed World Location to a lagging relay on a look, including on
+load. A test that asserted "nothing is published on load" over relays that
+disagree will see that heal. No signature is involved.
+
+---
+
 ## `@blobbi-kit/core` 0.11.0, `@blobbi-kit/react` 0.11.0: world travel (experimental)
 
 **Additive over 0.10.0.**
