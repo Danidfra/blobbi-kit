@@ -127,9 +127,10 @@ export interface WorldTravelOptions {
   /**
    * How long this World's own arrival plays before the Blobbi has formed (ms): its teleport's "incoming" part. The
    * arrival is started that much before the moment the Blobbi may be seen here (`arrival_after`), so the wait and
-   * the effect overlap instead of adding up. 0 (the default): the arrival starts at that moment.
+   * the effect overlap instead of adding up. 0 (the default): the arrival starts at that moment. A function is read
+   * at each arrival (a World whose pace or reduced motion changes during a session).
    */
-  arrivalLeadMs?: number;
+  arrivalLeadMs?: number | (() => number);
   /**
    * The shortest time from the player's act to the Blobbi forming here (ms), so a move from a World nobody is playing
    * (no departure window) still reads as a journey rather than a pop. Default `MIN_TRAVEL_MS`; 0 turns it off.
@@ -340,7 +341,16 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
   const lock = o.lock ?? pageLock;
   const store = o.store ?? null;
   const clampMs = (v: number | undefined, fallback: number) => Math.min(Math.max(Number.isFinite(v) ? (v as number) : fallback, 0), MAX_TRANSITION_S * 1000);
-  const arrivalLeadMs = clampMs(o.arrivalLeadMs, 0);
+  const leadOption = o.arrivalLeadMs;
+  const arrivalLead = (): number => {
+    let v: number | undefined;
+    try {
+      v = typeof leadOption === 'function' ? leadOption() : leadOption;
+    } catch {
+      v = 0;
+    }
+    return clampMs(v, 0);
+  };
   const minTravelMs = clampMs(o.minTravelMs, MIN_TRAVEL_MS);
   const counter: FollowCounter = createFollowCounter({ needed: o.followAfter ?? FOLLOW_INTERACTIONS, windowMs: o.followWindowMs ?? FOLLOW_WINDOW_MS });
   let followSuspended = false;
@@ -554,6 +564,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       return;
     }
     const t = now();
+    const arrivalLeadMs = arrivalLead();
     const formAt = Math.max(t + arrivalDelayMs(mine), startedAt + minTravelMs, t + arrivalLeadMs);
     const at = Math.max(formAt - arrivalLeadMs, t);
     if (at <= t) {

@@ -931,6 +931,18 @@ describe('the arrival schedule (M16.1)', () => {
     expect(t).toMatchObject({ phase: 'arriving', formAt: act + DEPARTURE_WINDOW_S * 1000, at: act + DEPARTURE_WINDOW_S * 1000 - 500 });
   });
 
+  it('arrivalLeadMs may be a function, read at each arrival (reduced motion changing mid-session)', async () => {
+    const net = network();
+    remoteMove(net, WORLD_PIXEL, START - 60_000);
+    let lead = 500;
+    const home = track(device(net, WORLD_HOME, { minTravelMs: MIN_TRAVEL_MS, arrivalLeadMs: () => lead }));
+    await settle(10);
+    lead = 200;
+    const act = Date.now();
+    await home.session.travel({ explicit: true });
+    expect(home.session.snapshot().travel).toMatchObject({ phase: 'arriving', at: act + MIN_TRAVEL_MS - 200 });
+  });
+
   it('a slow relay does not hold the arrival back: the first acceptance is enough', async () => {
     const net = network();
     remoteMove(net, WORLD_PIXEL, START - 60_000);

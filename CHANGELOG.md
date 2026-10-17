@@ -10,9 +10,17 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
-## `@blobbi-kit/core` 0.11.0-m16.2, `@blobbi-kit/react` 0.11.0-m16.2: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
+## `@blobbi-kit/core` 0.11.0-m16.3, `@blobbi-kit/react` 0.11.0-m16.3: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
 
-**m16.2 (M16.1 polish).** Everything is additive over m16.1 except the
+**m16.3** (found in the cross-device browser run): while a move here is under
+way (`travelView` = `coming`), `syncTravel` leaves a Blobbi the World is
+already showing where it is (`TravelView.coming`). Before, Pixel's birth
+intro showed the Blobbi, the sync settled it absent, and the arrival brought
+it back. `arrivalLeadMs` may be a function, read at each arrival.
+`travelView` tolerates a snapshot without `travel`. `WORLD-TRAVEL.md` is in
+the tarball.
+
+**m16.2 (M16.1 polish).** Everything is additive over m16.1, except the
 defaults marked *behaviour*.
 
 - **Following the player** (`world-travel-follow.ts`, `session.interact()`):

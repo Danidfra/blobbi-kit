@@ -89,6 +89,25 @@ describe('syncTravel', () => {
     sync2.dispose();
   });
 
+  it('a move here under way: a Blobbi the World already shows (its intro brought it) is left there, never taken away and brought back', () => {
+    const src = source({ place: WORLD_PIXEL, here: false, travel: { phase: 'publishing' } });
+    const b = blobbi('present');
+    const sync = syncTravel({ source: src, blobbi: b });
+    vi.advanceTimersByTime(2_000);
+    expect(b.log).toEqual([]);
+    src.set({ place: WORLD_HOME, here: true, travel: { phase: 'idle' }, change: { kind: 'live', key: 1 } });
+    expect(b.log).toEqual([]); // it was there all along
+    sync.dispose();
+    // The move failed instead: the Blobbi leaves with its journey (the historical place was seen), not a vanish
+    const src2 = source({ place: WORLD_PIXEL, here: false, travel: { phase: 'signing' } });
+    const b2 = blobbi('present');
+    const sync2 = syncTravel({ source: src2, blobbi: b2 });
+    src2.set({ travel: { phase: 'failed', reason: 'declined' } });
+    vi.advanceTimersByTime(VISIBLE_GRACE_MS);
+    expect(b2.log).toEqual(['leave']);
+    sync2.dispose();
+  });
+
   it('a live move away departs once the World’s moment ends; the journey is reported with its place', () => {
     const src = source({});
     const b = blobbi('present');

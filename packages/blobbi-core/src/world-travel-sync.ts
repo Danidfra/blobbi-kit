@@ -46,6 +46,12 @@ export interface TravelView {
   busy: boolean;
   /** How the change that led here should be shown. */
   change: 'historical' | 'live';
+  /**
+   * A move here is under way (checking, signing, publishing, or waiting for its arrival). A Blobbi the World is
+   * already showing (its own intro brought it in) is then left where it is: taking it away now would only bring it
+   * back a moment later.
+   */
+  coming?: boolean;
 }
 
 export type TravelAction = 'enter' | 'leave' | 'settle-present' | 'settle-absent' | null;
@@ -53,6 +59,7 @@ export type TravelAction = 'enter' | 'leave' | 'settle-present' | 'settle-absent
 export function reconcileTravel(view: TravelView): TravelAction {
   const inLine = view.here ? view.shown === 'present' || view.shown === 'arriving' : view.shown === 'absent' || view.shown === 'departing';
   if (inLine) return null;
+  if (view.coming && (view.shown === 'present' || view.shown === 'arriving')) return null;
   if (view.change === 'historical') return view.here ? 'settle-present' : 'settle-absent';
   if (!view.visible) return null;
   if (view.here) return 'enter';
@@ -133,6 +140,7 @@ export function syncTravel({
       visibleFor: p.visible && p.visibleSince !== null ? now() - p.visibleSince : 0,
       busy: busy(),
       change: historical ? 'historical' : 'live',
+      coming: travelView(s).kind === 'coming',
     });
     if (action === 'settle-present' || action === 'settle-absent') {
       settledKey = s.change.key;
@@ -200,7 +208,7 @@ export type TravelViewKind = 'looking' | 'here' | 'away' | 'coming';
 export function travelView(s: Pick<WorldTravelSnapshot, 'resolution' | 'here' | 'place' | 'world' | 'travel'>): { kind: TravelViewKind; unreachable: boolean } {
   const unreachable = s.resolution === 'unreachable';
   if (s.resolution === 'pending') return { kind: 'looking', unreachable };
-  const phase = s.travel.phase;
+  const phase = s.travel?.phase;
   if (!s.here && (phase === 'checking' || phase === 'signing' || phase === 'publishing' || phase === 'arriving')) return { kind: 'coming', unreachable };
   if (s.here) return { kind: 'here', unreachable };
   return { kind: s.place === s.world ? 'coming' : 'away', unreachable };
