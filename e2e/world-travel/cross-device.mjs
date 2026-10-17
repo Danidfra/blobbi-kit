@@ -34,8 +34,44 @@ const pixel = (p) =>
   p.page.evaluate(() => {
     const t = window.__blobbiWorldTravel;
     const s = t?.snapshot();
-    return s ? { status: s.status, place: s.place, here: s.here, phase: s.travel.phase, reason: s.travel.reason ?? null, change: s.change, location: s.location?.id ?? null, presence: s.presence.status, there: s.presence.there?.world ?? null, shown: t.shown() } : null;
+    return s ? { status: s.status, resolution: s.resolution, follow: s.follow, place: s.place, here: s.here, phase: s.travel.phase, reason: s.travel.reason ?? null, at: s.travel.at ?? null, formAt: s.travel.formAt ?? null, change: s.change, location: s.location?.id ?? null, presence: s.presence.status, there: s.presence.there?.world ?? null, shown: t.shown(), looking: t.looking?.() ?? null, coming: t.coming?.() ?? null } : null;
   });
+/** Distinct presses, 1.2 s apart (the kit counts inputs less than 1 s apart once), until `done()` or `max` presses. */
+async function presses(press, done, max = 5) {
+  for (let i = 1; i <= max; i++) {
+    await press(i);
+    await sleep(1_200);
+    if (await done()) return i;
+  }
+  return max + 1;
+}
+/** In-page record of Pixel's travel view, shown state and arrival schedule (every 20 ms, changes only). */
+async function installPixelRecorder(p) {
+  await p.context.addInitScript(() => {
+    window.__rec = [];
+    window.__arrivals = [];
+    setInterval(() => {
+      const t = window.__blobbiWorldTravel;
+      const s = t?.snapshot?.();
+      if (!s) return;
+      const r = { place: s.place, view: s.resolution === 'pending' ? 'looking' : s.here ? 'here' : s.place === 'blobbi-pixel' ? 'coming' : 'away', shown: t.shown?.() ?? null };
+      const last = window.__rec.at(-1);
+      if (!last || last.place !== r.place || last.view !== r.view || last.shown !== r.shown) window.__rec.push(r);
+      if (s.travel.phase === 'arriving' && !window.__arrivals.some((a) => a.formAt === s.travel.formAt)) window.__arrivals.push({ seenAt: Date.now(), at: s.travel.at, formAt: s.travel.formAt });
+    }, 20);
+  });
+}
+const KEYS = ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowLeft'];
+/** Keep playing in Pixel until Bambu has come over; returns how many presses it took. */
+async function followPixel(p, max = 5) {
+  await p.page.bringToFront();
+  return presses((i) => p.page.keyboard.press(KEYS[i % KEYS.length]), async () => (await pixel(p)).place === 'blobbi-pixel', max);
+}
+/** Keep playing in the Standalone (presses on the room floor, away from any control) until Bambu has come home. */
+async function followHome(h, max = 5) {
+  await h.page.bringToFront();
+  return presses((i) => h.page.mouse.click(40 + i * 7, 40), async () => (await homeStatus(h)).travelPlace === 'blobbi-home', max);
+}
 const locationsLogged = async () => (await relayLog()).filter((e) => e.kind === 31126);
 const distinct = (xs) => [...new Set(xs.map((x) => x.id))];
 
@@ -92,14 +128,18 @@ await step('1. Loading signs nothing, writes nothing, and shows the Blobbi where
   check('no World Location published by loading', (await locationsLogged()).length === 0);
 });
 
-await step('2. Home to Pixel across devices: the press that starts play moves Bambu; the laptop sees it leave', async () => {
+await step('2. Home to Pixel across devices: NEW ADVENTURE WITH BAMBU (its birth intro) calls Bambu at once; the laptop sees it leave', async () => {
   await clearTrail(laptop);
+  await installPixelRecorder(phone);
   await enterPixelPlay(phone, { reload: true });
   check('nothing signed before the press that started play', phone.signsBeforePlay === 0, `signs=${phone.signsBeforePlay}`);
   await until(async () => (await pixel(phone)).here, 'Pixel here', 15_000);
   await until(async () => ['present', 'arriving'].includes((await pixel(phone)).shown), 'Pixel Blobbi shown', 20_000).catch(() => null);
   const p = await pixel(phone);
   check('Pixel: place blobbi-pixel, here, arrival shown', p.place === 'blobbi-pixel' && (p.shown === 'present' || p.shown === 'arriving'), JSON.stringify(p));
+  const rec = await phone.page.evaluate(() => window.__rec ?? []);
+  const shownWhileAway = rec.filter((r) => r.place !== 'blobbi-pixel' && r.view === 'away' && (r.shown === 'present' || r.shown === 'arriving'));
+  check('the birth intro never shows Bambu while it is known away (no appear-and-vanish)', shownWhileAway.length === 0 && !rec.some((r, i) => i > 0 && rec[i - 1].shown === 'present' && r.shown === 'absent'), rec.map((r) => `${r.view}/${r.shown}`).join(' , ').slice(0, 400));
   check('Pixel asked its signer exactly once, for kind 31126', phone.signs.length === 1 && phone.signs[0].kind === 31126, JSON.stringify(phone.signs.map((s) => s.kind)));
   const logged = await locationsLogged();
   check('one World Location event, accepted by both travel relays', distinct(logged).length === 1 && new Set(logged.filter((e) => e.ok).map((e) => e.relay)).size === 2, JSON.stringify(logged.map((e) => [e.relay, e.ok])));
@@ -139,8 +179,9 @@ await step('4. Pixel to Home: "Call Bambu home" on the laptop; the phone sees it
 
 await step('5. Reload during nothing: a reloaded page shows the Blobbi as it is, no journey replayed', async () => {
   await sleep(5_200);
-  await phone.page.bringToFront();
-  await phone.page.keyboard.press('ArrowRight');
+  const before5 = distinct(await locationsLogged()).length;
+  const n = await followPixel(phone);
+  check('Pixel (CONTINUE, in play): Bambu came over on the third interaction, with one World Location', n === 3 && distinct(await locationsLogged()).length === before5 + 1, `presses=${n}`);
   await until(async () => (await homeStatus(laptop)).travelPlace === 'blobbi-pixel', 'moved to Pixel', 15_000);
   await sleep(1_500);
   await laptop.page.reload();
@@ -178,8 +219,12 @@ await step('6. A relay drops: the move still reaches the other device through th
 
 await step('7. Both devices move Bambu at the same moment: one NIP-01 winner, both agree, no ping-pong', async () => {
   await sleep(5_200);
-  // The phone casually (a press) and the laptop explicitly, within the same instant
+  // The phone casually (its third interaction) and the laptop explicitly, within the same instant
   await phone.page.bringToFront();
+  await phone.page.keyboard.press('ArrowLeft');
+  await sleep(1_200);
+  await phone.page.keyboard.press('ArrowUp');
+  await sleep(1_200);
   const a = phone.page.keyboard.press('ArrowRight');
   const b = laptop.page.evaluate(() => document.querySelector('[data-testid="world-presence-call-home"]')?.click());
   await Promise.all([a, b]);
@@ -197,8 +242,7 @@ await step('8. Publication fails everywhere: the move fails, then the same signe
   await sleep(5_200);
   // Make sure Bambu is in Pixel first
   if ((await homeStatus(laptop)).travelPlace !== 'blobbi-pixel') {
-    await phone.page.bringToFront();
-    await phone.page.keyboard.press('ArrowRight');
+    await followPixel(phone);
     await until(async () => (await pixel(phone)).here, 'in Pixel', 15_000);
     await sleep(5_200);
   }
@@ -239,18 +283,23 @@ await step('9. Active Presence: off by default; when on, a fresh presence gives 
   await sleep(5_200);
   await clearTrail(desk);
   await phone.page.bringToFront();
+  await phone.page.keyboard.press('ArrowLeft');
+  await sleep(1_200);
+  await phone.page.keyboard.press('ArrowUp');
+  await sleep(1_200);
   const t0 = Date.now();
   await phone.page.keyboard.press('ArrowRight');
   await until(async () => (await pixel(phone)).place === 'blobbi-pixel', 'moved', 15_000);
   const arriving = await pixel(phone);
   await until(async () => (await pixel(phone)).here, 'arrived', 15_000);
-  const waited = Date.now() - t0;
-  check('Pixel waits the departure window before arriving (~3 s)', arriving.phase === 'arriving' && waited >= 2_500 && waited < 9_000, `phase=${arriving.phase} waited=${waited}ms`);
+  const arr = (await phone.page.evaluate(() => window.__arrivals ?? [])).filter((a) => a.formAt >= t0).at(0);
+  const formIn = arr ? arr.formAt - t0 : null;
+  check('Pixel: the Blobbi forms at the end of the 2 s departure window (its fall overlaps the wait)', arr && formIn >= 1_800 && formIn < 4_500, `formAt-act=${formIn}ms lead=${arr ? arr.formAt - arr.at : null}ms place=${arriving.place}`);
   await until(async () => (await homeActor(desk)) === 'absent', 'desk departs', 10_000);
   const t = await trail(desk);
   check('the desk departs at once on the event', t.includes('depart'), t.join(' → '));
   // Still "played" (a real input under two minutes ago) and presence on: a renewal would be due within 60 s if the
-  // desk still held Bambu. It does not, so none may come. (No press here: a press while away would call Bambu home.)
+  // desk still held Bambu. It does not, so none may come. (No presses here: three would call Bambu home.)
   const n = (await relayLog()).filter((e) => e.kind === 21124).length;
   await sleep(70_000);
   check('the desk stops presence once Bambu is elsewhere (none for 70 s)', (await relayLog()).filter((e) => e.kind === 21124).length === n);
@@ -268,12 +317,13 @@ await step('10. The Standalone with a browser extension (a signer that may promp
   check('Bambu is away (in Pixel) on the extension laptop', (await homeStatus(ext)).travelPlace === 'blobbi-pixel');
   ext.refuse = true;
   await ext.page.bringToFront();
-  await ext.page.mouse.click(550, 300); // a casual press while away: asks the extension once
+  // Playing here while away: the third interaction asks the extension once
+  await presses((i) => ext.page.mouse.click(500 + i * 13, 300), async () => (await homeStatus(ext)).travelPhase === 'failed', 4);
   await until(async () => (await homeStatus(ext)).travelPhase === 'failed', 'declined', 15_000);
-  check('the refusal: failed / declined, still away', (await homeStatus(ext)).travelReason === 'declined', JSON.stringify(await homeStatus(ext)));
-  for (let i = 0; i < 4; i++) await ext.page.mouse.click(500 + i * 20, 320);
-  await sleep(2_000);
-  check('more casual presses ask nothing (cooldown)', ext.signs.length === 1, `signs=${ext.signs.length}`);
+  check('the refusal: failed / declined, still away, after one signature request', (await homeStatus(ext)).travelReason === 'declined' && ext.signs.length === 1, JSON.stringify(await homeStatus(ext)));
+  check('following is suspended after the refusal', (await homeStatus(ext)).followSuspended === 'true', (await homeStatus(ext)).followSuspended);
+  await presses((i) => ext.page.mouse.click(500 + i * 13, 320), async () => false, 6);
+  check('six more presses ask nothing (following suspended)', ext.signs.length === 1, `signs=${ext.signs.length}`);
   ext.refuse = false;
   // After a refusal the card offers "Try again" (an explicit request) in place of "Call home"
   await ext.page.locator('[data-testid="world-travel-retry"]').click();
@@ -282,6 +332,116 @@ await step('10. The Standalone with a browser extension (a signer that may promp
   await until(async () => (await pixel(phone)).place === 'blobbi-home', 'phone follows', 15_000);
   check('no page errors on the extension laptop', ext.errors.length === 0, ext.errors.join(' | ').slice(0, 200));
   await ext.context.close();
+});
+
+await step('11. M16.1 loading: a fresh device with slow relays never shows Bambu in the wrong World first (both apps)', async () => {
+  await sleep(5_200);
+  if ((await pixel(phone)).place !== 'blobbi-pixel') await followPixel(phone);
+  await until(async () => (await pixel(phone)).here, 'Bambu in Pixel', 15_000);
+  for (const r of ['ditto', 'primal']) await control(`/delay?relay=${r}&ms=2500`);
+  // A fresh laptop: no kept location, relays answer 2.5 s late
+  const visitor = await device({ acct, app: 'home', label: 'fresh laptop' });
+  await visitor.context.addInitScript(TRAIL);
+  await visitor.context.addInitScript(() => {
+    window.__res = [];
+    setInterval(() => {
+      const st = document.querySelector('[data-testid="world-travel-status"]');
+      const a = document.querySelector('[data-testid="blobbi-actor"]');
+      const looking = !!document.querySelector('[data-testid="world-travel-looking"]');
+      const v = `${st?.getAttribute('data-travel-resolution') ?? 'none'}|${a?.getAttribute('data-presence') ?? 'none'}|${looking}`;
+      if (window.__res.at(-1) !== v) window.__res.push(v);
+    }, 30);
+  });
+  const t0 = Date.now();
+  await visitor.page.goto(HOME_URL);
+  await until(async () => (await homeStatus(visitor)).travelResolution === 'confirmed', 'fresh laptop resolved', 15_000);
+  const resolvedIn = Date.now() - t0;
+  await until(async () => (await homeActor(visitor)) === 'absent', 'fresh laptop: absent', 5_000).catch(() => null);
+  const res = await visitor.page.evaluate(() => window.__res);
+  const t = await trail(visitor);
+  const pendingStates = res.filter((x) => x.startsWith('pending'));
+  check('fresh laptop: pending first, with the "looking" cue', pendingStates.some((x) => x.endsWith('|true')), res.join(' , '));
+  check('fresh laptop: Bambu never shown present before (or after) the answer: no flash, no departure', !t.includes('present') && !t.includes('depart') && !pendingStates.some((x) => x.includes('|present|')), `trail=${t.join(' → ')}`);
+  check('fresh laptop: resolved within the slow relays’ delay plus a little, then away in Pixel', resolvedIn < 8_000 && (await homeStatus(visitor)).travelPlace === 'blobbi-pixel', `${resolvedIn}ms`);
+  check('fresh laptop signed and published nothing while loading', (await locationsLogged()).filter((e) => e.at >= t0).length === 0);
+  await visitor.context.close();
+
+  // A fresh phone, Bambu already in Pixel: the entry waits for the answer, then Bambu arrives (never present, then gone)
+  const phone2 = await device({ acct, app: 'pixel', label: 'fresh phone' });
+  await phone2.context.addInitScript(() => {
+    window.__res = [];
+    setInterval(() => {
+      const t = window.__blobbiWorldTravel;
+      const s = t?.snapshot?.();
+      const v = `${s?.resolution ?? 'none'}|${t?.shown?.() ?? 'none'}`;
+      if (window.__res.at(-1) !== v) window.__res.push(v);
+    }, 30);
+  });
+  // Pixel resolves the account's own Blobbi from the relays first (its own 6 s budget): slow, but within it
+  for (const r of ['ditto', 'primal']) await control(`/delay?relay=${r}&ms=1200`);
+  await enterPixelPlay(phone2);
+  await sleep(1_500);
+  await phone2.page.keyboard.press('Escape'); // skip the birth intro (any key does)
+  await until(async () => (await pixel(phone2))?.here && (await pixel(phone2)).shown === 'present', 'fresh phone: Bambu present', 40_000);
+  const r2 = await phone2.page.evaluate(() => window.__res);
+  check('fresh phone: the Blobbi is never entered or present while the place is unknown', !r2.some((x) => (x.startsWith('pending') || x.startsWith('none')) && (x.endsWith('|present') || x.endsWith('|arriving'))), r2.join(' , '));
+  check('fresh phone: nothing signed (Bambu was already here)', phone2.signs.length === 0, `signs=${phone2.signs.length}`);
+  check('no page errors on the fresh devices', phone2.errors.length === 0, phone2.errors.join(' | ').slice(0, 200));
+  await phone2.context.close();
+  for (const r of ['ditto', 'primal']) await control(`/delay?relay=${r}&ms=0`);
+});
+
+await step('12. M16.1 three interactions on the Standalone: repeats and synthetic events never count; the third moves Bambu, with one consistent sequence', async () => {
+  await sleep(5_200);
+  await laptop.page.bringToFront();
+  await until(async () => (await homeStatus(laptop)).travelPlace === 'blobbi-pixel', 'laptop sees Bambu in Pixel', 15_000);
+  const before = distinct(await locationsLogged()).length;
+  await clearTrail(laptop);
+  await laptop.page.mouse.click(60, 40);
+  await sleep(1_200);
+  check('first interaction: counted, nothing published', (await homeStatus(laptop)).followCount === '1' && distinct(await locationsLogged()).length === before, JSON.stringify(await homeStatus(laptop)));
+  // Synthetic events (a script's) are never the player's
+  await laptop.page.evaluate(() => {
+    for (let i = 0; i < 5; i++) {
+      window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    }
+  });
+  await sleep(1_200);
+  check('synthetic presses and keys: not counted', (await homeStatus(laptop)).followCount === '1', (await homeStatus(laptop)).followCount);
+  // A held key: one interaction, however long the auto-repeat
+  for (let i = 0; i < 20; i++) await laptop.page.keyboard.down('Shift');
+  await laptop.page.keyboard.up('Shift');
+  await sleep(1_200);
+  const second = await homeStatus(laptop);
+  check('a held key counts once (repeats never)', second.followCount === '2' && distinct(await locationsLogged()).length === before, second.followCount);
+  await laptop.page.evaluate(() => {
+    window.__formAt = null;
+    const read = () => {
+      const v = document.querySelector('[data-testid="world-travel-status"]')?.getAttribute('data-travel-form-at');
+      if (v && window.__formAt === null) window.__formAt = Number(v);
+    };
+    new MutationObserver(read).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-travel-form-at'] });
+  });
+  const t0 = Date.now();
+  await laptop.page.mouse.click(80, 40);
+  const cue = await until(async () => laptop.page.locator('[data-testid="world-travel-coming"]').count(), 'the calling cue', 3_000, 30).catch(() => 0);
+  check('the third interaction shows the calling cue at once', cue > 0);
+  await until(async () => (await homeStatus(laptop)).travelPlace === 'blobbi-home', 'moved home', 15_000);
+  const formAt = await until(() => laptop.page.evaluate(() => window.__formAt), 'formAt recorded', 3_000, 30).catch(() => null);
+  const formIn = formAt ? formAt - t0 : null;
+  check('one World Location published by the third interaction', distinct(await locationsLogged()).length === before + 1);
+  check('the Blobbi forms 1.5–2.5 s after the act (phone idle: no departure window, MIN_TRAVEL_MS)', formIn !== null && formIn >= 1_300 && formIn <= 2_700, `formAt-act=${formIn}ms`);
+  await until(async () => (await homeActor(laptop)) === 'present', 'present', 10_000);
+  const t = await trail(laptop);
+  check('one arrival: absent → arrive → present, nothing doubled', t.filter((x) => x === 'arrive').length === 1 && t.at(-1) === 'present', t.join(' → '));
+  await until(async () => (await pixel(phone)).place === 'blobbi-home', 'phone follows', 15_000);
+  // Reconnection replays nothing
+  await control('/drop?relay=ditto&ms=2000');
+  await control('/drop?relay=primal&ms=2000');
+  await sleep(8_000);
+  const t2 = await trail(laptop);
+  check('relays dropping and reconnecting replay no animation', t2.filter((x) => x === 'arrive').length === 1 && t2.at(-1) === 'present', t2.join(' → '));
 });
 
 await step('Safety: nothing left the machine, nothing unexpected was signed, no page errors', async () => {

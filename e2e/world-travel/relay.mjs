@@ -13,6 +13,7 @@
  *   POST /reset                     forget everything
  *   POST /drop?relay=ditto&ms=3000  close every socket of that relay and refuse connections for ms
  *   POST /refuse?relay=ditto&on=1   answer every EVENT with OK false ("blocked:")
+ *   POST /delay?relay=ditto&ms=2500 answer every REQ (stored events and EOSE) this late (a slow relay; 0 turns it off)
  *
  * Usage: node relay.mjs [port]   (default 7777)
  */
@@ -26,7 +27,7 @@ const PORT = Number(process.argv[2] ?? process.env.RELAY_PORT ?? 7777);
 const relays = new Map();
 const log = [];
 const relayOf = (name) => {
-  if (!relays.has(name)) relays.set(name, { stored: new Map(), sockets: new Set(), downUntil: 0, refuse: false });
+  if (!relays.has(name)) relays.set(name, { stored: new Map(), sockets: new Set(), downUntil: 0, refuse: false, reqDelay: 0 });
   return relays.get(name);
 };
 
@@ -99,6 +100,7 @@ const server = createServer(async (req, res) => {
       r.stored.clear();
       r.refuse = false;
       r.downUntil = 0;
+      r.reqDelay = 0;
     }
     log.length = 0;
     return json(200, { ok: true });
@@ -108,6 +110,10 @@ const server = createServer(async (req, res) => {
     r.downUntil = Date.now() + Number(url.searchParams.get('ms') ?? 3000);
     for (const ws of r.sockets) ws.terminate();
     return json(200, { ok: true, until: r.downUntil });
+  }
+  if (req.method === 'POST' && url.pathname === '/delay') {
+    relayOf(name).reqDelay = Number(url.searchParams.get('ms') ?? 0);
+    return json(200, { ok: true });
   }
   if (req.method === 'POST' && url.pathname === '/refuse') {
     relayOf(name).refuse = url.searchParams.get('on') === '1';
@@ -143,13 +149,18 @@ server.on('upgrade', (req, socket, head) => {
         if (out.ok && out.fresh) broadcast(r, e);
       } else if (msg[0] === 'REQ') {
         const [, subId, ...filters] = msg;
-        ws.subs.set(subId, filters);
-        const now = Math.floor(Date.now() / 1000);
-        for (const f of filters) {
-          const hits = [...r.stored.values()].filter((e) => !expired(e, now) && matches(e, f)).sort((a, b) => b.created_at - a.created_at);
-          for (const e of hits.slice(0, f.limit ?? 500)) ws.send(JSON.stringify(['EVENT', subId, e]));
-        }
-        ws.send(JSON.stringify(['EOSE', subId]));
+        const answer = () => {
+          if (ws.readyState !== ws.OPEN) return;
+          ws.subs.set(subId, filters);
+          const now = Math.floor(Date.now() / 1000);
+          for (const f of filters) {
+            const hits = [...r.stored.values()].filter((e) => !expired(e, now) && matches(e, f)).sort((a, b) => b.created_at - a.created_at);
+            for (const e of hits.slice(0, f.limit ?? 500)) ws.send(JSON.stringify(['EVENT', subId, e]));
+          }
+          ws.send(JSON.stringify(['EOSE', subId]));
+        };
+        if (r.reqDelay) setTimeout(answer, r.reqDelay);
+        else answer();
       } else if (msg[0] === 'CLOSE') {
         ws.subs.delete(msg[1]);
       } else if (msg[0] === 'AUTH') {

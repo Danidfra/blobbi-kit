@@ -20,7 +20,8 @@ in for the public ones.
   - seed events;
   - show its log;
   - drop a relay;
-  - refuse writes.
+  - refuse writes;
+  - answer every REQ late (`/delay`, a slow relay).
 - **An in-page socket guard** (`ws-guard.mjs`), installed before any app code
   runs. It sends the apps' relay hosts to the local relay, lets Vite's own
   socket through, and refuses every other socket. The run fails if any other
@@ -55,16 +56,20 @@ the way a developer would, which only works on a dev server:
 
 A build switches it on with `VITE_BLOBBI_WORLD_TRAVEL=nostr`.
 
-## What it checks (45 checks)
+## What it checks (63 checks)
 
 1. **Loading:** loading either World signs nothing and publishes nothing.
-2. **Home to Pixel:** the press that starts play in Pixel moves Bambu with one
-   signature and one 31126 event, which both travel relays accept. The laptop
-   sees the move live and plays the departure (`present → depart → absent`).
+2. **Home to Pixel:** NEW ADVENTURE WITH BAMBU starts a birth intro that
+   shows Bambu, so its press is an explicit call. It moves Bambu at once, with
+   one signature and one 31126 event, which both travel relays accept. The
+   intro never shows Bambu while it is known away. The laptop sees the move
+   live and plays the departure (`present → depart → absent`).
 3. **Already here:** more presses in Pixel publish nothing.
 4. **Pixel to Home:** "Call Bambu home" on the laptop plays the arrival
    (`absent → arrive → present`). The phone departs live and signs nothing.
-5. **Reloads:** a reloaded page shows Bambu as it is, with no journey replayed.
+5. **Three interactions in Pixel (CONTINUE, in play):** Bambu comes over on
+   the third press, with one World Location. **Reloads:** a reloaded page
+   shows Bambu as it is, with no journey replayed.
 6. **A relay drops:** with relay.ditto.pub down, the move reaches the other
    device through relay.primal.net, and the relays now disagree. A third
    device still resolves the newest location.
@@ -77,12 +82,27 @@ A build switches it on with `VITE_BLOBBI_WORLD_TRAVEL=nostr`.
    - It is off by default.
    - When turned on, it publishes 21124 while the Blobbi is played, and the
      other World sees it.
-   - A move from a recently active World waits about 3 s for the departure.
+   - A move from a recently active World forms the Blobbi at the end of the
+     2 s departure window. Pixel's 1.9 s fall overlaps that wait.
    - Presence stops once the Blobbi is elsewhere (none for 70 s), and it never
      moves the location.
 10. **Extension signer:** the Standalone with a NIP-07 extension signs nothing
-    on load. After one refusal, casual presses ask nothing again. "Try again"
-    asks once more and moves Bambu.
+    on load. Three interactions ask the extension once. After the refusal,
+    following is suspended and six more presses ask nothing. "Try again" asks
+    once more and moves Bambu.
+11. **Loading (M16.1):** relays answer 2.5 s late.
+    - A fresh laptop shows the "looking" cue. Bambu is never shown present
+      and never departs. It ends away within the delay, and nothing is
+      signed.
+    - A fresh phone (relays 1.2 s late, inside Pixel's own Blobbi-loading
+      budget) never enters or shows Bambu while its place is unknown.
+12. **Three interactions on the Standalone (M16.1):**
+    - Synthetic events and held-key repeats never count.
+    - The third interaction shows the calling cue and publishes one World
+      Location.
+    - The Blobbi forms 1.5 s after the act.
+    - There is exactly one arrival, and dropping both relays replays
+      nothing.
 
 **Safety checks:**
 

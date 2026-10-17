@@ -30,7 +30,7 @@ export function account(name = 'Bambu', petId = '0a1b2c3d4e') {
 }
 
 export async function control(path, body) {
-  const res = await fetch(`${CONTROL}${path}`, { method: body === undefined && !path.startsWith('/reset') && !path.startsWith('/drop') && !path.startsWith('/refuse') ? 'GET' : 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await fetch(`${CONTROL}${path}`, { method: body === undefined && !path.startsWith('/reset') && !path.startsWith('/drop') && !path.startsWith('/refuse') && !path.startsWith('/delay') ? 'GET' : 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
   return res.json();
 }
 export const reset = () => control('/reset');
