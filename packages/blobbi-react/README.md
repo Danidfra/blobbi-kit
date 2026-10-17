@@ -21,6 +21,11 @@ the [CHANGELOG](../../CHANGELOG.md).
   takes from the host.
 - Pure helpers under `lib/*` (XP tables, streak arithmetic, mission
   definitions) plus in-memory session stores for mission progress.
+- World travel (0.11): `useWorldTravel` (one `createWorldTravel` session per
+  owner, Blobbi and World), `useWorldTravelSync` (keeps the World's own
+  Blobbi on screen in line with it) and `poolWorldTravelRelays` (the
+  session's relays over any Nostrify-style pool). The protocol is in
+  `@blobbi-kit/core` (`WORLD-TRAVEL.md`).
 
 Runtime dependencies are React, TanStack Query, `@nostrify/react` and
 `@blobbi-kit/core`, all peers. Nothing here imports a host application.

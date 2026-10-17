@@ -31,6 +31,11 @@ the [CHANGELOG](../../CHANGELOG.md).
   `ShopItem`, `ItemEffect`), so it is public API, distinct from the parsed
   `BlobbiCompanion` model.
 - A no-op logger you can replace with `setBlobbiLogger`.
+- **World travel** (0.11): a Blobbi's canonical World across Blobbi apps and
+  devices (World Location, kind 31126), optional Active Presence (kind
+  21124), and `createWorldTravel`, a session with relays, signer, store and
+  lock injected. The specification is `WORLD-TRAVEL.md`, shipped in this
+  package. **The two kinds are provisional** (`WORLD_TRAVEL_KINDS_STATUS`).
 
 ## Install
 
@@ -51,6 +56,8 @@ These are Blobbi-specific kinds. They are not part of any NIP.
 | `KIND_BLOBBONAUT_PROFILE` | 11125 | The player profile (owned Blobbis, XP, level, onboarding, daily missions). Replaceable; `d` is `blobbonaut-<12 hex of pubkey>`. |
 | `KIND_BLOBBI_INTERACTION` | 1124 | One social interaction with a Blobbi: `a` address, `p` owner, `action`, `source`. Regular event. |
 | `KIND_BLOBBONAUT_PROFILE_LEGACY` | 31125 | Deprecated profile kind. `fetchFreshBlobbonautProfile` still reads it as a fallback and prefers 11125 when both exist. Nothing here writes it. |
+| `KIND_WORLD_LOCATION` | 31126 | **Provisional.** Where a Blobbi is: the World it was last moved to. Addressable, same `d` as its 31124; never expires. See `WORLD-TRAVEL.md`. |
+| `KIND_ACTIVE_PRESENCE` | 21124 | **Provisional.** Recent play of a Blobbi in a World. Ephemeral, NIP-40 expiration; never moves the Blobbi. |
 
 Every event carries `["b", "blobbi:ecosystem:v1"]` (`BLOBBI_ECOSYSTEM_NAMESPACE`).
 Addresses are the raw `31124:<pubkey>:<d>` string from `buildBlobbiAddress`;

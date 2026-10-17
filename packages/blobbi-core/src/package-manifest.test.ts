@@ -121,7 +121,7 @@ describe('@blobbi-kit/core package manifest', () => {
 
   describe('packaged contents', () => {
     it('ships only dist and the license', () => {
-      expect(manifest.files).toEqual(['dist', 'LICENSE']);
+      expect(manifest.files).toEqual(['dist', 'LICENSE', 'WORLD-TRAVEL.md']);
     });
 
     it('exposes the barrel and deep subpath exports as ESM with types', () => {

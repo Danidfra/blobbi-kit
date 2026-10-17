@@ -10,6 +10,51 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## `@blobbi-kit/core` 0.11.0-m16.2, `@blobbi-kit/react` 0.11.0-m16.2: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
+
+**m16.2 (M16.1 polish).** Everything is additive over m16.1 except the
+defaults marked *behaviour*.
+
+- **Following the player** (`world-travel-follow.ts`, `session.interact()`):
+  - a Blobbi in another World comes over after the **third** meaningful
+    interaction within a rolling 20 s window (`FOLLOW_INTERACTIONS`,
+    `FOLLOW_WINDOW_MS`);
+  - inputs less than 1 s apart count once (`FOLLOW_GAP_MS`), and key repeats
+    never count;
+  - a refusal suspends following until an explicit move;
+  - `snapshot.follow` reports the count;
+  - options `followAfter` and `followWindowMs`;
+  - `travel()` is unchanged (explicit requests use it directly).
+- **Loading resolution**:
+  - `snapshot.resolution` (`pending`, `cached`, `confirmed`,
+    `unreachable`);
+  - `syncTravel` asks nothing of the Blobbi while `pending` (*behaviour*);
+  - `travelView(snapshot)` → `looking`, `here`, `away` or `coming`.
+- **Arrival schedule**:
+  - options `arrivalLeadMs` and `minTravelMs`;
+  - `MIN_TRAVEL_MS` = 1.5 s by default (*behaviour*: an arrival from an idle
+    origin is no longer instant; pass `minTravelMs: 0` for the old timing);
+  - `travel.arriving` gains `formAt`;
+  - a move proceeds on the first relay acceptance (*behaviour*: it no longer
+    waits for every relay).
+- **Protocol hardening**:
+  - `MAX_LOCATION_SKEW_S` (900 s) and `isFutureLocation`;
+  - `resolveWorldLocation` takes an optional `now`, and ignores locations
+    dated beyond it;
+  - `planTransfer` takes `observedAt`, so the stay is measured from when a
+    location was first seen;
+  - `storedWorldLocation` takes `now`;
+  - `DEPARTURE_WINDOW_S` 3 → 2 (*behaviour*, wire-visible in `arrival_after`
+    only; readers honour any value up to 6 s).
+- `WORLD-TRAVEL.md` ships in the package. It gained:
+  - the product model (§0);
+  - the follow rule (§4);
+  - the consistent timing (§5);
+  - the timestamp review (§7a);
+  - future autonomy (§10);
+  - future Worlds (§11);
+  - the shared-effects decision (§12).
+
 ## `@blobbi-kit/core` 0.11.0-m16.1, `@blobbi-kit/react` 0.11.0-m16.1: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
 
 **m16.1** (found while integrating): `storedWorldLocation(store, { owner, d, verify })`

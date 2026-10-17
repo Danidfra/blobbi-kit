@@ -20,8 +20,31 @@ answers two different questions with two different events:
 
 Code: `src/world-travel.ts` (pure rules), `src/world-travel-session.ts` (the
 operations, with relays, signer, store and lock injected),
-`src/world-travel-sync.ts` (the on-screen Blobbi), and in `@blobbi-kit/react`
-`useWorldTravel`, `useWorldTravelSync` and `poolWorldTravelRelays`.
+`src/world-travel-sync.ts` (the on-screen Blobbi), `src/world-travel-follow.ts`
+(the interaction count, M16.1), and in `@blobbi-kit/react` `useWorldTravel`,
+`useWorldTravelSync` and `poolWorldTravelRelays`.
+
+## 0. The product model: a Blobbi persists, a session does not
+
+A Blobbi is a persistent entity in the ecosystem. Its owner may leave a
+World, close the browser or go offline. The Blobbi does not cease to exist:
+it stays associated with the last World it was moved to.
+
+- **World Location (31126) is where the Blobbi is.** It is the last known
+  World. It persists after the player disconnects. It does not need renewing
+  and it never expires. Nothing changes it except a new World Location (a
+  move): not a browser closing, not a tab hiding, not a presence expiring.
+- **Active Presence (21124) is recent activity, nothing more.** It says "the
+  owner's session was recently playing this Blobbi in this World". It is
+  ephemeral and optional. It does not decide the location. It does not decide
+  whether the Blobbi exists, and it does not mean the Blobbi is alive or dead.
+  When it expires, the Blobbi does **not** return home and does not move at
+  all.
+- **A missing Active Presence means "activity unknown".** It does not mean
+  the Blobbi has disappeared, or that nobody is playing. Presence is opt-in,
+  relays do not store it, and it may be dropped. A World therefore uses it
+  only for presentation: whether a departure window is worth waiting for (§5),
+  and "being played there now" in its away notice.
 
 ## 1. World identifiers
 
@@ -124,9 +147,32 @@ Ephemeral. Relays forward it and do not store it.
 1. **On load**, the World reads the location (relays, stream and store) and
    publishes nothing. If the Blobbi is elsewhere, it is shown away at once,
    with no departure replayed.
-2. **On the player's first meaningful act** in a World that does not hold the
-   Blobbi (a trusted press or key in a visible, focused page, or a "call home"
-   button):
+2. **The Blobbi follows its owner** (M16.1). In a World that does not hold
+   the Blobbi, each meaningful interaction is passed to `session.interact()`.
+   The **third** interaction within a rolling **20 s** window starts a move,
+   so one stray press never pulls the Blobbi out of the World it was just
+   moved to, and a player who keeps playing here is followed without clicking
+   anything (`world-travel-follow.ts`):
+   - what is meaningful is each World's business: a trusted press or key in a
+     visible, focused page, a distinct burst of movement. Never a load, a
+     timer, a re-render, a script's (synthetic) event, programmatic focus or a
+     visibility change;
+   - an auto-repeat of a held key (`repeat: true`) never counts. Inputs closer
+     than **1 s** to the last counted one are the same gesture (a pointerdown
+     with its keydown, frames of one movement) and count once, so three
+     interactions take at least 2 s;
+   - the count starts over after a move (whatever it came to), when the
+     Blobbi's place changes, and with a new session (another account, Blobbi
+     or World). Nothing is counted while the place is still unknown
+     (`resolution: 'pending'`), while the Blobbi is here or already on its
+     way, or with no signer;
+   - a **refusal suspends** following for the session: further interactions
+     ask the signer nothing until an explicit request succeeds;
+   - the threshold and window are options (`followAfter`, `followWindowMs`),
+     not a player setting.
+
+   An **explicit request** (a "Call home" / "Call here" button) skips the
+   count and moves at once. Either way, the move is `travel()`:
    1. re-read every relay; if none answers, stop (`unreachable`, nothing signed);
    2. if the location already names this World, stop (`already-here`);
    3. if it moved less than 5 s ago and the request is not explicit, stop
@@ -156,10 +202,41 @@ Ephemeral. Relays forward it and do not store it.
 
 ## 5. Travel animation timing
 
-- The destination asks for a **departure window** in `arrival_after`: 3 s
-  when the previous World shows fresh Active Presence (someone may be watching
-  the Blobbi leave there), 0 s otherwise. The arrival itself is always the
-  World's own short animation.
+The Nostr event decides the World; the animation only shows the change. The
+location never waits for, or depends on, an animation.
+
+- The destination asks for a **departure window** in `arrival_after`: **2 s**
+  (3 s before M16.1) when the previous World shows fresh Active Presence
+  (someone may be watching the Blobbi leave there), 0 s otherwise. 2 s covers
+  the origin's stream latency (well under a second) and its departure until
+  the body has dissolved. The origin is never asked to acknowledge anything.
+- **One consistent sequence** (M16.1, a UX target, not protocol). The
+  session schedules the arrival from the player's act (`travel.arriving` =
+  `{ at, formAt }`):
+  - `formAt`, when the Blobbi has formed here, is the latest of: the end of
+    the departure window, `minTravelMs` after the act (default
+    `MIN_TRAVEL_MS` = 1.5 s, so a move from a World nobody plays still reads
+    as a journey, not a pop), and the World's own `arrivalLeadMs` from now;
+  - `at`, when the World starts its arrival (`here` turns true), is
+    `formAt − arrivalLeadMs`: the World's "incoming" effect overlaps the wait
+    instead of adding to it;
+  - from the act until `at`, `travelView` says `coming`, and a World shows a
+    short "calling" cue at the Blobbi's spot;
+  - a move proceeds on the **first** relay acceptance; a slow relay does not
+    hold the arrival back.
+
+  In normal conditions the Blobbi forms 1.5 s (origin idle) to about 2.5 s
+  (origin active) after the act.
+- The origin's departure and the destination's arrival may overlap by a
+  moment (dissolving there, forming here). The Blobbi is never `present` in
+  both: the destination is `arriving` until its animation ends.
+- **Loading** (M16.1): until the first look answers (`resolution:
+  'pending'`, only on a device that kept no signed location), `syncTravel`
+  asks nothing of the Blobbi, and a World shows a small "looking for it" cue
+  (`travelView` = `looking`), never the Blobbi standing here. The first look
+  ends within the relay timeout: then `confirmed`, or `unreachable` (the kept
+  location, or the default World, stands, and a World may say the relays
+  could not be reached).
 - The destination measures the wait on its own clock, from its own
   `created_at`. It wrote both, so there is no clock skew. The wait is never
   more than 6 s.
@@ -234,6 +311,49 @@ nos.lol and relay.nostr.band could not be reached. The probes were read-only
 (REQ/CLOSE only). This is evidence, not a registry: zero events does not prove
 a kind is unused.
 
+## 7a. Timestamps (reviewed for M16.1)
+
+- **Ordering** is NIP-01 for addressable events (`replacesLocation`): the
+  higher `created_at`, then the lower id. It is a total order, so every reader
+  picks the same winner from the same events, whatever the relay.
+- **`created_at` is the writer's claim, not trusted time.** A move is dated
+  `max(now, latest.created_at + 1)`, so a writer whose clock is behind still
+  replaces what it read.
+- **Future-dated locations.** A location dated more than
+  `MAX_LOCATION_SKEW_S` (900 s, the bound strfry applies by default) ahead of
+  the reader's clock is ignored when resolving with a clock, which the
+  session always does (`isFutureLocation`). It stays known and counts once
+  the clock reaches it. So:
+  - a device whose clock is years ahead can never pin the Blobbi, or force
+    every later move to be dated after it;
+  - timestamp inflation is bounded: `latest` is at most 900 s ahead, so a move
+    is at most 901 s ahead;
+  - known limit: a relay that *accepted* a far-future event keeps it as the
+    newest for its address, and so drops the newer real-time events until
+    its clock passes. The other relays, the stream and the store still carry
+    the real moves. A NIP-09 deletion of the bad event would clean such a
+    relay. It is not automated: it is another signature, and it is for the
+    owner to approve.
+- **The stay** ("just moved", `MIN_STAY_MS`) is measured from the earlier of
+  `created_at` and when this session first saw the location (`observedAt`).
+  A location dated a few minutes ahead therefore cannot stretch the no-reclaim
+  rule beyond 5 s.
+- **Malformed timestamps** (negative, fractional, beyond safe integers) make
+  the event invalid. `arrival_after` is clamped to `[created_at, created_at +
+  6 s]`.
+- **Replay.** A replayed old location is older than the newest, so it never
+  wins. Replaying the newest changes nothing (same id). A replay cannot move a
+  Blobbi.
+- **Active Presence**: fresh only while `expiration` is after the reader's
+  clock and `created_at` is at most 60 s ahead (`MAX_CLOCK_SKEW_S`). A life
+  longer than 300 s is malformed. Expired presence is dropped. Presence is
+  never a location.
+- **Stable?** No further change to the event formats is needed for the kinds
+  to be considered stable: everything above is reader- and writer-side logic,
+  and old events stay valid. The only wire-visible change in M16.1 is the
+  shorter default window (`arrival_after` = `created_at + 2`), which readers
+  only honour.
+
 ## 8. Concurrency and its limits
 
 - **Account-scoped.** Sessions are per owner + Blobbi + World. Every
@@ -264,3 +384,104 @@ A World Location is a public, durable fact ("this Blobbi was last in Blobbi
 Pixel"), written only by the player's act. Active Presence is a recent
 activity signal: it is opt-in, short-lived and never stored by relays, and it
 names a World, never a position or a room.
+
+## 10. Future autonomy (design compatibility only; nothing implemented)
+
+Some Blobbis may one day have their own Nostr identity, act while their
+owner is offline, travel by themselves, meet other Blobbis and stay
+observable in persistent multiplayer Worlds. M16 does not implement this, and
+it adds no agents, servers or kinds for it. What M16 deliberately leaves
+open:
+
+- **Nothing assumes a click.** `travel()` is "a move by an authorised actor";
+  `explicit` only says the actor asked deliberately. Interaction counting
+  (`interact`) is one host policy for when a casual move starts, not a
+  protocol rule. The event carries no "clicked" claim.
+- **The location is a fact about the Blobbi, not about a session.** It
+  persists offline and never expires, which is exactly what an autonomous
+  Blobbi in a persistent World needs.
+- **Presence is decoupled.** A future Blobbi-run session could publish its
+  own activity without touching ownership.
+
+What autonomy would need, safely, before any implementation:
+
+1. **An identity for the Blobbi.** For example, a key the Blobbi uses,
+   announced by the owner in a signed, revocable authorisation event. It
+   would name the Blobbi's 31124 address, the allowed kinds (31126 only, for
+   that `d`), an expiry, and optionally the allowed Worlds.
+2. **Readers that accept two authors.** Addressable replacement is per
+   pubkey, so an owner's 31126 and an agent's 31126 are two addresses.
+   Resolution would merge both by `created_at` and id, accepting the agent's
+   only while its authorisation is valid at the event's time. The owner must
+   always be able to override and revoke.
+3. **No key custody in the apps.** The agent's key lives with the agent: a
+   remote signer (NIP-46) or a server the owner runs. It is never in a Blobbi
+   app's storage, and there is no unrestricted delegated signing (NIP-26 is
+   deprecated and too broad).
+4. **Rate and loop limits** on agent moves (a minimum stay, a daily budget),
+   enforced by readers, so a runaway agent cannot thrash a Blobbi's location.
+5. **A new `v` or a new tag** for agent-authored moves. Today's readers would
+   ignore them (they check the author), so this would be an additive change.
+
+Until then, the security model is unchanged: only the owner's own key writes
+a World Location, readers check the author, the `d` and the `a`, and every
+signature is verified.
+
+## 11. Future Worlds (documentation only; those repositories are untouched)
+
+Planned next integrations, in order. None is implemented, and none of these
+repositories was modified for M16/M16.1.
+
+1. **Blobbi Island.** It needs a separate, comprehensive audit first: Island
+   is well behind the current ecosystem. The audit must cover:
+   - legacy Nostr kinds (31950 presence, 21201 communication, 31951/21951
+     playback; see §7), which must not be reused or reinterpreted;
+   - compatibility with the current blobbi-kit, and its Blobbi lifecycle;
+   - companion identity (`current_companion`) and inventory interoperability
+     (`@nostr-games/inventory`);
+   - hardcoded functionality and logic duplicated from the kit;
+   - visual rendering and state persistence;
+   - World Travel: a World id (for example `blobbi-island`), its own
+     protected moments, and how its room presence (31950) relates to Active
+     Presence (they stay separate kinds with separate meanings).
+2. **Nostr Farm** (31415/31416/31417 world/map/slot). A World id (for example
+   `nostr-farm`), `registerWorld` for its name, and its own input policy for
+   `interact`.
+3. **Blobbi Rumble.** Its 3D Blobbi (`@blobbi-kit/3d`, Babylon.js) is a
+   different model from the Standalone's miniature room Blobbi (three.js).
+   Travel effects would need a Babylon adapter of the teleport (see the
+   Standalone's `src/features/teleport/KIT_EXTRACTION.md`), not the room's.
+   Fights and rounds are protected moments.
+
+Each new World needs: a valid World id; its own trusted-input detection fed
+to `interact`; its explicit "call here"; `settle` / `enter` / `leave` on its
+own Blobbi; an `arrivalLeadMs` for its arrival; and the shared travel relays
+(`BLOBBI_WORLD_TRAVEL_RELAYS`).
+
+## 12. Shared travel effects: what is in the kit, what is not (M16.1 review)
+
+Standalone draws its teleport with a 2D canvas and three.js; Pixel draws its
+own on a pixel canvas. They share no renderer.
+
+**In the kit**, the parts with no renderer in them:
+- the phases: `ShownState` (present, departing, absent, arriving);
+- `TravelViewKind` (looking, here, away, coming);
+- the reconciliation rules (`reconcileTravel`, `syncTravel`);
+- the timing (`arrival_after`, the departure window, `MIN_TRAVEL_MS`,
+  `arrivalLeadMs`, `travel.arriving.formAt`).
+
+**Not in the kit**:
+- the teleport timelines, particles, masks and shaders: each app keeps its
+  own;
+- particle parameters: Standalone and Pixel tune theirs for very different
+  pixel densities, so a shared table would be a coincidence, not a reuse.
+
+There is no new renderer package. `@blobbi-kit/core` stays free of the DOM,
+Canvas, WebGL and three.js.
+
+**Future extraction**: the Standalone's teleport (timeline, motes, presence
+controller) is already engine-free, and its own plan proposes a
+`@blobbi-kit/teleport` package with per-engine adapters
+(`src/features/teleport/KIT_EXTRACTION.md`). That is worth doing when a third
+World (Rumble, on Babylon.js) needs the same journey. It is out of M16.1's
+scope.
