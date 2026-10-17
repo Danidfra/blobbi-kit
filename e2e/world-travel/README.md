@@ -1,8 +1,9 @@
 # Cross-device world travel checks (M16)
 
 These checks drive real browsers through world travel with the real apps. The
-travel layer is `@blobbi-kit/core` 0.11.0 (the m16.4 prerelease before
-it), installed from local tarballs. The two apps each run on their own dev server. A local relay stands
+travel layer is `@blobbi-kit/core`: 0.11.0 from npm, or 0.11.1 (relay
+convergence) installed from its release tarballs into throwaway clones of the
+apps. The two apps each run on their own dev server. A local relay stands
 in for the public ones.
 
 - **Two independent browser contexts.** Each context has its own cookies,
@@ -20,7 +21,8 @@ in for the public ones.
   - seed events;
   - show its log;
   - drop a relay;
-  - refuse writes;
+  - refuse writes (`/refuse?relay=…&on=1`, with an optional `reason`; the
+    default `blocked:` is a permanent refusal to the kit);
   - answer every REQ late (`/delay`, a slow relay).
 - **An in-page socket guard** (`ws-guard.mjs`), installed before any app code
   runs. It sends the apps' relay hosts to the local relay, lets Vite's own
@@ -56,7 +58,7 @@ the way a developer would, which only works on a dev server:
 
 A build switches it on with `VITE_BLOBBI_WORLD_TRAVEL=nostr`.
 
-## What it checks (68 checks)
+## What it checks (75 checks)
 
 1. **Loading:** loading either World signs nothing and publishes nothing.
 2. **Home to Pixel:** NEW ADVENTURE WITH BAMBU starts a birth intro that
@@ -111,6 +113,16 @@ A build switches it on with `VITE_BLOBBI_WORLD_TRAVEL=nostr`.
     - The page shows unreachable first, then confirmed by the late answer.
     - The real place is shown as history, with no journey.
     - Nothing is signed.
+
+14. **Relay convergence (0.11.1):**
+    - ditto refuses a move for now (`rate-limited:`) and primal carries it.
+      Once ditto accepts again it holds the **identical** signed event (id,
+      `created_at`, tags, content, sig), with no new signature.
+    - ditto is down during a move. Once it is back, a later look heals it
+      with the phone's event, with no further signature.
+    - Each event reaches ditto a bounded number of times, and nothing more
+      is published once the relays agree.
+    - This needs kit 0.11.1. Against 0.11.0, its heal checks fail.
 
 **Safety checks:**
 

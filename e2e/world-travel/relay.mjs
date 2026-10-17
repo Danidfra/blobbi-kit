@@ -117,6 +117,7 @@ const server = createServer(async (req, res) => {
   }
   if (req.method === 'POST' && url.pathname === '/refuse') {
     relayOf(name).refuse = url.searchParams.get('on') === '1';
+    relayOf(name).refuseReason = url.searchParams.get('reason') ?? 'blocked: refusing writes (test)';
     return json(200, { ok: true });
   }
   json(404, { error: 'not found' });
@@ -143,7 +144,7 @@ server.on('upgrade', (req, socket, head) => {
       }
       if (msg[0] === 'EVENT') {
         const e = msg[1];
-        const out = r.refuse ? { ok: false, reason: 'blocked: refusing writes (test)' } : accept(r, e);
+        const out = r.refuse ? { ok: false, reason: r.refuseReason ?? 'blocked: refusing writes (test)' } : accept(r, e);
         log.push({ relay: name, kind: e?.kind, id: e?.id, pubkey: e?.pubkey, ok: out.ok, reason: out.reason, at: Date.now() });
         ws.send(JSON.stringify(['OK', e?.id ?? '', out.ok, out.reason]));
         if (out.ok && out.fresh) broadcast(r, e);

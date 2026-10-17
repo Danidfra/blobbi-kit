@@ -476,6 +476,49 @@ await step('13. M16.2 relays slower than the timeout: unreachable at first, then
   await late.context.close();
 });
 
+await step('14. 0.11.1 relay convergence: a relay that missed a move is healed with the very same signed event', async () => {
+  await sleep(5_200);
+  if ((await homeStatus(laptop)).travelPlace === 'blobbi-home') {
+    await followPixel(phone);
+    await until(async () => (await homeStatus(laptop)).travelPlace === 'blobbi-pixel', 'laptop sees Pixel', 15_000);
+    await sleep(5_200);
+  }
+  const t0 = Date.now();
+  const phoneSigns = phone.signs.length;
+  // A: ditto refuses for now (not for good): the move is made through primal alone
+  await control(`/refuse?relay=ditto&on=1&reason=${encodeURIComponent('rate-limited: slow down (test)')}`);
+  await laptop.page.bringToFront();
+  await laptop.page.locator('[data-testid="world-presence-call-home"]').click();
+  await until(async () => (await homeStatus(laptop)).travelHere === 'true', 'laptop here with ditto refusing', 15_000);
+  const moved = (await homeStatus(laptop)).travelLocation;
+  check('ditto refused the move for now: the relays disagree', !(await control('/events?relay=ditto')).some((e) => e.id === moved), moved?.slice(0, 8));
+  await control('/refuse?relay=ditto&on=0');
+  await until(async () => (await control('/events?relay=ditto')).some((e) => e.id === moved), 'ditto healed', 75_000);
+  const onDitto = (await control('/events?relay=ditto')).find((e) => e.id === moved);
+  const onPrimal = (await control('/events?relay=primal')).find((e) => e.id === moved);
+  check('ditto healed with the very same signed event (id, created_at, tags, content, sig)', !!onDitto && JSON.stringify(onDitto) === JSON.stringify(onPrimal), `healed ${Math.round((Date.now() - t0) / 1000)} s after the move`);
+  check('healing signed nothing: one event for the move, no signature on the phone', distinct((await locationsLogged()).filter((e) => e.at >= t0)).length === 1 && phone.signs.length === phoneSigns, `signs=${phone.signs.length - phoneSigns}`);
+  // B: ditto is down during a move; it is healed once it is back (a reconnect, a look)
+  await phone.page.bringToFront();
+  await until(async () => (await pixel(phone)).location === moved, 'phone sees the laptop’s move', 75_000);
+  await sleep(5_200);
+  const t1 = Date.now();
+  await control('/drop?relay=ditto&ms=12000');
+  await followPixel(phone);
+  await until(async () => (await pixel(phone)).here && (await pixel(phone)).location !== moved, 'phone here with ditto down', 15_000);
+  const moved2 = (await pixel(phone)).location;
+  check('the move made with ditto down reached primal only', !(await control('/events?relay=ditto')).some((e) => e.id === moved2) && (await control('/events?relay=primal')).some((e) => e.id === moved2), moved2?.slice(0, 8));
+  await until(async () => (await control('/events?relay=ditto')).some((e) => e.id === moved2), 'ditto healed after it came back', 75_000);
+  check('ditto, back, holds the phone’s move, with no further signature', phone.signs.length === phoneSigns + 1 && distinct((await locationsLogged()).filter((e) => e.at >= t1)).length === 1, `healed ${Math.round((Date.now() - t1) / 1000)} s after the drop`);
+  // Bounded, and quiet once the relays agree
+  const toDitto = (await relayLog()).filter((e) => e.kind === 31126 && e.relay === 'ditto' && (e.id === moved || e.id === moved2));
+  const perId = [moved, moved2].map((id) => toDitto.filter((e) => e.id === id).length);
+  check('each event reached ditto a bounded number of times (its move, then at most 3 heals per device)', perId.every((n) => n >= 1 && n <= 1 + 3 * 2), JSON.stringify(perId));
+  const quiet = (await locationsLogged()).length;
+  await sleep(15_000);
+  check('relays in agreement: nothing more is published', (await locationsLogged()).length === quiet, `${(await locationsLogged()).length - quiet} more`);
+});
+
 await step('Safety: nothing left the machine, nothing unexpected was signed, no page errors', async () => {
   const blocked = [...(await wsLog(laptop.page)), ...(await wsLog(phone.page))].filter((x) => x.blocked);
   check('no socket to anything but the local relay was even attempted', blocked.length === 0, JSON.stringify(blocked.slice(0, 5)));
