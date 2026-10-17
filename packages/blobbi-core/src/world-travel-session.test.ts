@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NostrEvent } from './nostr-protocol';
 import { KIND_ACTIVE_PRESENCE, KIND_WORLD_LOCATION, MIN_STAY_MS, PRESENCE_RENEW_S, WORLD_HOME, WORLD_PIXEL, buildPresenceTemplate, buildWorldLocationTemplate, parseWorldLocation, type WorldTravelTemplate } from './world-travel';
-import { AUTO_RESEND_MS, PENDING_TTL_MS, PRESENCE_SIGN_BUDGET_MS, TRAVEL_COOLDOWN_MS, createWorldTravel, type WorldTravelOptions, type WorldTravelSession, type WorldTravelSigner, type WorldTravelStore } from './world-travel-session';
+import { AUTO_RESEND_MS, PENDING_TTL_MS, PRESENCE_SIGN_BUDGET_MS, TRAVEL_COOLDOWN_MS, createWorldTravel, storedWorldLocation, worldLocationStoreKey, type WorldTravelOptions, type WorldTravelSession, type WorldTravelSigner, type WorldTravelStore } from './world-travel-session';
 import { A, B, dOf, network, relayAccept, signAs, verify, type Network } from './world-travel.test-helpers';
 
 const D = dOf(A);
@@ -493,6 +493,19 @@ describe('failures and retries', () => {
     expect(after.session.snapshot()).toMatchObject({ place: WORLD_PIXEL });
   });
 
+  it('with no store at all, the automatic resend still has the signed move (kept in memory)', async () => {
+    const net = network();
+    const sign = signer();
+    const pixel = track({ session: createWorldTravel({ owner: A, d: D, world: WORLD_PIXEL, relays: net.port(), verify, signer: () => sign }) });
+    await settle(10);
+    for (const r of net.relays) r.refuse = true;
+    expect(await pixel.session.travel()).toBe('unreachable');
+    for (const r of net.relays) r.refuse = false;
+    await settle(AUTO_RESEND_MS + 10);
+    expect(sign.asked).toHaveLength(1);
+    expect(pixel.session.snapshot()).toMatchObject({ place: WORLD_PIXEL, here: true });
+  });
+
   it('one relay down: the move still happens through the others', async () => {
     const net = network();
     net.relays[0].down = true;
@@ -621,6 +634,24 @@ describe('Active Presence', () => {
 });
 
 describe('lifecycle', () => {
+  it('storedWorldLocation reads what a session kept, at once, checked like any event', async () => {
+    const net = network();
+    const store = memoryStore();
+    expect(storedWorldLocation(store, { owner: A, d: D, verify })).toBeNull();
+    expect(storedWorldLocation(null, { owner: A, d: D, verify })).toBeNull();
+    const pixel = track(device(net, WORLD_PIXEL, { store }));
+    await settle(10);
+    await pixel.session.travel();
+    expect(storedWorldLocation(store, { owner: A, d: D, verify })?.world).toBe(WORLD_PIXEL);
+    expect(storedWorldLocation(store, { owner: B, d: dOf(B), verify })).toBeNull();
+    // Tampered or junk: ignored
+    const kept = JSON.parse(store.get(worldLocationStoreKey(A, D))!);
+    store.set(worldLocationStoreKey(A, D), JSON.stringify({ ...kept, tags: [...kept.tags, ['world', 'blobbi-home']] }));
+    expect(storedWorldLocation(store, { owner: A, d: D, verify })).toBeNull();
+    store.set(worldLocationStoreKey(A, D), '{not json');
+    expect(storedWorldLocation(store, { owner: A, d: D, verify })).toBeNull();
+  });
+
   it('dispose: no more reads, signatures, presence or listeners; a travel after it is refused', async () => {
     const net = network();
     const home = track(device(net, WORLD_HOME, { presenceEnabled: true, isActive: () => true }));

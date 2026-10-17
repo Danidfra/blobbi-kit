@@ -10,7 +10,15 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
-## `@blobbi-kit/core` 0.11.0-m16.0, `@blobbi-kit/react` 0.11.0-m16.0: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
+## `@blobbi-kit/core` 0.11.0-m16.1, `@blobbi-kit/react` 0.11.0-m16.1: world travel (LOCAL PRERELEASE, NOT PUBLISHED)
+
+**m16.1** (found while integrating): `storedWorldLocation(store, { owner, d, verify })`
+and `worldLocationStoreKey` / `pendingMoveStoreKey`, so a World reads the last
+kept location for its first frame without knowing the key; a signed move
+waiting for a relay is also kept in memory, so the automatic resend works for
+a session with no store.
+
+**m16.0**:
 
 A local build for integrating M16 into Blobbi Standalone and Blobbi Pixel
 (installed there from tarballs, `file:../blobbi-kit-m16-packs/…`). The version

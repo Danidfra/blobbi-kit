@@ -227,8 +227,27 @@ export const PRESENCE_TICK_MS = 15_000;
 /** After a move is published, the relays are read again this soon (a simultaneous move elsewhere shows up) (ms). */
 export const RECONCILE_AFTER_MS = 2_000;
 
-const storeKey = (owner: string, d: string) => `blobbi-kit:world-location:v1:${owner}:${d}`;
-const pendingKey = (owner: string, d: string) => `blobbi-kit:world-move:v1:${owner}:${d}`;
+/** Where a session keeps the last signed World Location of a Blobbi in the host's store. */
+export const worldLocationStoreKey = (owner: string, d: string) => `blobbi-kit:world-location:v1:${owner}:${d}`;
+/** Where a session keeps a signed move no relay has accepted yet. */
+export const pendingMoveStoreKey = (owner: string, d: string) => `blobbi-kit:world-move:v1:${owner}:${d}`;
+const storeKey = worldLocationStoreKey;
+const pendingKey = pendingMoveStoreKey;
+
+/**
+ * The last World Location a session kept for this Blobbi, read at once (no relay): what a World shows on its very
+ * first frame, before any session answers. Untrusted like any event: checked, and null when absent or invalid. A
+ * newer location on the relays always replaces it once the session looks.
+ */
+export function storedWorldLocation(store: WorldTravelStore | null | undefined, o: { owner: string; d: string; verify: EventVerifier }): WorldLocation | null {
+  if (!store) return null;
+  try {
+    const raw = store.get(worldLocationStoreKey(o.owner, o.d));
+    return raw ? resolveWorldLocation([JSON.parse(raw)], o) : null;
+  } catch {
+    return null;
+  }
+}
 
 /** The in-page fallback for `lock`: one move per Blobbi at a time in this page. */
 const pageLocks = new Map<string, Promise<unknown>>();
@@ -277,6 +296,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
   let presenceProven = false;
   let unsubscribe: (() => void) | null = null;
   const autoResent = new Set<string>();
+  let memoryPending: { at: number; event: NostrEvent } | null = null;
   const listeners = new Set<(s: WorldTravelSnapshot) => void>();
 
   let snap: WorldTravelSnapshot = {
@@ -463,6 +483,8 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
   };
 
   const keepPending = (event: NostrEvent, at: number) => {
+    // Kept in memory too: without a store (or when it refuses), the automatic resend still has the event
+    memoryPending = { at, event };
     try {
       store?.set(pendingKey(owner, d), JSON.stringify({ v: 1, world, at, event }));
     } catch {
@@ -470,17 +492,22 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     }
   };
   const readPending = (): { at: number; event: NostrEvent } | null => {
-    const p = readStore(pendingKey(owner, d)) as { v?: unknown; world?: unknown; at?: unknown; event?: unknown } | null;
+    const p = (readStore(pendingKey(owner, d)) ?? (memoryPending ? { v: 1, world, ...memoryPending } : null)) as { v?: unknown; world?: unknown; at?: unknown; event?: unknown } | null;
     if (!p || p.v !== 1 || p.world !== world || typeof p.at !== 'number') return null;
     const loc = parseWorldLocation(p.event, { verify });
     if (!loc || loc.owner !== owner || loc.d !== d || loc.world !== world) return null;
     return { at: p.at, event: loc.event };
   };
 
+  const dropPending = () => {
+    memoryPending = null;
+    removeStore(pendingKey(owner, d));
+  };
+
   /** Send a signed move (fresh, or stored); never one a newer location already replaced. */
   const send = async (mine: WorldLocation): Promise<TravelOutcome> => {
     if (location && location.id !== mine.id && replacesLocation(location, mine)) {
-      removeStore(pendingKey(owner, d));
+      dropPending();
       return currentWorld(location) === world ? 'already-here' : fail('stale');
     }
     if (!stillAccount()) return fail('wrong-account');
@@ -501,7 +528,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
       }
       return fail('unreachable');
     }
-    removeStore(pendingKey(owner, d));
+    dropPending();
     arrive(mine);
     // Someone else may have moved it at the same moment: look again soon, and follow the NIP-01 winner
     setTimer(() => {
@@ -577,7 +604,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     if (inFlight) return 'busy';
     const pending = readPending();
     if (!pending || now() - pending.at > PENDING_TTL_MS) {
-      removeStore(pendingKey(owner, d));
+      dropPending();
       return 'stale';
     }
     inFlight = true;
@@ -701,7 +728,7 @@ export function createWorldTravel(o: WorldTravelOptions): WorldTravelSession {
     const pending = readPending();
     if (pending) {
       if (now() - pending.at <= PENDING_TTL_MS) void retry();
-      else removeStore(pendingKey(owner, d));
+      else dropPending();
     }
   });
   scheduleRefresh();
