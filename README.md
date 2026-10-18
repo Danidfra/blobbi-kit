@@ -333,4 +333,4 @@ blobbi-kit/
 
 ## License
 
-MIT. Each published package ships its own `LICENSE` file.
+MIT, see [LICENSE](LICENSE). Each published package also ships its own copy.
