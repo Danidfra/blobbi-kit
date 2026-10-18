@@ -334,3 +334,12 @@ blobbi-kit/
 ## License
 
 MIT, see [LICENSE](LICENSE). Each published package also ships its own copy.
+
+## Contributors
+
+Much of the kit began as Blobbi code in [Ditto](https://gitlab.com/soapbox-pub/ditto).
+Most of it was written by Daniel Filemon.
+Parts of the progression, missions and task code (`blobbi-core` `missions.ts` and
+`progression.ts`, and the mission, task and cooldown modules in `blobbi-react`) were
+first written by Chad Curtis in Ditto, and he licenses them here under MIT. The Git
+histories of both projects record who wrote what.
