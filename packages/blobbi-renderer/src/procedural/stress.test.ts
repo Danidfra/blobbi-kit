@@ -91,5 +91,7 @@ describe('stress', () => {
     expect(again.reverse()).toEqual(first);
     // Not all distinct: a face's expression cannot be seen from behind, and an egg has no face at all.
     expect(new Set(first).size).toBeGreaterThan(first.length * 0.6);
-  });
+    // Every drawing twice: ~2 s inside the full suite on a fast laptop, past the 5 s default on
+    // a CI runner. A budget like the sweep's above, not a smaller sample.
+  }, 60_000);
 });

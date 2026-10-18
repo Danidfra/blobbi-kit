@@ -97,7 +97,9 @@ describe('renderBlobbiSvg', () => {
       }
     }
     expect(problems).toEqual([]);
-  });
+    // A CPU-bound sweep: ~2 s inside the full parallel suite on a fast laptop and about
+    // 2.3x that on a CI runner, which is the 5 s default. The budget is for the runner.
+  }, 60_000);
 
   it('survives extreme and malformed genes by clamping them', () => {
     for (const value of [1, -1, 50, -50, Number.NaN, Infinity]) {
