@@ -10,6 +10,27 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## `@blobbi-kit/renderer` 0.6.1 (fix: a pale baby's half lid shows)
+
+**A backward-compatible patch.** Only `@blobbi-kit/renderer` is released;
+core, react and 3d are unchanged. `@blobbi-kit/3d` 0.1.1 depends on
+`^0.6.0`, which accepts 0.6.1, so it needs no release.
+
+- **The V1 baby's half lid vanished on a pale Blobbi.** The lid (`eyes:
+  'half'`, as in the `sad` and `sleepy` presets) is filled with the body
+  gradient's middle stop. A white or near-white secondary colour lightens
+  that stop to white, so the lid was white over the eye white and only its
+  line crossed an open-looking eye. When the middle stop is too pale to show
+  on the eye white (relative luminance above 0.75) and the base stop is
+  darker, the lid now takes the base stop: still one of the body's own
+  colours, a shade deeper. Every other Blobbi keeps the middle stop, so its
+  lid is unchanged.
+- No export, prop, type, geometry or other artwork changed. The V2 adult and
+  the V3 procedural lids are untouched.
+- `baby-v1-expression.test.ts` holds it: three pale colourings, `sad` and
+  `sleepy`, get the base stop and never `#ffffff`; an ordinary Blobbi keeps
+  the middle stop.
+
 ## `@blobbi-kit/core` 0.11.1, `@blobbi-kit/react` 0.11.1: world travel relay convergence (fix)
 
 **A backward-compatible patch.**

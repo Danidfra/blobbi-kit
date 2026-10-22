@@ -46,8 +46,10 @@ describe('@blobbi-kit/3d package manifest', () => {
       expect(manifest.peerDependencies?.[RENDERER]).toBeUndefined();
     });
 
-    it('pins the renderer to the version being released', () => {
-      expect(manifest.dependencies?.[RENDERER]).toBe(`^${rendererManifest.version}`);
+    it('pins a caret range that accepts the renderer in this workspace', () => {
+      // A renderer patch released on its own (0.6.1) needs no 3d release: the
+      // range still names the renderer 3d was released against, and accepts it.
+      expect(manifest.dependencies?.[RENDERER]).toMatch(/^\^\d+\.\d+\.\d+$/);
       expect(satisfies(rendererManifest.version, manifest.dependencies![RENDERER])).toBe(true);
     });
 
