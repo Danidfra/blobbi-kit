@@ -101,6 +101,26 @@ describe('every non-neutral preset changes the face and only the face', () => {
     expect(/fill="([^"]+)"[^>]*data-part="left-eyelid"/.exec(other)![1]).not.toBe(/fill="([^"]+)"[^>]*data-part="left-eyelid"/.exec(baby('sad').svg)![1]);
   });
 
+  it('a pale Blobbi still gets a lid that shows: never white skin over the eye white', () => {
+    const lidFill = (svg: string) => /<path d="[^"]+" fill="([^"]+)"[^>]*data-part="left-eyelid"/.exec(svg)![1];
+    const stopsOf = (svg: string) => [...(/<radialGradient[^>]*blobbiBodyGradient[^>]*>([\s\S]*?)<\/radialGradient>/.exec(svg)?.[1] ?? '').matchAll(/stop-color:\s*(#[0-9a-fA-F]{3,8})/g)].map((m) => m[1]);
+    // A white secondary colour lightens to a white middle stop: the lid was white, only its line showed
+    for (const colors of [{ baseColor: '#8ec5d6', secondaryColor: '#ffffff' }, { baseColor: '#a7d8e8', secondaryColor: '#eef9ff' }, { baseColor: '#f4f4f4' }]) {
+      for (const emotion of ['sad', 'sleepy'] as const) {
+        const svg = renderBlobbiSvg({ stage: 'baby', expression: emotion, instanceId: 'pale', ...colors }).svg;
+        const stops = stopsOf(svg);
+        const fill = lidFill(svg);
+        // Still one of the body's own stops, so it follows the colour: its base
+        expect(stops, JSON.stringify(colors)).toContain(fill);
+        expect(fill.toLowerCase(), JSON.stringify(colors)).toBe(stops[stops.length - 1].toLowerCase());
+        expect(fill.toLowerCase()).not.toBe('#ffffff');
+      }
+    }
+    // A Blobbi of ordinary colour keeps the middle stop, as before
+    const plain = baby('sad').svg;
+    expect(lidFill(plain)).toBe(stopsOf(plain)[1]);
+  });
+
   it('every mouth is the authored mouth moved a little: same neighbourhood, same stroke', () => {
     for (const mouth of ['smile', 'grin', 'frown', 'flat'] as const) {
       const tag = /<path d="([^"]+)"[^>]*data-part="mouth"[^>]*\/>/.exec(baby({ mouth }).svg)!;

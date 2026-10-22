@@ -17,7 +17,8 @@
  *           `open` becomes a small filled ellipse in the mouth's colour
  *   eyes    `half` draws a LID over the upper part of each eye: the eye
  *           white cut along a chord, filled with a solid skin colour taken
- *           from the body gradient, with a lid LINE along the chord in the
+ *           from the body gradient (its middle stop, or its base when the
+ *           middle one is too pale to show on the eye white), with a lid LINE along the chord in the
  *           mouth's colour (the same stroke the authored sleeping eyes
  *           use). The lids go in their own block after the pupils block,
  *           so gaze still moves the pupils under them. The fill is a SOLID
@@ -144,10 +145,34 @@ function lidPaths(cx: number, side: 'left' | 'right', lid: LidShape): { region: 
   };
 }
 
-/** The lid colour: the body gradient's middle stop, so the lid reads as skin whatever the Blobbi's colour. */
+/** Relative luminance of a `#rgb`/`#rrggbb` colour, 0 (black) to 1 (white). */
+function luminance(hex: string): number {
+  const h = hex.length === 4 ? hex.slice(1).split('').map((c) => c + c).join('') : hex.slice(1, 7);
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * A stop this light is no skin over the eye white (`#ffffff` to `#f1f5f9`):
+ * a pale secondary colour lightened to the middle stop turns white, and the
+ * lid vanished, leaving only its line across an open-looking eye.
+ */
+const PALE_SKIN = 0.75;
+
+/**
+ * The lid colour: the body gradient's middle stop, so the lid reads as skin
+ * whatever the Blobbi's colour; when that stop is too pale to read against
+ * the eye white, the body's base stop (its own colour, a shade deeper).
+ */
 function skinColor(svg: string): string {
   const stops = [...(BODY_GRADIENT.exec(svg)?.[1] ?? '').matchAll(STOP_COLOR)].map((m) => m[1]);
-  return stops[1] ?? stops[stops.length - 1] ?? FALLBACK_SKIN;
+  const mid = stops[1] ?? stops[stops.length - 1];
+  if (!mid) return FALLBACK_SKIN;
+  const base = stops[stops.length - 1];
+  return luminance(mid) > PALE_SKIN && luminance(base) < luminance(mid) ? base : mid;
 }
 
 function applyLids(svg: string, expression: ResolvedBlobbiExpression): string {
