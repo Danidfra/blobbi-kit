@@ -10,6 +10,36 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## Unreleased: `@blobbi-kit/core`, the Blobbi house (experimental kind 31127)
+
+- **The house protocol** (`HOUSE.md`, `src/house*.ts`): kind 31127, one
+  addressable event per house, so a player may own several. The content is
+  the whole house as JSON:
+  - rooms of any number and size, with walls and finishes;
+  - pieces with stable ids, namespaced types, a floor or wall surface, a
+    position in room tiles, and a quarter turn.
+- **Pure helpers, no relay or signer:** validation, parsing, canonical
+  serialization and event templates. Unknown fields and other games' piece
+  types are kept.
+- **Edits:** create, add or remove rooms, add, move, turn or remove pieces,
+  change finishes. They are immutable and deterministic (a new piece's id is
+  random unless an id or a seeded source is given).
+- **Shared furniture catalog:** Ditto's 44 official types with measured sizes,
+  a footprint and a drawn-area rule matching Ditto's.
+- **Blobbi starting house:** Ditto's four visible rooms with their default
+  finishes and furniture.
+- **Ditto converters:** pure converters to and from Ditto's 11125 rooms, with
+  every loss reported. The import never throws and never returns part of a
+  house: a room whose shape is not Ditto's gives `status: 'failed'`, with
+  the reasons in `failures`.
+- **Republishing a house** keeps tags it does not manage, except a NIP-40
+  `expiration`, which is never carried over.
+- **`WORLD-TRAVEL.md`:** 31127 is no longer a World Location fallback; 31128 is.
+- **The preferred house** is a mutable NIP-78 preference (`d = "blobbi:preferences"`, content `{v, house}`). It is
+  never stored in a house or in kind 11125. This is a documented design; nothing reads or writes it yet.
+
+---
+
 ## `@blobbi-kit/renderer` 0.6.1 (fix: a pale baby's half lid shows)
 
 **A backward-compatible patch.** Only `@blobbi-kit/renderer` is released;
