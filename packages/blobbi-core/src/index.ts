@@ -85,3 +85,8 @@ export * from './fetchFreshBlobbonautProfile';
 export * as BlobbiTypes from './types/blobbi';
 export * as AdultTypes from './types/adult';
 export * as ShopTypes from './types/shop';
+
+// Relay routing: the Blobbi relay as primary, merging answers from several
+// relays (NIP-01 winners), deciding when a read is usable, and planning which
+// signed events may be carried to a relay that lacks them. Pure: no socket.
+export * from './relay-routing';
