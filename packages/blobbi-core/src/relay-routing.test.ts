@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   BLOBBI_RELAY_URL,
+  SyncConsent,
   SyncLedger,
   classifyRejection,
   decideRead,
@@ -10,6 +11,7 @@ import {
   normalizeRelayUrl,
   planSync,
   summarizeDelivery,
+  withSyncConsent,
   withPrimaryRelay,
   type RelayEvent,
   type RelayReadState,
@@ -217,5 +219,41 @@ describe('verdicts and the delivery ledger', () => {
 
     const restored = new SyncLedger({ now: () => now, initial: ledger.snapshot() });
     expect(restored.canAttempt('e1', DITTO)).toBe(false);
+  });
+});
+
+describe('consent to carry existing events', () => {
+  it('is off until the account says so, and off when signed out', () => {
+    const consent = new SyncConsent();
+    expect(consent.isEnabled(ME)).toBe(false);
+    expect(consent.isEnabled(null)).toBe(false);
+    expect(consent.allows(ME, DITTO)).toBe(false);
+    expect(consent.uncovered(ME, [BLOBBI_RELAY_URL, DITTO])).toEqual([BLOBBI_RELAY_URL, DITTO]);
+  });
+
+  it('covers exactly the relays the account was shown, for that account only, and persists', () => {
+    const saved: unknown[] = [];
+    const consent = new SyncConsent({ now: () => 5, onChange: (r) => saved.push(r) });
+    consent.enable(ME, [BLOBBI_RELAY_URL, `${DITTO}/`]);
+    expect(consent.allows(ME, DITTO)).toBe(true);
+    expect(consent.allows(ME, PRIMAL)).toBe(false);
+    expect(consent.allows(OTHER, DITTO)).toBe(false);
+    expect(consent.uncovered(ME, [BLOBBI_RELAY_URL, DITTO, PRIMAL])).toEqual([PRIMAL]);
+
+    const restored = new SyncConsent({ initial: consent.snapshot() });
+    expect(restored.allows(ME, BLOBBI_RELAY_URL)).toBe(true);
+    restored.disable(ME);
+    expect(restored.isEnabled(ME)).toBe(false);
+    expect(saved).toHaveLength(1);
+  });
+
+  it('a policy under consent plans nothing while off, and only consented destinations once on', () => {
+    const e = pet('a', 100);
+    const states = [state(BLOBBI_RELAY_URL, 'eose'), state(DITTO, 'eose', [e]), state(PRIMAL, 'eose')];
+    const consent = new SyncConsent();
+    expect(planSync({ states, filters: PETS, policy: withSyncConsent(own, consent, ME) })).toEqual([]);
+    consent.enable(ME, [BLOBBI_RELAY_URL]);
+    expect(planSync({ states, filters: PETS, policy: withSyncConsent(own, consent, ME) }).map((t) => t.relay)).toEqual([BLOBBI_RELAY_URL]);
+    expect(planSync({ states, filters: PETS, policy: withSyncConsent(own, consent, OTHER) })).toEqual([]);
   });
 });

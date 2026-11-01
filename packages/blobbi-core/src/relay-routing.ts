@@ -25,6 +25,8 @@
  *      may be offered to it. Only when its absence is certain (EOSE, and the
  *      filter was not truncated), only for events the flow allows, and never
  *      for private, ephemeral, expiring, deleted or relay-bound events.
+ *      And only once the account has said so (`SyncConsent`): until then a
+ *      read sends nothing, whoever is signed in.
  *
  * This module opens no socket and signs nothing. It depends on nothing, so a
  * host that cannot yet take this kit version can carry the file as it is.
@@ -605,4 +607,104 @@ export class SyncLedger {
   snapshot(): Record<string, SyncLedgerEntry> {
     return Object.fromEntries(this.entries);
   }
+}
+
+// ── Consent: carrying existing events is the account's choice ───────────────
+
+/** One account's answer to "may this app copy my existing events to these relays?". */
+export interface SyncConsentRecord {
+  enabled: boolean;
+  /** When the account answered (ms). */
+  at: number;
+  /** The relays the account was shown and agreed to. Nothing is carried anywhere else. */
+  destinations: string[];
+}
+
+export interface SyncConsentOptions {
+  now?: () => number;
+  /** Persisted answers from an earlier session, by pubkey. */
+  initial?: Record<string, SyncConsentRecord>;
+  /** Called after every change with the answers to persist. */
+  onChange?: (records: Record<string, SyncConsentRecord>) => void;
+}
+
+/**
+ * Whether existing events may be carried between relays, per account.
+ *
+ * OFF until the account says otherwise. Opening the app, restoring a saved
+ * login, or receiving the answer to a query sends nothing: a read stays a
+ * read. Publishing a NEW event the player just caused (an adoption, a care
+ * action) is not carrying and does not pass through here.
+ *
+ * The answer is tied to the exact relays the account was shown. A relay added
+ * later is not covered until the account is asked again: `allows` is false
+ * for it, and `uncovered` lists it.
+ */
+export class SyncConsent {
+  private readonly records = new Map<string, SyncConsentRecord>();
+  private readonly now: () => number;
+  private readonly onChange?: (records: Record<string, SyncConsentRecord>) => void;
+
+  constructor(options: SyncConsentOptions = {}) {
+    this.now = options.now ?? Date.now;
+    this.onChange = options.onChange;
+    for (const [pubkey, record] of Object.entries(options.initial ?? {})) {
+      if (record && typeof record.enabled === 'boolean' && Array.isArray(record.destinations)) {
+        this.records.set(pubkey, {
+          enabled: record.enabled,
+          at: Number(record.at) || 0,
+          destinations: dedupeRelayUrls(record.destinations),
+        });
+      }
+    }
+  }
+
+  get(pubkey: string | null | undefined): SyncConsentRecord | undefined {
+    return pubkey ? this.records.get(pubkey) : undefined;
+  }
+
+  /** Whether this account turned carrying on. Signed out: never. */
+  isEnabled(pubkey: string | null | undefined): boolean {
+    return this.get(pubkey)?.enabled === true;
+  }
+
+  /** Whether this account agreed to existing events being carried to this relay. */
+  allows(pubkey: string | null | undefined, relay: string): boolean {
+    const record = this.get(pubkey);
+    if (!record?.enabled) return false;
+    return record.destinations.includes(normalizeRelayUrl(relay) ?? relay);
+  }
+
+  /** The relays of `candidates` this account has not agreed to (all of them while off). */
+  uncovered(pubkey: string | null | undefined, candidates: readonly string[]): string[] {
+    return dedupeRelayUrls(candidates).filter((relay) => !this.allows(pubkey, relay));
+  }
+
+  /** The account chose to carry its existing events to exactly these relays. */
+  enable(pubkey: string, destinations: readonly string[]): void {
+    this.records.set(pubkey, { enabled: true, at: this.now(), destinations: dedupeRelayUrls(destinations) });
+    this.onChange?.(this.snapshot());
+  }
+
+  /** The account turned carrying off. */
+  disable(pubkey: string): void {
+    this.records.set(pubkey, { enabled: false, at: this.now(), destinations: [] });
+    this.onChange?.(this.snapshot());
+  }
+
+  snapshot(): Record<string, SyncConsentRecord> {
+    return Object.fromEntries(this.records);
+  }
+}
+
+/** A sync policy narrowed by consent: nothing without it, and only to the relays it names. */
+export function withSyncConsent<E extends RelayEvent>(
+  policy: SyncPolicy<E>,
+  consent: SyncConsent,
+  pubkey: string | null | undefined,
+): SyncPolicy<E> {
+  return {
+    allows: (event) => consent.isEnabled(pubkey) && event.pubkey === pubkey && policy.allows(event),
+    destinations: (event) => policy.destinations(event).filter((relay) => consent.allows(pubkey, relay)),
+  };
 }
