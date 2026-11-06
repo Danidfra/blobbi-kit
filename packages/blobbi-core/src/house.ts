@@ -58,6 +58,16 @@ export const HOUSE_LIMITS = {
   /** Item types (`sno:` types are long). */
   maxTypeLength: 256,
   maxNameLength: 120,
+  /**
+   * Nesting of objects and arrays, the document itself being depth 1. A real
+   * house nests about 7 deep (document, rooms, room, items, item, ext, a
+   * namespace's data); this leaves applications 50 levels of their own. It
+   * exists because deeply nested JSON overflows the stack of the recursive
+   * copy and serialization, long before the content size limit.
+   */
+  maxDepth: 64,
+  /** Objects, arrays and values walked in a document handed to `validateHouse`; a 256 KiB content cannot reach it. */
+  maxNodes: 262_144,
 } as const;
 
 /**
@@ -231,6 +241,24 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/**
+ * Why untrusted JSON-like input is too deep or too big to walk safely, or
+ * null. Iterative, so it cannot overflow the stack itself; it stops at the
+ * first limit, so a cyclic or huge object costs at most `maxNodes` steps.
+ */
+function shapeProblem(input: unknown): 'too-deep' | 'too-many-nodes' | null {
+  const stack: [unknown, number][] = [[input, 1]];
+  let nodes = 0;
+  while (stack.length) {
+    const [value, depth] = stack.pop()!;
+    if (++nodes > HOUSE_LIMITS.maxNodes) return 'too-many-nodes';
+    if (typeof value !== 'object' || value === null) continue;
+    if (depth > HOUSE_LIMITS.maxDepth) return 'too-deep';
+    for (const child of Array.isArray(value) ? value : Object.values(value)) stack.push([child, depth + 1]);
+  }
+  return null;
+}
+
 class Issues {
   readonly list: HouseIssue[] = [];
   error(path: string, code: string, message: string): false {
@@ -339,10 +367,30 @@ function checkItem(value: unknown, room: { size: RoomSize; walls: readonly House
  * Check a house document (untrusted JSON). Never throws.
  *
  * Unknown fields, at every level, and unknown item types are valid and kept.
- * See `HouseStatus` for what each result allows.
+ * See `HouseStatus` for what each result allows. A document nested deeper
+ * than `HOUSE_LIMITS.maxDepth`, or one that is not plain JSON (a cycle, a
+ * BigInt, a throwing getter), is `malformed`.
  */
 export function validateHouse(input: unknown): HouseValidation {
+  try {
+    return checkHouse(input);
+  } catch {
+    // A last guard: whatever plain JSON cannot hold must not escape as an exception
+    return { status: 'malformed', doc: null, issues: [{ severity: 'error', code: 'not-json', path: '', message: 'the house is not plain JSON' }] };
+  }
+}
+
+function checkHouse(input: unknown): HouseValidation {
   const out = new Issues();
+  const shape = shapeProblem(input);
+  if (shape === 'too-deep') {
+    out.error('', 'too-deep', `nested deeper than ${HOUSE_LIMITS.maxDepth} levels`);
+    return { status: 'malformed', doc: null, issues: out.list };
+  }
+  if (shape === 'too-many-nodes') {
+    out.error('', 'too-large', `more than ${HOUSE_LIMITS.maxNodes} values`);
+    return { status: 'malformed', doc: null, issues: out.list };
+  }
   if (!isRecord(input)) {
     out.error('', 'not-object', 'a house is a JSON object');
     return { status: 'malformed', doc: null, issues: out.list };
@@ -598,13 +646,20 @@ function wellFormed(event: unknown): event is NostrEvent {
  * a `v` tag, when present, must agree with the content).
  */
 export function parseHouseEvent(event: unknown, opts: HouseParseOptions = {}): ParsedHouse {
-  const refuse = (code: string, message: string, info: HouseEventInfo | null = null): ParsedHouse => ({
-    status: 'malformed',
-    doc: null,
-    issues: [{ severity: 'error', code, path: '', message }],
-    event: info,
-    writable: false,
-  });
+  try {
+    return readHouseEvent(event, opts);
+  } catch {
+    // A last guard (a hostile object with throwing getters, say): input is refused, never thrown back
+    return refuseHouse('not-an-event', 'not a well-formed Nostr event');
+  }
+}
+
+function refuseHouse(code: string, message: string, info: HouseEventInfo | null = null): ParsedHouse {
+  return { status: 'malformed', doc: null, issues: [{ severity: 'error', code, path: '', message }], event: info, writable: false };
+}
+
+function readHouseEvent(event: unknown, opts: HouseParseOptions): ParsedHouse {
+  const refuse = refuseHouse;
   if (!wellFormed(event)) return refuse('not-an-event', 'not a well-formed Nostr event');
   if (event.kind !== KIND_BLOBBI_HOUSE) return refuse('wrong-kind', `kind ${event.kind} is not a house (${KIND_BLOBBI_HOUSE})`);
   const d = single(event.tags, 'd');
@@ -626,6 +681,7 @@ export function parseHouseEvent(event: unknown, opts: HouseParseOptions = {}): P
   } catch {
     return refuse('content-json', 'the content is not JSON', info);
   }
+  // validateHouse never throws (depth and node limits, then a last guard)
   const result = validateHouse(content);
   const vTag = single(event.tags, 'v');
   if (result.status !== 'malformed' && isRecord(content)) {
