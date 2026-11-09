@@ -21,6 +21,8 @@
  * (no NIP or registry entry, no NIP pull request, no public code, no events
  * on five large relays), which is evidence, not a registry.
  */
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex } from '@noble/hashes/utils';
 import { BLOBBI_ECOSYSTEM_NAMESPACE } from './blobbi';
 import type { NostrEvent, NostrFilter } from './nostr-protocol';
 import type { EventVerifier } from './profile-order';
@@ -184,6 +186,7 @@ const TOKEN_RE = /^[a-z0-9][a-z0-9._:-]*$/;
 const STYLE_RE = /^[a-z][a-z0-9-]*$/;
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const HEX64 = /^[0-9a-f]{64}$/;
+const HEX128 = /^[0-9a-f]{128}$/;
 const MAX_TOKEN_LENGTH = 64;
 const MAX_STYLE_LENGTH = 32;
 
@@ -610,11 +613,44 @@ export interface ParsedHouse extends HouseValidation {
   event: HouseEventInfo | null;
   /** Only a `valid` house may be edited and written back. */
   writable: boolean;
+  /**
+   * Whether the `verify` option checked the signature. False when no verifier
+   * was given: the event's id was still checked (unless `checkId: false`),
+   * but not who signed it.
+   */
+  verified: boolean;
 }
 
+/**
+ * Where signatures are checked (see `HOUSE.md`, Security). Core depends on no
+ * Nostr library, so it cannot check a Schnorr signature itself:
+ *
+ * - Events straight from a relay through Nostrify's `NRelay1` (and so
+ *   `NPool`) are already verified by the transport, unless the host replaced
+ *   its `verifyEvent`.
+ * - Events from anywhere else (a cache, storage, another app, a host API)
+ *   are not: pass `verify` (nostr-tools' `verifyEvent`, say).
+ *
+ * Whatever the source, this module always checks, cheaply, that `id`,
+ * `pubkey` and `sig` have the NIP-01 shapes (64, 64 and 128 lower-case hex)
+ * and that `id` is the NIP-01 hash of the event, so a tampered content or
+ * date cannot keep a genuine id.
+ */
 export interface HouseParseOptions {
-  /** Checks id and signature (core depends on no Nostr library). Without it the signature is NOT checked. */
+  /** Checks the signature (core depends on no Nostr library). Without it the signature is NOT checked (`verified: false`). */
   verify?: EventVerifier;
+  /**
+   * Check the id and signature shapes and that the id is the event's NIP-01
+   * hash. Default true. Pass false only for an event that is not signed yet
+   * (a template being previewed) or whose integrity the caller has already
+   * established.
+   */
+  checkId?: boolean;
+}
+
+/** The NIP-01 id of an event: the SHA-256 of `[0, pubkey, created_at, kind, tags, content]`. */
+export function houseEventHash(event: Pick<NostrEvent, 'pubkey' | 'created_at' | 'kind' | 'tags' | 'content'>): string {
+  return bytesToHex(sha256(new TextEncoder().encode(JSON.stringify([0, event.pubkey, event.created_at, event.kind, event.tags, event.content]))));
 }
 
 function single(tags: string[][], name: string): string | undefined | null {
@@ -655,7 +691,7 @@ export function parseHouseEvent(event: unknown, opts: HouseParseOptions = {}): P
 }
 
 function refuseHouse(code: string, message: string, info: HouseEventInfo | null = null): ParsedHouse {
-  return { status: 'malformed', doc: null, issues: [{ severity: 'error', code, path: '', message }], event: info, writable: false };
+  return { status: 'malformed', doc: null, issues: [{ severity: 'error', code, path: '', message }], event: info, writable: false, verified: false };
 }
 
 function readHouseEvent(event: unknown, opts: HouseParseOptions): ParsedHouse {
@@ -665,6 +701,13 @@ function readHouseEvent(event: unknown, opts: HouseParseOptions): ParsedHouse {
   const d = single(event.tags, 'd');
   if (!isHouseId(d)) return refuse('house-id', 'a house needs exactly one valid `d` tag');
   const info: HouseEventInfo = { id: event.id, owner: event.pubkey, houseId: d, address: houseAddress(event.pubkey, d), createdAt: event.created_at };
+  // Size first: nothing below hashes or parses an oversized content
+  if (utf8Bytes(event.content) > HOUSE_LIMITS.maxContentBytes) return refuse('too-large', `content above ${HOUSE_LIMITS.maxContentBytes} bytes`, info);
+  if (opts.checkId !== false) {
+    if (!HEX64.test(event.id)) return refuse('event-id', 'the event id is not 64 lower-case hex characters', info);
+    if (typeof event.sig !== 'string' || !HEX128.test(event.sig)) return refuse('signature', 'the signature is not 128 lower-case hex characters', info);
+    if (houseEventHash(event) !== event.id) return refuse('event-id', 'the event id is not the hash of the event: it was altered', info);
+  }
   if (opts.verify) {
     let verified = false;
     try {
@@ -674,7 +717,6 @@ function readHouseEvent(event: unknown, opts: HouseParseOptions): ParsedHouse {
     }
     if (!verified) return refuse('signature', 'the signature does not verify', info);
   }
-  if (utf8Bytes(event.content) > HOUSE_LIMITS.maxContentBytes) return refuse('too-large', `content above ${HOUSE_LIMITS.maxContentBytes} bytes`, info);
   let content: unknown;
   try {
     content = JSON.parse(event.content);
@@ -688,7 +730,7 @@ function readHouseEvent(event: unknown, opts: HouseParseOptions): ParsedHouse {
     if (vTag === null) result.issues.push({ severity: 'warning', code: 'v-tag', path: '', message: 'more than one `v` tag, or one without a value; the content wins' });
     else if (vTag !== undefined && vTag !== String(content.v)) result.issues.push({ severity: 'warning', code: 'v-tag', path: '', message: `the \`v\` tag (${vTag}) disagrees with the content; the content wins` });
   }
-  return { ...result, event: info, writable: result.status === 'valid' };
+  return { ...result, event: info, writable: result.status === 'valid', verified: opts.verify !== undefined };
 }
 
 /** An unsigned house event for a signer. */

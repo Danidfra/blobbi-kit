@@ -12,6 +12,7 @@ import {
   createInitialHouse,
   houseAddress,
   houseContentBytes,
+  houseEventHash,
   houseFilter,
   isHouseId,
   isHouseItemType,
@@ -49,9 +50,9 @@ function tiny(): HouseDocument {
   };
 }
 
+/** A house event with its true NIP-01 id (an `id` in `over` replaces it); the signature is a placeholder of the right shape. */
 function event(content: unknown, over: Partial<NostrEvent> = {}): NostrEvent {
-  return {
-    id: 'e'.repeat(64),
+  const e = {
     pubkey: OWNER,
     created_at: 1_800_000_000,
     kind: KIND_BLOBBI_HOUSE,
@@ -60,6 +61,7 @@ function event(content: unknown, over: Partial<NostrEvent> = {}): NostrEvent {
     sig: 'f'.repeat(128),
     ...over,
   };
+  return { id: houseEventHash(e), ...e };
 }
 
 function codes(doc: unknown): string[] {
@@ -260,10 +262,11 @@ describe('serializeHouse', () => {
 
 describe('parseHouseEvent', () => {
   it('reads a house: the owner is the author, the id is the d tag, valid means writable', () => {
-    const result = parseHouseEvent(event(tiny()));
+    const e = event(tiny());
+    const result = parseHouseEvent(e);
     expect(result.status).toBe('valid');
     expect(result.writable).toBe(true);
-    expect(result.event).toEqual({ id: 'e'.repeat(64), owner: OWNER, houseId: 'main', address: `31127:${OWNER}:main`, createdAt: 1_800_000_000 });
+    expect(result.event).toEqual({ id: e.id, owner: OWNER, houseId: 'main', address: `31127:${OWNER}:main`, createdAt: 1_800_000_000 });
     expect(result.doc).toEqual(tiny());
   });
 
@@ -320,7 +323,8 @@ describe('house events', () => {
       tags: [['d', 'main'], ['v', '1'], ['b', BLOBBI_ECOSYSTEM_NAMESPACE], ['alt', 'Blobbi house: Tiny']],
       content: serializeHouse(tiny()),
     });
-    expect(parseHouseEvent({ ...t, id: '0'.repeat(64), pubkey: OWNER, sig: '' }).status).toBe('valid');
+    // Not signed yet: a preview opts out of the id check
+    expect(parseHouseEvent({ ...t, id: '0'.repeat(64), pubkey: OWNER, sig: '' }, { checkId: false }).status).toBe('valid');
   });
 
   it('dates a new version after the one it replaces, and keeps tags it does not manage', () => {
@@ -369,7 +373,8 @@ describe('HOUSE.md', () => {
     const block = houseDoc.split('<!-- house-example:start -->')[1].split('<!-- house-example:end -->')[0];
     const json = block.slice(block.indexOf('{'), block.lastIndexOf('}') + 1);
     const example = JSON.parse(json);
-    const result = parseHouseEvent(example);
+    // The example shows `<event id>` and `<signature>` placeholders: it is not signed
+    const result = parseHouseEvent(example, { checkId: false });
     expect(result.status).toBe('valid');
     expect(result.event!.houseId).toBe('main');
     expect(result.doc!.rooms.map((r) => r.id)).toEqual(['home', 'rest']);
@@ -380,7 +385,7 @@ describe('review regressions (P2.1)', () => {
   it('reads several houses of one owner as separate, independent houses', () => {
     const cabin = { ...tiny(), name: 'Cabin', app: 'some-game', category: 'cabin' };
     const a = parseHouseEvent(event(tiny()));
-    const b = parseHouseEvent(event(cabin, { id: 'c'.repeat(64), tags: [['d', 'cabin-7f3a']] }));
+    const b = parseHouseEvent(event(cabin, { tags: [['d', 'cabin-7f3a']] }));
     expect([a.status, b.status]).toEqual(['valid', 'valid']);
     expect(a.event!.address).not.toBe(b.event!.address);
     expect(b.event!.owner).toBe(a.event!.owner);

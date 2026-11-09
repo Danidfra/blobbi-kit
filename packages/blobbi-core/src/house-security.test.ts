@@ -71,7 +71,7 @@ describe('K1: deeply nested JSON never throws', () => {
       (d: string) => `{"v":1,"name":"x","rooms":[{"id":"r","size":{"w":1,"d":1,"h":1},"walls":[],"items":[],"ext":{"game":${d}}}]}`,
       (d: string) => `{"v":1,"name":"x","rooms":[{"id":"r","size":{"w":1,"d":1,"h":1},"walls":[],"items":[{"id":"i","type":"a:b","surface":"floor","x":0,"z":0,"content":${d}}]}]}`,
       (d: string) => `{"v":1,"name":"x","rooms":[{"id":"r","size":{"w":1,"d":1,"h":1},"walls":[],"items":[],"floor":{"style":"wood","palette":["#fff"],"x":${d}}}]}`,
-      (d: string) => `{"v":1,"name":"x","rooms":${nestedArrays(30_000)}}`,
+      (_d: string) => `{"v":1,"name":"x","rooms":${nestedArrays(30_000)}}`,
       (d: string) => `{"v":1,"name":${d},"rooms":[]}`,
     ];
     for (const place of places) {
@@ -112,5 +112,47 @@ describe('K1: deeply nested JSON never throws', () => {
     const content = `{"room_furniture_v2":{"v":2,"by_room":{"bedroom":[{"id":"official:bed-single","at":"floor","x":1,"y":1,"extra":${nestedArrays(10_000)}}]}}}`;
     expect(() => houseFromDittoProfile(content)).not.toThrow();
     expect(houseFromDittoProfile(content).status).toBe('failed');
+  });
+});
+
+describe('K2: the event id and signature boundary', () => {
+  const content = JSON.stringify(tiny());
+
+  it('accepts an event whose id is its NIP-01 hash, and says the signature was not checked without a verifier', () => {
+    expect(parseHouseEvent(event(content))).toMatchObject({ status: 'valid', writable: true, verified: false });
+    expect(parseHouseEvent(event(content), { verify: () => true })).toMatchObject({ status: 'valid', verified: true });
+  });
+
+  it('refuses an id that is not the hash: a relay cannot alter the content, date or tags under a genuine id', () => {
+    const genuine = event(content);
+    const altered = [
+      { ...genuine, content: JSON.stringify({ ...tiny(), name: 'Stolen' }) },
+      { ...genuine, created_at: genuine.created_at + 1 },
+      { ...genuine, tags: [...genuine.tags, ['t', 'x']] },
+      { ...genuine, pubkey: 'c'.repeat(64) },
+    ];
+    for (const e of altered) expect(parseHouseEvent(e).issues[0].code).toBe('event-id');
+  });
+
+  it('refuses ids and signatures of the wrong shape (length, case, characters)', () => {
+    expect(parseHouseEvent(event(content, { id: 'e'.repeat(63) })).issues[0].code).toBe('event-id');
+    expect(parseHouseEvent(event(content, { id: 'E'.repeat(64) })).issues[0].code).toBe('event-id');
+    for (const sig of ['', 'f'.repeat(127), 'F'.repeat(128), 'z'.repeat(128), `sig:${'f'.repeat(124)}`]) {
+      expect(parseHouseEvent(event(content, { sig })).issues[0].code).toBe('signature');
+    }
+    expect(parseHouseEvent(event(content, { sig: undefined as unknown as string })).issues[0].code).toBe('signature');
+  });
+
+  it('checks shapes and the hash before the injected verifier, which never sees a mismatched event', () => {
+    let calls = 0;
+    const verify = () => ++calls > 0;
+    parseHouseEvent({ ...event(content), content: '{}' }, { verify });
+    expect(calls).toBe(0);
+    parseHouseEvent(event(content), { verify });
+    expect(calls).toBe(1);
+  });
+
+  it('lets a caller opt out of the id check for an event it already trusts (an unsigned preview)', () => {
+    expect(parseHouseEvent(event(content, { id: '0'.repeat(64), sig: '' }), { checkId: false }).status).toBe('valid');
   });
 });
