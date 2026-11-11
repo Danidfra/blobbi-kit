@@ -18,6 +18,7 @@ import {
   houseFromDittoProfile,
   isFutureHouse,
   parseHouseEvent,
+  resolveHouse,
   validateHouse,
   type HouseDocument,
   type NostrEvent,
@@ -187,6 +188,7 @@ describe('K3: a future-dated house never becomes the newest', () => {
     const future = parseHouseEvent(at(4_000_000_000), { now: NOW });
     const candidates = [future, legit].filter((h) => h.status !== 'future' && h.event);
     expect(candidates).toEqual([legit]);
+    expect(resolveHouse([at(4_000_000_000), at(NOW / 1000)], { owner: OWNER, houseId: MAIN_HOUSE_ID, verify: null, now: NOW })?.event?.createdAt).toBe(NOW / 1000);
   });
 
   it('refuses to build on a far-future version, so a forged or broken date never makes this writer sign far-future versions', () => {
@@ -201,5 +203,47 @@ describe('K3: a future-dated house never becomes the newest', () => {
     expect(buildHouseTemplate({ houseId: 'main', doc: tiny(), now: NOW, previous: { createdAt: NOW / 1000 + 600 } }).created_at).toBe(NOW / 1000 + 601);
     // A client that asked its player may continue the future version anyway
     expect(buildHouseTemplate({ houseId: 'main', doc: tiny(), now: NOW, previous, acceptFuturePrevious: true }).created_at).toBe(4_000_000_001);
+  });
+});
+
+describe('ownership: only the owner can write the owner\'s house', () => {
+  const NOW = 1_800_000_000_000;
+  const OTHER = 'b'.repeat(64);
+  const house = (over: Partial<NostrEvent>, doc: HouseDocument = tiny()) => event(JSON.stringify(doc), over);
+
+  it('reads the owner from the author, never from the content, an a tag or a p tag', () => {
+    const claims = house({ pubkey: OTHER, tags: [['d', 'main'], ['a', `31127:${OWNER}:main`], ['p', OWNER]] }, { ...tiny(), owner: OWNER } as HouseDocument);
+    const parsed = parseHouseEvent(claims);
+    expect(parsed.event).toMatchObject({ owner: OTHER, address: `31127:${OTHER}:main` });
+    expect(parsed.issues.map((i) => i.code)).toContain('owner-ignored');
+  });
+
+  it('never takes another author\'s event, even newer and claiming the owner, as the owner\'s house', () => {
+    const mine = house({ created_at: NOW / 1000 - 10 });
+    const theirs = house({ pubkey: OTHER, created_at: NOW / 1000, tags: [['d', 'main'], ['p', OWNER]] }, { ...tiny(), name: 'Stolen', owner: OWNER } as HouseDocument);
+    const got = resolveHouse([theirs, mine], { owner: OWNER, houseId: 'main', verify: null, now: NOW });
+    expect(got?.event?.id).toBe(mine.id);
+    expect(got?.doc?.name).toBe('Tiny');
+    expect(resolveHouse([theirs], { owner: OWNER, houseId: 'main', verify: null })).toBeNull();
+  });
+
+  it('keeps houses apart by d, skips forged ids, bad signatures and future dates, and breaks ties by the lower id', () => {
+    const a = house({ created_at: NOW / 1000 });
+    const b = house({ created_at: NOW / 1000, content: JSON.stringify({ ...tiny(), name: 'B' }) });
+    const low = a.id < b.id ? a : b;
+    expect(resolveHouse([a, b], { owner: OWNER, houseId: 'main', verify: null })?.event?.id).toBe(low.id);
+    expect(resolveHouse([b, a], { owner: OWNER, houseId: 'main', verify: null })?.event?.id).toBe(low.id);
+    const cabin = house({ created_at: NOW / 1000 + 5, tags: [['d', 'cabin']] });
+    const forged = { ...house({ created_at: NOW / 1000 + 6 }), content: JSON.stringify({ ...tiny(), name: 'Forged' }) };
+    const future = house({ created_at: 4_000_000_000 });
+    expect(resolveHouse([cabin, forged, future, a], { owner: OWNER, houseId: 'main', verify: null, now: NOW })?.event?.id).toBe(a.id);
+    const badSig = house({ created_at: NOW / 1000 + 7 });
+    expect(resolveHouse([badSig, a], { owner: OWNER, houseId: 'main', verify: (e) => e.id !== badSig.id })?.event?.id).toBe(a.id);
+  });
+
+  it('returns a newest invalid or newer-schema version as it is, read-only, rather than an older valid one', () => {
+    const old = house({ created_at: NOW / 1000 - 100 });
+    const newer = event(JSON.stringify({ v: 2, name: 'Future schema', spaces: [] }), { created_at: NOW / 1000 });
+    expect(resolveHouse([old, newer], { owner: OWNER, houseId: 'main', verify: null, now: NOW })).toMatchObject({ status: 'unsupported-version', writable: false });
   });
 });

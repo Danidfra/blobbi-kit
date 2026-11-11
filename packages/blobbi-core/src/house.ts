@@ -821,3 +821,41 @@ export function buildHouseTemplate({ houseId, doc, now, previous = null, acceptF
 export function replacesHouse(a: Pick<HouseEventInfo, 'id' | 'createdAt'>, b: Pick<HouseEventInfo, 'id' | 'createdAt'>): boolean {
   return a.createdAt > b.createdAt || (a.createdAt === b.createdAt && a.id < b.id);
 }
+
+export interface ResolveHouseOptions {
+  /** The house's owner: only events by this author count, whatever else a relay returns. */
+  owner: string;
+  houseId: string;
+  /**
+   * Checks signatures. Required, so skipping it is a decision: pass null only
+   * when every event came from a transport that verifies (Nostrify's
+   * `NRelay1`/`NPool` with their default `verifyEvent`).
+   */
+  verify: EventVerifier | null;
+  /** The reader's clock (ms): houses dated beyond `MAX_HOUSE_SKEW_S` are not versions yet. Without it, pure NIP-01. */
+  now?: number;
+}
+
+/**
+ * The current version of one house among any events (several relays, a
+ * cache, in any order): the newest by NIP-01 among the events that are
+ * houses of `owner` with `d = houseId`, have a true id and (with `verify`)
+ * a valid signature, and are not dated in the future. Null when there is
+ * none. The result may be `invalid` or `unsupported-version`: it is still
+ * the newest version, to show read-only and never write over.
+ *
+ * Use it rather than `parseHouseEvent` on query results: it is what keeps
+ * another author's event, returned by a careless or hostile relay for a
+ * filter on `owner`, from being taken for the owner's house.
+ */
+export function resolveHouse(events: Iterable<unknown>, { owner, houseId, verify, now }: ResolveHouseOptions): ParsedHouse | null {
+  let best: ParsedHouse | null = null;
+  for (const e of events) {
+    const parsed = parseHouseEvent(e, { verify: verify ?? undefined, now });
+    const info = parsed.event;
+    if (!info || info.owner !== owner || info.houseId !== houseId) continue;
+    if (parsed.status === 'malformed' || parsed.status === 'future') continue;
+    if (!best || replacesHouse(info, best.event!)) best = parsed;
+  }
+  return best;
+}
