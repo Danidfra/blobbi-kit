@@ -9,9 +9,14 @@ import { describe, expect, it } from 'vitest';
 import {
   BLOBBI_ECOSYSTEM_NAMESPACE,
   HOUSE_LIMITS,
+  HouseValidationError,
   KIND_BLOBBI_HOUSE,
   MAIN_HOUSE_ID,
+  MAX_HOUSE_SKEW_S,
+  MAX_LOCATION_SKEW_S,
+  buildHouseTemplate,
   houseFromDittoProfile,
+  isFutureHouse,
   parseHouseEvent,
   validateHouse,
   type HouseDocument,
@@ -154,5 +159,47 @@ describe('K2: the event id and signature boundary', () => {
 
   it('lets a caller opt out of the id check for an event it already trusts (an unsigned preview)', () => {
     expect(parseHouseEvent(event(content, { id: '0'.repeat(64), sig: '' }), { checkId: false }).status).toBe('valid');
+  });
+});
+
+describe('K3: a future-dated house never becomes the newest', () => {
+  const NOW = 1_800_000_000_000; // ms
+  const at = (createdAt: number) => event(JSON.stringify(tiny()), { created_at: createdAt });
+
+  it('reads a house dated beyond MAX_HOUSE_SKEW_S of the reader clock as future: not shown, not writable', () => {
+    const far = parseHouseEvent(at(4_000_000_000), { now: NOW });
+    expect(far).toMatchObject({ status: 'future', doc: null, writable: false });
+    expect(far.event?.createdAt).toBe(4_000_000_000);
+    expect(parseHouseEvent(at(NOW / 1000 + MAX_HOUSE_SKEW_S + 1), { now: NOW }).status).toBe('future');
+    // Up to the window, a fast clock is believed
+    expect(parseHouseEvent(at(NOW / 1000 + MAX_HOUSE_SKEW_S), { now: NOW }).status).toBe('valid');
+    // Without a clock, pure NIP-01 (as before)
+    expect(parseHouseEvent(at(4_000_000_000)).status).toBe('valid');
+    expect(isFutureHouse({ createdAt: 4_000_000_000 }, NOW)).toBe(true);
+  });
+
+  it('uses the same window as World Locations', () => {
+    expect(MAX_HOUSE_SKEW_S).toBe(MAX_LOCATION_SKEW_S);
+  });
+
+  it('lets a legitimate update win over a far-future version for a reader with a clock', () => {
+    const legit = parseHouseEvent(at(NOW / 1000), { now: NOW });
+    const future = parseHouseEvent(at(4_000_000_000), { now: NOW });
+    const candidates = [future, legit].filter((h) => h.status !== 'future' && h.event);
+    expect(candidates).toEqual([legit]);
+  });
+
+  it('refuses to build on a far-future version, so a forged or broken date never makes this writer sign far-future versions', () => {
+    const previous = { createdAt: 4_000_000_000, tags: [] };
+    expect(() => buildHouseTemplate({ houseId: 'main', doc: tiny(), now: NOW, previous })).toThrow(HouseValidationError);
+    try {
+      buildHouseTemplate({ houseId: 'main', doc: tiny(), now: NOW, previous });
+    } catch (e) {
+      expect((e as HouseValidationError).issues[0].code).toBe('previous-future');
+    }
+    // A clock a little behind still dates after the replaced version
+    expect(buildHouseTemplate({ houseId: 'main', doc: tiny(), now: NOW, previous: { createdAt: NOW / 1000 + 600 } }).created_at).toBe(NOW / 1000 + 601);
+    // A client that asked its player may continue the future version anyway
+    expect(buildHouseTemplate({ houseId: 'main', doc: tiny(), now: NOW, previous, acceptFuturePrevious: true }).created_at).toBe(4_000_000_001);
   });
 });

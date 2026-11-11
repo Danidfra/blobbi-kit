@@ -328,7 +328,8 @@ describe('house events', () => {
   });
 
   it('dates a new version after the one it replaces, and keeps tags it does not manage', () => {
-    const t = buildHouseTemplate({ houseId: 'cabin', doc: tiny(), now: 1_000_000, previous: { createdAt: 1_800_000_000, tags: [['d', 'cabin'], ['t', 'cosy'], ['alt', 'old'], ['client', 'some-game']] } });
+    // This clock is 10 minutes behind the replaced version (within MAX_HOUSE_SKEW_S; further is refused, see house-security)
+    const t = buildHouseTemplate({ houseId: 'cabin', doc: tiny(), now: (1_800_000_000 - 600) * 1000, previous: { createdAt: 1_800_000_000, tags: [['d', 'cabin'], ['t', 'cosy'], ['alt', 'old'], ['client', 'some-game']] } });
     expect(t.created_at).toBe(1_800_000_001);
     expect(t.tags).toEqual([['d', 'cabin'], ['v', '1'], ['t', 'cosy'], ['client', 'some-game'], ['b', BLOBBI_ECOSYSTEM_NAMESPACE], ['alt', 'Blobbi house: Tiny']]);
   });
@@ -417,7 +418,7 @@ describe('review regressions (P2.1)', () => {
 describe('final review fixes (P2.1)', () => {
   it('never carries a NIP-40 expiration over from the replaced version (a house is persistent), and keeps every other unknown tag', () => {
     const previous = { createdAt: 1_800_000_000, tags: [['d', 'main'], ['t', 'cosy'], ['expiration', '1800000500'], ['client', 'some-game'], ['expiration', '1900000000']] };
-    const t = buildHouseTemplate({ houseId: 'main', doc: tiny(), now: 0, previous });
+    const t = buildHouseTemplate({ houseId: 'main', doc: tiny(), now: 1_800_000_000_000, previous });
     expect(t.tags.some((tag) => tag[0] === 'expiration')).toBe(false);
     expect(t.tags).toEqual([['d', 'main'], ['v', '1'], ['t', 'cosy'], ['client', 'some-game'], ['b', BLOBBI_ECOSYSTEM_NAMESPACE], ['alt', 'Blobbi house: Tiny']]);
   });

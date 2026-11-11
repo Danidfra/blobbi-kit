@@ -79,6 +79,17 @@ export const HOUSE_LIMITS = {
  */
 export const HOUSE_RECOMMENDED_CONTENT_BYTES = 16_384;
 
+/**
+ * A house dated this far ahead of the reader's clock is not believed yet (s):
+ * the same bound as World Locations (`MAX_LOCATION_SKEW_S`) and as common
+ * relays (strfry rejects events more than 15 minutes ahead). Without it, one
+ * version from a device whose clock is years ahead would win every NIP-01
+ * comparison, and every later version would have to be dated after it
+ * (`buildHouseTemplate` dates a version after the one it replaces), freezing
+ * the house's dates in the future.
+ */
+export const MAX_HOUSE_SKEW_S = 900;
+
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 /** A room's walls, by the plane they stand in: west x = 0, north z = 0, east x = w, south z = d. */
@@ -223,8 +234,10 @@ export interface HouseIssue {
  *   would lose the invalid parts.
  * - `unsupported-version`: written by a newer schema; `doc` is null. Never write over it.
  * - `malformed`: not a house at all, or past a security limit; `doc` is null.
+ * - `future`: dated more than `MAX_HOUSE_SKEW_S` ahead of the reader's clock (only with the `now` option); `doc` is
+ *   null. Not a version yet: never show it as the newest, never build on it.
  */
-export type HouseStatus = 'valid' | 'invalid' | 'unsupported-version' | 'malformed';
+export type HouseStatus = 'valid' | 'invalid' | 'unsupported-version' | 'malformed' | 'future';
 
 export interface HouseValidation {
   status: HouseStatus;
@@ -646,6 +659,17 @@ export interface HouseParseOptions {
    * established.
    */
   checkId?: boolean;
+  /**
+   * The reader's clock (ms). With it, a house dated more than
+   * `MAX_HOUSE_SKEW_S` ahead is `future` (not believed yet). Without it, every
+   * date counts (pure NIP-01).
+   */
+  now?: number;
+}
+
+/** Whether a house is dated too far ahead of `now` (ms) to be believed yet (`MAX_HOUSE_SKEW_S`). */
+export function isFutureHouse(house: Pick<HouseEventInfo, 'createdAt'>, now: number): boolean {
+  return house.createdAt > Math.floor(now / 1000) + MAX_HOUSE_SKEW_S;
 }
 
 /** The NIP-01 id of an event: the SHA-256 of `[0, pubkey, created_at, kind, tags, content]`. */
@@ -717,6 +741,16 @@ function readHouseEvent(event: unknown, opts: HouseParseOptions): ParsedHouse {
     }
     if (!verified) return refuse('signature', 'the signature does not verify', info);
   }
+  if (opts.now !== undefined && isFutureHouse(info, opts.now)) {
+    return {
+      status: 'future',
+      doc: null,
+      issues: [{ severity: 'error', code: 'future', path: '', message: `dated more than ${MAX_HOUSE_SKEW_S} s ahead of this clock: not a version yet` }],
+      event: info,
+      writable: false,
+      verified: opts.verify !== undefined,
+    };
+  }
   let content: unknown;
   try {
     content = JSON.parse(event.content);
@@ -748,6 +782,14 @@ export interface HouseTemplateInput {
   now: number;
   /** The version being replaced, if any: the new one is dated after it, and keeps its unknown tags. */
   previous?: { createdAt: number; tags?: string[][] } | null;
+  /**
+   * Build on a `previous` dated more than `MAX_HOUSE_SKEW_S` ahead of `now`
+   * anyway (the new version is then dated after it, in the future too).
+   * Default false: such a previous is refused, so a forged or broken
+   * far-future version never makes this writer sign far-future versions.
+   * Only for a client that asked its player.
+   */
+  acceptFuturePrevious?: boolean;
 }
 
 const MANAGED_TAGS = new Set(['d', 'v', 'b', 'alt']);
@@ -759,10 +801,15 @@ const NOT_CARRIED_TAGS = new Set(['expiration']);
  * when this clock is behind (NIP-01 would otherwise keep the old one). Tags
  * this module does not manage, from the previous version, are kept, except
  * `expiration` (NIP-40), which is dropped.
- * Throws `HouseValidationError` on an invalid house.
+ * Throws `HouseValidationError` on an invalid house, and on a `previous`
+ * dated beyond `MAX_HOUSE_SKEW_S` of `now` (code `previous-future`) unless
+ * `acceptFuturePrevious`.
  */
-export function buildHouseTemplate({ houseId, doc, now, previous = null }: HouseTemplateInput): HouseTemplate {
+export function buildHouseTemplate({ houseId, doc, now, previous = null, acceptFuturePrevious = false }: HouseTemplateInput): HouseTemplate {
   if (!isHouseId(houseId)) throw new HouseValidationError([{ severity: 'error', code: 'house-id', path: '', message: 'invalid house id' }]);
+  if (previous && !acceptFuturePrevious && isFutureHouse(previous, now)) {
+    throw new HouseValidationError([{ severity: 'error', code: 'previous-future', path: '', message: `the version being replaced is dated more than ${MAX_HOUSE_SKEW_S} s ahead of this clock` }]);
+  }
   const content = serializeHouse(doc);
   const createdAt = Math.max(Math.floor(now / 1000), previous ? previous.createdAt + 1 : 0);
   const kept = (previous?.tags ?? []).filter((t) => !MANAGED_TAGS.has(t[0]) && !NOT_CARRIED_TAGS.has(t[0]));
