@@ -284,4 +284,15 @@ describe('unknown fields survive a rewrite, whatever their names (forward compat
     const sneaky = JSON.parse('{"v":1,"name":"x","rooms":[{"id":"r","walls":["west"],"items":[],"__proto__":{"size":{"w":1,"d":1,"h":1}}}]}');
     expect(validateHouse(sneaky).issues.map((i) => i.code)).toContain('size-not-object');
   });
+
+  it('keeps a Ditto placement\'s unknown __proto__ field, and a Ditto room named like a prototype member gets no false notes', () => {
+    const ditto = '{"room_furniture_v2":{"v":2,"by_room":{"constructor":[{"id":"official:bed-single","at":"floor","x":1,"y":1,"__proto__":{"rot":2},"toString":5}]}}}';
+    const result = houseFromDittoProfile(ditto);
+    expect(result.status).toBe('converted');
+    const item = result.doc!.rooms.find((r) => r.id === 'constructor')!.items[0];
+    expect(Object.prototype.hasOwnProperty.call(item, '__proto__')).toBe(true);
+    expect(item.rot).toBeUndefined();
+    expect(item.toString).toBe(5);
+    expect(result.notes.filter((n) => n.room === 'constructor').map((n) => n.code)).toEqual(['unknown-room']);
+  });
 });

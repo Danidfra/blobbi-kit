@@ -81,6 +81,8 @@ export function dittoFrameProblem(room: Pick<HouseRoom, 'size' | 'walls'>): stri
   return null;
 }
 
+const hasOwn = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -185,7 +187,8 @@ function fromDittoPlacement(raw: unknown, room: string, notes: HouseConversionNo
   for (const [k, v] of Object.entries(raw)) {
     if (DITTO_PLACEMENT_KEYS.has(k)) continue;
     if (HOUSE_ITEM_KEYS.has(k)) notes.push({ code: 'field-dropped', room, message: `${id}: Ditto field \`${k}\` has a different meaning in a house and was dropped`, lossy: true });
-    else item[k] = v;
+    // Defined, not assigned: a field called `__proto__` would otherwise replace the piece's prototype and be lost
+    else Object.defineProperty(item, k, { value: v, enumerable: true, writable: true, configurable: true });
   }
   return item;
 }
@@ -371,7 +374,7 @@ export function houseFromDittoProfile(content: unknown, { starter = blobbiStarte
       doc.rooms.push(room);
       notes.push({ code: known ? 'room-added' : 'unknown-room', room: roomId, message: known ? `${roomId}, saved in Ditto but not in the starting house, was added` : `${roomId} is not a Ditto room (Ditto skips it); it was kept as a room`, lossy: false });
     }
-    const list = byRoom?.[roomId];
+    const list = byRoom && hasOwn(byRoom, roomId) ? byRoom[roomId] : undefined;
     if (Array.isArray(list)) {
       let placements: (Omit<HouseItem, 'id'> | null)[];
       if (version === 1) {
@@ -395,10 +398,10 @@ export function houseFromDittoProfile(content: unknown, { starter = blobbiStarte
         kept.length = HOUSE_LIMITS.maxItemsPerRoom;
       }
       room.items = kept.map((p, i) => ({ id: dittoItemId(roomId, i + 1), ...p }) as HouseItem);
-    } else if (byRoom && roomId in byRoom) {
+    } else if (byRoom && hasOwn(byRoom, roomId)) {
       notes.push({ code: 'room-not-list', room: roomId, message: 'saved furniture that is not a list was ignored (Ditto ignores it too); the room keeps its starting pieces', lossy: true });
     }
-    if (roomId in layoutRooms) {
+    if (hasOwn(layoutRooms, roomId)) {
       const saved = layoutRooms[roomId];
       const wall = isRecord(saved) ? fromDittoSurface(saved.wall, 'wall', roomId, notes) : null;
       const floor = isRecord(saved) ? fromDittoSurface(saved.floor, 'floor', roomId, notes) : null;
