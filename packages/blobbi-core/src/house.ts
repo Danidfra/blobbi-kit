@@ -530,11 +530,27 @@ export function utf8Bytes(text: string): number {
   return n;
 }
 
-/** Known fields first, in a fixed order, then every other field in the order it came. */
+const hasOwn = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+
+/**
+ * Set an own data property, whatever its name. Plain assignment would call
+ * the `__proto__` setter (replacing the object's prototype, and losing the
+ * field), so an unknown field called `__proto__` must be defined, not assigned.
+ */
+function setOwn(o: Record<string, unknown>, k: string, v: unknown): void {
+  Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true });
+}
+
+/**
+ * Known fields first, in a fixed order, then every other field in the order
+ * it came. Only own fields count: an unknown field named like an
+ * `Object.prototype` member (`constructor`, `toString`, `__proto__`) is kept
+ * like any other.
+ */
 function ordered(value: Record<string, unknown>, known: readonly string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const k of known) if (value[k] !== undefined) out[k] = value[k];
-  for (const [k, v] of Object.entries(value)) if (!(k in out) && v !== undefined) out[k] = v;
+  for (const k of known) if (hasOwn(value, k) && value[k] !== undefined) setOwn(out, k, value[k]);
+  for (const [k, v] of Object.entries(value)) if (!hasOwn(out, k) && v !== undefined) setOwn(out, k, v);
   return out;
 }
 

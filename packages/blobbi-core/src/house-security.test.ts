@@ -19,6 +19,8 @@ import {
   isFutureHouse,
   parseHouseEvent,
   resolveHouse,
+  rotateItem,
+  serializeHouse,
   validateHouse,
   type HouseDocument,
   type NostrEvent,
@@ -245,5 +247,41 @@ describe('ownership: only the owner can write the owner\'s house', () => {
     const old = house({ created_at: NOW / 1000 - 100 });
     const newer = event(JSON.stringify({ v: 2, name: 'Future schema', spaces: [] }), { created_at: NOW / 1000 });
     expect(resolveHouse([old, newer], { owner: OWNER, houseId: 'main', verify: null, now: NOW })).toMatchObject({ status: 'unsupported-version', writable: false });
+  });
+});
+
+describe('unknown fields survive a rewrite, whatever their names (forward compatibility)', () => {
+  // Fields a newer client might write, at every level, including names that are Object.prototype members
+  const NEWER = '{"v":1,"name":"x","constructor":"c","toString":1,"hasOwnProperty":2,"__proto__":{"polluted":true},"future":{"a":[1,{"b":2}]},'
+    + '"rooms":[{"id":"r","size":{"w":4,"d":4,"h":3,"valueOf":3},"walls":["west"],"__proto__":{"x":1},"mood":"calm",'
+    + '"floor":{"style":"wood","palette":["#fff"],"isPrototypeOf":true},'
+    + '"items":[{"id":"i","type":"a:b","surface":"floor","x":1,"z":1,"__proto__":{"y":1},"constructor":{"k":1},"glow":0.5}]}]}';
+
+  it('keeps every field, own __proto__ included, through validate and serialize, in canonical order', () => {
+    const doc = JSON.parse(NEWER) as HouseDocument;
+    expect(validateHouse(doc).status).toBe('valid');
+    const out = JSON.parse(serializeHouse(doc));
+    expect(out).toEqual(JSON.parse(NEWER));
+    for (const k of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) expect(Object.prototype.hasOwnProperty.call(out, k)).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(out.rooms[0].items[0], '__proto__')).toBe(true);
+    // Never through the prototype: a field is never read as a known field, and nothing is polluted
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it('keeps them through event, parse, edit, serialize and parse again', () => {
+    const first = parseHouseEvent(event(NEWER));
+    expect(first.status).toBe('valid');
+    const edited = rotateItem(first.doc!, 'i');
+    const again = parseHouseEvent(event(serializeHouse(edited)));
+    expect(again.status).toBe('valid');
+    const expected = JSON.parse(NEWER);
+    expected.rooms[0].items[0].rot = 1;
+    expect(again.doc).toEqual(expected);
+  });
+
+  it('a __proto__ field cannot pass for a known field (an item\'s y, a room\'s size)', () => {
+    const sneaky = JSON.parse('{"v":1,"name":"x","rooms":[{"id":"r","walls":["west"],"items":[],"__proto__":{"size":{"w":1,"d":1,"h":1}}}]}');
+    expect(validateHouse(sneaky).issues.map((i) => i.code)).toContain('size-not-object');
   });
 });
