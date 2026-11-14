@@ -35,6 +35,19 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 - **Republishing a house** keeps tags it does not manage, except a NIP-40
   `expiration`, which is never carried over.
 - **`WORLD-TRAVEL.md`:** 31127 is no longer a World Location fallback; 31128 is.
+- **Security hardening of the house** (`HOUSE.md`, Security):
+  - `parseHouseEvent`/`validateHouse` really never throw: deeply nested
+    content (`HOUSE_LIMITS.maxDepth`, `maxNodes`) and non-JSON input are
+    `malformed`.
+  - Every house event's `id` must be its NIP-01 hash, and `id`/`sig` must be
+    hex (`checkId: false` for unsigned previews); results say `verified`.
+  - `MAX_HOUSE_SKEW_S` (900 s): with `now`, a house dated beyond it is the
+    new status `future`; `buildHouseTemplate` refuses to build on one
+    (`previous-future`, `acceptFuturePrevious` to override).
+  - `resolveHouse` picks the current version of one owner's house from query
+    results, ignoring other authors' events.
+  - Unknown fields named like `Object.prototype` members (`constructor`,
+    `__proto__`, ...) are no longer dropped on rewrite or in the Ditto import.
 - **The preferred house** is a mutable NIP-78 preference (`d = "blobbi:preferences"`, content `{v, house}`). It is
   never stored in a house or in kind 11125. This is a documented design; nothing reads or writes it yet.
 

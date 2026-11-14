@@ -438,10 +438,44 @@ permutation.
 ## 12. Security
 
 - **Untrusted input**: content is parsed defensively, never trusted
-  (`parseHouseEvent`, `validateHouse`, which never throw). Signatures are
-  checked when a verifier is given (core depends on no Nostr library).
+  (`parseHouseEvent`, `validateHouse`, which never throw). Content nested
+  deeper than `HOUSE_LIMITS.maxDepth` (64 levels; a real house nests about 7)
+  or holding more than `HOUSE_LIMITS.maxNodes` values is `malformed`
+  (`too-deep`, `too-large`), and so is anything plain JSON cannot hold (a
+  cycle, a BigInt, a throwing getter). Deep nesting would otherwise overflow
+  the stack of the JSON copy, long before the 256 KiB content limit.
+- **Ids and signatures** (where they are checked):
+  - Core depends on no Nostr library, so it cannot check a Schnorr
+    signature. Events read through Nostrify's `NRelay1` (and so `NPool`) are
+    verified by the transport, unless the host replaced its `verifyEvent`.
+    Events from anywhere else (a cache, storage, another app, a host API)
+    are not: pass `verify` (nostr-tools' `verifyEvent`, say).
+  - Whatever the source, `parseHouseEvent` always checks that `id`, `pubkey`
+    and `sig` are 64, 64 and 128 lower-case hex, and that `id` is the NIP-01
+    hash of the event (`houseEventHash`), before any verifier runs. A
+    tampered content, date or tag set cannot keep a genuine id. Only an
+    unsigned preview opts out (`checkId: false`).
+  - `verified` on the result says whether a verifier checked the signature.
 - **Ownership**: the event author is the owner. A client MUST NOT draw or edit
-  a house as someone's other than its author's.
+  a house as someone's other than its author's. Nothing else names an owner:
+  an `owner` field in the content is ignored (and reported), and `a` or `p`
+  tags mean nothing for ownership. Read query results with `resolveHouse`
+  (`owner`, `houseId`, a required `verify` or an explicit `null` for a
+  verifying transport, and `now`): it keeps only that author's events for
+  that `d`, so another author's event returned by a careless or hostile
+  relay is never taken for the owner's house.
+- **Future dates**: a house dated more than `MAX_HOUSE_SKEW_S` (900 s, the
+  World Location bound and strfry's default) ahead of the reader's clock is
+  not a version yet: with the `now` option it is `future` (no document, not
+  writable), and `resolveHouse` skips it. `buildHouseTemplate` refuses to
+  build on such a previous version (`previous-future`), so one far-future
+  version can never make a writer date every later version after it.
+  `acceptFuturePrevious` overrides that, for a client that asked its player.
+- **Forward compatibility**: unknown fields are kept on rewrite whatever their
+  names, including `constructor`, `toString` or `__proto__`. Fields are read
+  as own properties only, and copied by definition, never by assignment, so a
+  `__proto__` field can neither pass for a known field nor change a
+  prototype.
 - **Limits** — three kinds, kept apart:
 
   | Kind | Values | Effect |
@@ -459,7 +493,13 @@ permutation.
   untrusted. Clients SHOULD bound what they fetch.
 - **Stale and replayed versions**: addressable semantics keep only the newest.
   A writer dates a new version after the one it replaces
-  (`buildHouseTemplate`: `created_at = max(now, previous + 1)`).
+  (`buildHouseTemplate`: `created_at = max(now, previous + 1)`), as long as
+  the replaced version is within `MAX_HOUSE_SKEW_S` of the writer's clock
+  (see Future dates).
+- **Not limited in v1** (proposals, not rules, because they could refuse
+  events that existing writers produce): the number of tags on a house event,
+  and the length of unknown string fields. Both are bounded only by the
+  content limit and by relays' own message limits.
 - **Visitors** only read. Whatever a visitor does (care, play) is its own
   events, never a change to the house.
 - **Decoration is not ownership**: in v1 any piece may be placed. An inventory
