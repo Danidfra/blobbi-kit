@@ -1,6 +1,13 @@
 # The repository's verification pipeline, exactly as `npm run verify` runs it
 # locally: typecheck, tests, build, then the smoke test over the built output.
 # No publishing, no releases, no secrets.
+#
+# Hardening:
+# - The token is read-only (`contents: read`) and the checkout does not keep it.
+# - Third-party actions are pinned to full commit SHAs (the tag they were
+#   resolved from is in the comment; update both together).
+# - Triggers are `push` and `pull_request` only, never `pull_request_target`,
+#   so a pull request from a fork runs with no secrets and a read-only token.
 name: CI
 
 on:
@@ -8,13 +15,19 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -33,3 +46,20 @@ jobs:
 
       - name: Smoke test the built packages
         run: npm run smoke
+
+  # Advisories in what installs with the packages (dependencies and peers),
+  # not in the dev tooling. Reads the lockfile and the public advisory API.
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
