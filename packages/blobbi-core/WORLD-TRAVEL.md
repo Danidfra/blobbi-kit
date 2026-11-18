@@ -462,6 +462,17 @@ used only by this explicit recovery.
 - **Reconnection.** A dropped stream is subscribed again with backoff, and the
   session looks again. Periodic looks run every 60 s while visible (5 minutes
   while hidden), and on `online` and on visibility.
+  In `poolWorldTravelRelays` (`@blobbi-kit/react`), a stream counts as healthy
+  only if it stayed open 30 s after its EOSE (`TRAVEL_STREAM_HEALTHY_MS`). A
+  healthy stream that ends is followed again after 1–2 s; a relay that ends
+  streams sooner (closes subscriptions after EOSE, drops idle ones) climbs
+  `TRAVEL_STREAM_BACKOFF_MS` (2, 5, 15, 30, 60, 120 s) to a 5-minute cap.
+  Every wait has equal jitter (half to all of its step). While the page is
+  hidden nothing is re-subscribed; on visibility and `online`, idle relays
+  are followed at once with the backoff reset. Measured with fake relays that
+  CLOSE after EOSE (B3): 31 REQs per relay in the first minute and 1,801 in
+  an hour before, 5–6 and 18–30 after; a relay that keeps the stream open is
+  asked once either way.
 
 ## 8a. Relay convergence (0.11.1)
 

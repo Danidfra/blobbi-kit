@@ -10,6 +10,23 @@ The project is pre-1.0, so a **minor** bump is used for breaking changes
 
 ---
 
+## Unreleased: `@blobbi-kit/react`, world-travel re-subscription (B3)
+
+- **`poolWorldTravelRelays` no longer re-subscribes every 2 s to a relay that
+  ends streams after EOSE.** A stream now resets the backoff only if it stayed
+  open `TRAVEL_STREAM_HEALTHY_MS` (30 s) after EOSE; shorter streams climb
+  `TRAVEL_STREAM_BACKOFF_MS` to a 5-minute cap, with equal jitter on every
+  wait. Nothing is re-subscribed while the page is hidden; visibility and
+  `online` follow idle relays at once with the backoff reset. Measured with
+  fake relays (fake timers, per relay): 31 REQs in the first minute and 1,801
+  in an hour before, 5–6 and 18–30 after; the session's look-again calls for
+  two such relays went from 3,600 an hour to 34–58. Relays that keep the
+  stream open are unchanged (one REQ). New options (`now`, `random`,
+  `isHidden`, `onWake`) are test seams with browser defaults; no API is
+  removed.
+
+---
+
 ## `@blobbi-kit/renderer` 0.6.1 (fix: a pale baby's half lid shows)
 
 **A backward-compatible patch.** Only `@blobbi-kit/renderer` is released;
