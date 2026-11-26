@@ -138,6 +138,7 @@ them carry `["b", "blobbi:ecosystem:v1"]`.
 | 11125 | replaceable | The Blobbonaut, meaning the player profile. `d` is `blobbonaut-<12 hex of pubkey>`. |
 | 1124 | regular | One social interaction with someone's Blobbi. |
 | 31125 | addressable, deprecated | The old profile kind. Still read as a fallback, never written. |
+| 31127 | addressable, experimental | A house: rooms and the furniture placed in them, one event per house. See `packages/blobbi-core/HOUSE.md`. |
 
 **Kind 31124.** Required tags are `d`, `b`, `stage` (`egg`, `baby`, `adult`),
 `state` (`active`, `sleeping`, `hibernating`) and `last_interaction`.
