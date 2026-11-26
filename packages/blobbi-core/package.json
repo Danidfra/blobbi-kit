@@ -34,7 +34,8 @@
   "files": [
     "dist",
     "LICENSE",
-    "WORLD-TRAVEL.md"
+    "WORLD-TRAVEL.md",
+    "HOUSE.md"
   ],
   "sideEffects": false,
   "exports": {

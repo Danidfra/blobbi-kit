@@ -6,7 +6,7 @@ import { missionProgress, serializeProfileContent, type MissionsContent } from '
 const query = vi.fn(async () => [] as NostrEvent[]);
 vi.mock('@nostrify/react', () => ({ useNostr: () => ({ nostr: { query } }) }));
 
-import { createDailyMissionsContent, getTodayDateString } from '../lib/daily-missions';
+import { areAllDailyComplete, createDailyMissionsContent, getTodayDateString } from '../lib/daily-missions';
 import { mergeIntoDailyStore, readDailyFromStorage, trackDailyMissionProgress, writeDailyToStorage } from '../lib/daily-mission-tracker';
 import { useDailyMissions } from './useDailyMissions';
 import { usePersistDailyProgress } from './usePersistDailyProgress';
@@ -65,9 +65,13 @@ describe('useDailyMissions: the profile is merged in, never written over progres
   });
 
   it('a merge never starts a save (only something done in the app does)', async () => {
+    // The day's missions depend on the date and the account, and a finished day is never saved by this hook. A fixed
+    // clock and account give a known set whose [1, 1, 1] progress leaves the day unfinished, whatever today is.
     vi.useFakeTimers();
-    const pk = freshKey();
+    vi.setSystemTime(new Date(2026, 9, 24, 12));
+    const pk = 'a'.repeat(64);
     const base = dayFor(pk);
+    expect(areAllDailyComplete(withProgress(base, [1, 1, 1]))).toBe(false);
     const publish = vi.fn(async () => ({}) as NostrEvent);
     const { rerender } = renderHook(({ c }) => {
       useDailyMissions({ pubkey: pk, availableStages: STAGES, profileContent: c });

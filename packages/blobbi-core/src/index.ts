@@ -69,6 +69,14 @@ export * from './world-travel-session';
 export * from './world-travel-sync';
 export * from './world-travel-follow';
 
+// The Blobbi house (P2.1, experimental kind 31127): the schema, edits, the shared furniture catalog, the Blobbi
+// starting house and Ditto's 11125 rooms. Pure: no relay, no signer.
+export * from './house';
+export * from './house-ops';
+export * from './house-catalog';
+export * from './house-template';
+export * from './house-ditto';
+
 // Async Nostr helpers.
 export * from './fetchFreshEvent';
 export * from './fetchFreshBlobbonautProfile';
@@ -77,3 +85,8 @@ export * from './fetchFreshBlobbonautProfile';
 export * as BlobbiTypes from './types/blobbi';
 export * as AdultTypes from './types/adult';
 export * as ShopTypes from './types/shop';
+
+// Relay routing: the Blobbi relay as primary, merging answers from several
+// relays (NIP-01 winners), deciding when a read is usable, and planning which
+// signed events may be carried to a relay that lacks them. Pure: no socket.
+export * from './relay-routing';

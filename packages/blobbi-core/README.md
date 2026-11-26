@@ -61,6 +61,7 @@ These are Blobbi-specific kinds. They are not part of any NIP.
 | `KIND_BLOBBI_INTERACTION` | 1124 | One social interaction with a Blobbi: `a` address, `p` owner, `action`, `source`. Regular event. |
 | `KIND_BLOBBONAUT_PROFILE_LEGACY` | 31125 | Deprecated profile kind. `fetchFreshBlobbonautProfile` still reads it as a fallback and prefers 11125 when both exist. Nothing here writes it. |
 | `KIND_WORLD_LOCATION` | 31126 | **Experimental.** Where a Blobbi is: the World it was last moved to. Addressable, same `d` as its 31124; never expires. See `WORLD-TRAVEL.md`. |
+| `KIND_BLOBBI_HOUSE` | 31127 | **Experimental.** A player's house: rooms, finishes and placed furniture, drawn the same way in 2D, 3D or pixel art. Addressable, one per house (`d` is the house id; a player may own several). See `HOUSE.md`. |
 | `KIND_ACTIVE_PRESENCE` | 21124 | **Experimental.** Recent play of a Blobbi in a World. Ephemeral, NIP-40 expiration; never moves the Blobbi. |
 
 Every event carries `["b", "blobbi:ecosystem:v1"]` (`BLOBBI_ECOSYSTEM_NAMESPACE`).

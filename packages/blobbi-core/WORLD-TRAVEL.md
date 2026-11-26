@@ -312,8 +312,9 @@ location never waits for, or depends on, an animation.
   expiration). Reusing it would change its meaning for Island's readers.
 
 **Candidates.** For the addressable range, 31126, next to 31124/31125. For the
-ephemeral range, 21124, the 1124/31124 family. Fallbacks: 31127/31128 and
-21125/21126.
+ephemeral range, 21124, the 1124/31124 family. Fallbacks were 31127/31128 and
+21125/21126; 31127 has since been taken by the Blobbi house (`HOUSE.md`), so
+the addressable fallback is now 31128.
 
 **Evidence that they are unused:**
 
